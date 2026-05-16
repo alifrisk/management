@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import Link from 'next/link'
 import { supabase } from '@/supabase/client'
 import { Eye, EyeOff, Loader2, AlertCircle } from 'lucide-react'
@@ -11,6 +11,23 @@ export default function LoginPage() {
   const [showPassword, setShowPassword] = useState(false)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
+
+  useEffect(() => {
+    supabase.auth.getSession().then(async ({ data: { session } }) => {
+      if (session) {
+        const { data: profile } = await supabase
+          .from('user_profiles')
+          .select('role')
+          .eq('id', session.user.id)
+          .single()
+        if (profile?.role === 'admin') {
+          window.location.href = '/dashboard'
+        } else {
+          window.location.href = '/incident-form'
+        }
+      }
+    })
+  }, [])
 
   async function handleLogin(e: React.FormEvent) {
     e.preventDefault()
@@ -30,7 +47,6 @@ export default function LoginPage() {
     }
 
     if (data.session) {
-      // Проверяем роль пользователя
       const { data: profile } = await supabase
         .from('user_profiles')
         .select('role')
