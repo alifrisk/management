@@ -30,7 +30,18 @@ export default function LoginPage() {
     }
 
     if (data.session) {
-      window.location.href = '/dashboard'
+      // Проверяем роль пользователя
+      const { data: profile } = await supabase
+        .from('user_profiles')
+        .select('role')
+        .eq('id', data.session.user.id)
+        .single()
+
+      if (profile?.role === 'admin') {
+        window.location.href = '/dashboard'
+      } else {
+        window.location.href = '/incident-form'
+      }
     }
   }
 
