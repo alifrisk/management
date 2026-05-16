@@ -243,6 +243,19 @@ export default function RegistryPage() {
   function handleChange(field: string, value: unknown) {
     setFormData(prev => {
       const updated = { ...prev, [field]: value }
+      // Валидация: дата инцидента не может быть позже даты обнаружения
+      if (field === 'incident_date' && prev.discovery_date && value) {
+        if (String(value) > String(prev.discovery_date)) {
+          alert('Фактическая дата инцидента не может быть позже даты обнаружения!')
+          return prev
+        }
+      }
+      if (field === 'discovery_date' && prev.incident_date && value) {
+        if (String(prev.incident_date) > String(value)) {
+          alert('Дата обнаружения не может быть раньше фактической даты инцидента!')
+          return prev
+        }
+      }
       if (field === 'probability' || field === 'impact') {
         const p = Number(field === 'probability' ? value : prev.probability) || 0
         const i = Number(field === 'impact' ? value : prev.impact) || 0
