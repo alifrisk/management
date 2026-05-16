@@ -2,7 +2,7 @@
 
 import { useState } from 'react'
 import { supabase } from '@/supabase/client'
-import { Loader2, CheckCircle2, AlertCircle, FileText, Building2, Briefcase, AlertTriangle, Monitor, Calendar, DollarSign, Mail, ChevronRight } from 'lucide-react'
+import { Loader2, CheckCircle2, AlertCircle, FileText, Building2, Briefcase, AlertTriangle, Monitor, Calendar, Mail, ChevronRight } from 'lucide-react'
 import { BUSINESS_PROCESSES, RISK_FACTORS, SYSTEMS, DEPARTMENTS } from '@/lib/constants'
 
 export default function IncidentFormPage() {
@@ -25,7 +25,28 @@ export default function IncidentFormPage() {
   const [error, setError] = useState<string | null>(null)
 
   function handleChange(e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) {
-    setFormData(prev => ({ ...prev, [e.target.name]: e.target.value }))
+    const { name, value } = e.target
+    setFormData(prev => {
+      const updated = { ...prev, [name]: value }
+      
+      // Дата инцидента не может быть позже даты обнаружения
+      if (name === 'incident_date' && prev.discovery_date && value > prev.discovery_date) {
+        alert('Фактическая дата инцидента не может быть позже даты обнаружения!')
+        return prev
+      }
+      if (name === 'discovery_date' && prev.incident_date && prev.incident_date > value) {
+        alert('Дата обнаружения не может быть раньше фактической даты инцидента!')
+        return prev
+      }
+      
+      // Сумма восстановления не может быть больше суммы ущерба
+      if (name === 'recovery_amount' && prev.loss_amount && Number(value) > Number(prev.loss_amount)) {
+        alert('Сумма восстановления не может быть больше суммы ущерба!')
+        return prev
+      }
+      
+      return updated
+    })
   }
 
   async function handleSubmit(e: React.FormEvent) {
@@ -245,17 +266,17 @@ export default function IncidentFormPage() {
               </div>
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="block text-xs font-medium text-gray-500 mb-1.5 uppercase tracking-wide">Сумма ущерба</label>
+                  <label className="block text-xs font-medium text-gray-500 mb-1.5 uppercase tracking-wide">Сумма ущерба (сомони)</label>
                   <div className="relative">
-                    <DollarSign className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 pointer-events-none" />
-                    <input name="loss_amount" type="number" step="0.01" value={formData.loss_amount} onChange={handleChange} placeholder="0.00" className={inputCls + ' pl-10'} />
+                    <span className="absolute left-3 top-1/2 -translate-y-1/2 text-xs font-bold text-gray-400 pointer-events-none">TJS</span>
+                    <input name="loss_amount" type="number" step="0.01" min="0" value={formData.loss_amount} onChange={handleChange} placeholder="0.00" className={inputCls + ' pl-12'} />
                   </div>
                 </div>
                 <div>
-                  <label className="block text-xs font-medium text-gray-500 mb-1.5 uppercase tracking-wide">Сумма восстановления</label>
+                  <label className="block text-xs font-medium text-gray-500 mb-1.5 uppercase tracking-wide">Сумма восстановления (сомони)</label>
                   <div className="relative">
-                    <DollarSign className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 pointer-events-none" />
-                    <input name="recovery_amount" type="number" step="0.01" value={formData.recovery_amount} onChange={handleChange} placeholder="0.00" className={inputCls + ' pl-10'} />
+                    <span className="absolute left-3 top-1/2 -translate-y-1/2 text-xs font-bold text-gray-400 pointer-events-none">TJS</span>
+                    <input name="recovery_amount" type="number" step="0.01" min="0" value={formData.recovery_amount} onChange={handleChange} placeholder="0.00" className={inputCls + ' pl-12'} />
                   </div>
                 </div>
               </div>
