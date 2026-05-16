@@ -2,17 +2,10 @@
 
 import { useState } from 'react'
 import { supabase } from '@/supabase/client'
-import { Shield, Loader2, CheckCircle2, AlertCircle } from 'lucide-react'
-import {
-  BUSINESS_PROCESSES,
-  RISK_FACTORS,
-  SYSTEMS,
-  DEPARTMENTS,
-} from '@/lib/constants'
+import { Loader2, CheckCircle2, AlertCircle } from 'lucide-react'
+import { BUSINESS_PROCESSES, RISK_FACTORS, SYSTEMS, DEPARTMENTS } from '@/lib/constants'
 
 export default function IncidentFormPage() {
-  
-
   const [formData, setFormData] = useState({
     discovered_by: '',
     business_process: '',
@@ -27,7 +20,6 @@ export default function IncidentFormPage() {
     department: '',
     submitted_by: '',
   })
-
   const [loading, setLoading] = useState(false)
   const [success, setSuccess] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -60,7 +52,7 @@ export default function IncidentFormPage() {
       })
 
     if (insertError) {
-      setError('Ошибка при отправке анкеты. Попробуйте снова или обратитесь в СУР.')
+      setError('Ошибка при отправке. Попробуйте снова.')
       setLoading(false)
       return
     }
@@ -80,11 +72,11 @@ export default function IncidentFormPage() {
           <p className="text-gray-500 text-sm mb-2">
             Служба управления рисками получила уведомление и обработает инцидент в ближайшее время.
           </p>
-          <p className="text-gray-400 text-xs">
-            Если у вас есть вопросы, обратитесь в СУР напрямую.
-          </p>
           <button
-            onClick={() => { setSuccess(false); setFormData({ discovered_by: '', business_process: '', factor: '', cause: '', system: '', discovery_date: '', incident_date: '', loss_amount: '', recovery_amount: '', disclosure: '', department: '', submitted_by: '' }) }}
+            onClick={() => {
+              setSuccess(false)
+              setFormData({ discovered_by: '', business_process: '', factor: '', cause: '', system: '', discovery_date: '', incident_date: '', loss_amount: '', recovery_amount: '', disclosure: '', department: '', submitted_by: '' })
+            }}
             className="mt-5 w-full py-2.5 bg-[#1B8A4C] text-white rounded-lg font-medium hover:bg-[#177040] transition-colors"
           >
             Заполнить ещё одну анкету
@@ -94,14 +86,14 @@ export default function IncidentFormPage() {
     )
   }
 
+  const inputCls = "w-full px-4 py-2.5 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#1B8A4C] focus:border-transparent bg-white"
+  const labelCls = "block text-sm font-medium text-gray-700 mb-1.5"
+
   return (
     <div className="min-h-screen bg-[#F5F8F6] py-8 px-4">
       <div className="max-w-xl mx-auto">
         {/* Header */}
         <div className="text-center mb-6">
-          <div className="inline-flex items-center justify-center w-12 h-12 bg-[#1B8A4C] rounded-xl mb-3">
-            <Shield className="w-6 h-6 text-white" />
-          </div>
           <h1 className="text-xl font-semibold text-gray-900">Анкета операционного инцидента</h1>
           <p className="text-gray-500 text-sm mt-1">ОАО «Алиф Банк» · Служба управления рисками</p>
         </div>
@@ -115,212 +107,88 @@ export default function IncidentFormPage() {
           )}
 
           <form onSubmit={handleSubmit} className="space-y-4">
-            {/* ФИО */}
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1.5">
-                ФИО обнаружившего инцидент <span className="text-red-500">*</span>
-              </label>
-              <input
-                name="discovered_by"
-                type="text"
-                value={formData.discovered_by}
-                onChange={handleChange}
-                placeholder="Иванов Иван Иванович"
-                required
-                className="w-full px-4 py-2.5 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#1B8A4C] focus:border-transparent"
-              />
+              <label className={labelCls}>ФИО обнаружившего инцидент *</label>
+              <input name="discovered_by" type="text" value={formData.discovered_by} onChange={handleChange} placeholder="Иванов Иван Иванович" required className={inputCls} />
             </div>
 
-            {/* Подразделение */}
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1.5">
-                Структурное подразделение <span className="text-red-500">*</span>
-              </label>
-              <select
-                name="department"
-                value={formData.department}
-                onChange={handleChange}
-                required
-                className="w-full px-4 py-2.5 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#1B8A4C] focus:border-transparent bg-white"
-              >
+              <label className={labelCls}>Структурное подразделение *</label>
+              <select name="department" value={formData.department} onChange={handleChange} required className={inputCls}>
                 <option value="">Выберите подразделение</option>
                 {DEPARTMENTS.map(d => <option key={d} value={d}>{d}</option>)}
               </select>
             </div>
 
-            {/* Бизнес-процесс */}
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1.5">
-                Бизнес-процесс <span className="text-red-500">*</span>
-              </label>
-              <select
-                name="business_process"
-                value={formData.business_process}
-                onChange={handleChange}
-                required
-                className="w-full px-4 py-2.5 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#1B8A4C] focus:border-transparent bg-white"
-              >
+              <label className={labelCls}>Бизнес-процесс *</label>
+              <select name="business_process" value={formData.business_process} onChange={handleChange} required className={inputCls}>
                 <option value="">Выберите бизнес-процесс</option>
                 {BUSINESS_PROCESSES.map(p => <option key={p} value={p}>{p}</option>)}
               </select>
             </div>
 
-            {/* Фактор */}
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1.5">
-                Фактор риска <span className="text-red-500">*</span>
-              </label>
-              <select
-                name="factor"
-                value={formData.factor}
-                onChange={handleChange}
-                required
-                className="w-full px-4 py-2.5 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#1B8A4C] focus:border-transparent bg-white"
-              >
+              <label className={labelCls}>Фактор риска *</label>
+              <select name="factor" value={formData.factor} onChange={handleChange} required className={inputCls}>
                 <option value="">Выберите фактор</option>
                 {RISK_FACTORS.map(f => <option key={f} value={f}>{f}</option>)}
               </select>
             </div>
 
-            {/* Система */}
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1.5">
-                Система <span className="text-red-500">*</span>
-              </label>
-              <select
-                name="system"
-                value={formData.system}
-                onChange={handleChange}
-                required
-                className="w-full px-4 py-2.5 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#1B8A4C] focus:border-transparent bg-white"
-              >
+              <label className={labelCls}>Система *</label>
+              <select name="system" value={formData.system} onChange={handleChange} required className={inputCls}>
                 <option value="">Выберите систему</option>
                 {SYSTEMS.map(s => <option key={s} value={s}>{s}</option>)}
               </select>
             </div>
 
-            {/* Причина / Раскрытие */}
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1.5">
-                Причина инцидента <span className="text-red-500">*</span>
-              </label>
-              <input
-                name="cause"
-                type="text"
-                value={formData.cause}
-                onChange={handleChange}
-                placeholder="Кратко опишите причину"
-                required
-                className="w-full px-4 py-2.5 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#1B8A4C] focus:border-transparent"
-              />
+              <label className={labelCls}>Причина инцидента *</label>
+              <input name="cause" type="text" value={formData.cause} onChange={handleChange} placeholder="Кратко опишите причину" required className={inputCls} />
             </div>
 
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1.5">
-                Описание инцидента (раскрытие) <span className="text-red-500">*</span>
-              </label>
-              <textarea
-                name="disclosure"
-                value={formData.disclosure}
-                onChange={handleChange}
-                placeholder="Подробно опишите что произошло..."
-                required
-                rows={3}
-                className="w-full px-4 py-2.5 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#1B8A4C] focus:border-transparent resize-none"
-              />
+              <label className={labelCls}>Описание инцидента *</label>
+              <textarea name="disclosure" value={formData.disclosure} onChange={handleChange} placeholder="Подробно опишите что произошло..." required rows={3} className={inputCls + ' resize-none'} />
             </div>
 
-            {/* Даты */}
             <div className="grid grid-cols-2 gap-3">
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1.5">
-                  Дата обнаружения <span className="text-red-500">*</span>
-                </label>
-                <input
-                  name="discovery_date"
-                  type="date"
-                  value={formData.discovery_date}
-                  onChange={handleChange}
-                  required
-                  className="w-full px-4 py-2.5 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#1B8A4C] focus:border-transparent"
-                />
+                <label className={labelCls}>Дата обнаружения *</label>
+                <input name="discovery_date" type="date" value={formData.discovery_date} onChange={handleChange} required className={inputCls} />
               </div>
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1.5">
-                  Дата инцидента <span className="text-red-500">*</span>
-                </label>
-                <input
-                  name="incident_date"
-                  type="date"
-                  value={formData.incident_date}
-                  onChange={handleChange}
-                  required
-                  className="w-full px-4 py-2.5 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#1B8A4C] focus:border-transparent"
-                />
+                <label className={labelCls}>Дата инцидента *</label>
+                <input name="incident_date" type="date" value={formData.incident_date} onChange={handleChange} required className={inputCls} />
               </div>
             </div>
 
-            {/* Финансы (опционально) */}
             <div className="grid grid-cols-2 gap-3">
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1.5">
-                  Сумма ущерба (если есть)
-                </label>
-                <input
-                  name="loss_amount"
-                  type="number"
-                  step="0.01"
-                  value={formData.loss_amount}
-                  onChange={handleChange}
-                  placeholder="0.00"
-                  className="w-full px-4 py-2.5 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#1B8A4C] focus:border-transparent"
-                />
+                <label className={labelCls}>Сумма ущерба (если есть)</label>
+                <input name="loss_amount" type="number" step="0.01" value={formData.loss_amount} onChange={handleChange} placeholder="0.00" className={inputCls} />
               </div>
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1.5">
-                  Сумма восстановления
-                </label>
-                <input
-                  name="recovery_amount"
-                  type="number"
-                  step="0.01"
-                  value={formData.recovery_amount}
-                  onChange={handleChange}
-                  placeholder="0.00"
-                  className="w-full px-4 py-2.5 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#1B8A4C] focus:border-transparent"
-                />
+                <label className={labelCls}>Сумма восстановления</label>
+                <input name="recovery_amount" type="number" step="0.01" value={formData.recovery_amount} onChange={handleChange} placeholder="0.00" className={inputCls} />
               </div>
             </div>
 
-            {/* Email координатора */}
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1.5">
-                Ваш email (корпоративный)
-              </label>
-              <input
-                name="submitted_by"
-                type="email"
-                value={formData.submitted_by}
-                onChange={handleChange}
-                placeholder="имя@alifbank.tj"
-                className="w-full px-4 py-2.5 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#1B8A4C] focus:border-transparent"
-              />
+              <label className={labelCls}>Ваш email</label>
+              <input name="submitted_by" type="email" value={formData.submitted_by} onChange={handleChange} placeholder="имя@alif.tj" className={inputCls} />
             </div>
 
-            <button
-              type="submit"
-              disabled={loading}
-              className="w-full py-3 bg-[#1B8A4C] hover:bg-[#177040] disabled:bg-gray-300 disabled:cursor-not-allowed text-white font-medium rounded-lg transition-all flex items-center justify-center gap-2 mt-2"
-            >
-              {loading ? (
-                <><Loader2 className="w-4 h-4 animate-spin" /> Отправляем...</>
-              ) : 'Отправить анкету в СУР'}
+            <button type="submit" disabled={loading} className="w-full py-3 bg-[#1B8A4C] hover:bg-[#177040] disabled:opacity-70 text-white font-medium rounded-lg transition-all flex items-center justify-center gap-2">
+              {loading ? <><Loader2 className="w-4 h-4 animate-spin" /> Отправляем...</> : 'Отправить анкету в СУР'}
             </button>
           </form>
         </div>
 
         <p className="text-center text-gray-400 text-xs mt-4">
-          ОАО «Алиф Банк» · Служба управления рисками · Конфиденциально
+          © 2026 ОАО «Алиф Банк» · Служба управления рисками · Конфиденциально
         </p>
       </div>
     </div>
