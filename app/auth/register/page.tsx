@@ -42,8 +42,8 @@ export default function RegisterPage() {
     }
 
     // Проверка корпоративного email
-    if (!formData.email.endsWith('@alifbank.tj')) {
-      setError('Для регистрации используйте корпоративный email @alifbank.tj')
+    if (!formData.email.endsWith('@alif.tj')) {
+      setError('Для регистрации используйте корпоративный email @alif.tj')
       return
     }
 
@@ -156,7 +156,7 @@ export default function RegisterPage() {
                 type="email"
                 value={formData.email}
                 onChange={handleChange}
-                placeholder="имя@alifbank.tj"
+                placeholder="имя@alif.tj"
                 required
                 className="w-full px-4 py-2.5 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#1B8A4C] focus:border-transparent transition-all"
               />
