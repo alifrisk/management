@@ -12,55 +12,34 @@ export async function updateSession(request: NextRequest) {
         getAll() {
           return request.cookies.getAll()
         },
-        setAll(cookiesToSet) {
+        setAll(cookiesToSet: { name: string; value: string; options?: Record<string, unknown> }[]) {
           cookiesToSet.forEach(({ name, value }) =>
             request.cookies.set(name, value)
           )
           supabaseResponse = NextResponse.next({ request })
           cookiesToSet.forEach(({ name, value, options }) =>
-            supabaseResponse.cookies.set(name, value, options)
+            supabaseResponse.cookies.set(name, value, options as Parameters<typeof supabaseResponse.cookies.set>[2])
           )
         },
       },
     }
   )
 
-  const {
-    data: { user },
-  } = await supabase.auth.getUser()
+  const { data: { user } } = await supabase.auth.getUser()
 
-  // Защищённые маршруты — нужна авторизация
-  const protectedPaths = [
-    '/dashboard',
-    '/operational-risk',
-    '/credit-risk',
-    '/market-risk',
-    '/liquidity',
-    '/admin',
-  ]
-
-  const isProtected = protectedPaths.some((path) =>
-    request.nextUrl.pathname.startsWith(path)
-  )
+  const protectedPaths = ['/dashboard', '/operational-risk', '/credit-risk', '/market-risk', '/liquidity', '/admin']
+  const isProtected = protectedPaths.some((path) => request.nextUrl.pathname.startsWith(path))
 
   if (isProtected && !user) {
     const url = request.nextUrl.clone()
     url.pathname = '/auth/login'
-    url.searchParams.set('redirect', request.nextUrl.pathname)
     return NextResponse.redirect(url)
   }
 
-  // Если уже авторизован и идёт на auth — редирект на дашборд
   if (user && request.nextUrl.pathname.startsWith('/auth/login')) {
     const url = request.nextUrl.clone()
     url.pathname = '/dashboard'
     return NextResponse.redirect(url)
-  }
-
-  // Анкета инцидента — доступна без полного входа (по специальной ссылке)
-  // но с проверкой токена
-  if (request.nextUrl.pathname.startsWith('/incident-form')) {
-    return supabaseResponse
   }
 
   return supabaseResponse
