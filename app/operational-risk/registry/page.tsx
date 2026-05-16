@@ -256,11 +256,14 @@ export default function RegistryPage() {
           return prev
         }
       }
-      if (field === 'probability' || field === 'impact') {
+      if (field === 'probability' || field === 'impact' || field === 'control_quality') {
         const p = Number(field === 'probability' ? value : prev.probability) || 0
         const i = Number(field === 'impact' ? value : prev.impact) || 0
-        const score = p * i
-        updated.risk_level = score <= 4 ? 'Низкий' : score <= 9 ? 'Средний' : score <= 16 ? 'Высокий' : 'Экстремальные'
+        const c = Number(field === 'control_quality' ? value : prev.control_quality) || 1
+        const score = (p * i) / c
+        updated.risk_level = score <= 3 ? 'Низкий' : score <= 6 ? 'Средний' : score <= 12 ? 'Высокий' : 'Экстремальные'
+        updated.probability_score = p
+        updated.impact_score = i
       }
       return updated
     })
@@ -883,15 +886,14 @@ export default function RegistryPage() {
                         {CONTROL_SCORES.map(c => <option key={c.value} value={c.value}>{c.value} — {c.label}</option>)}
                       </select>
                     </div>
-                    <div>
-                      <label className={labelCls}>Оценка вероятности</label>
-                      <input type="number" step="0.1" value={String(formData.probability_score)} onChange={e => handleChange('probability_score', e.target.value)} placeholder="0.0" className={inputCls} />
-                    </div>
-                    <div>
-                      <label className={labelCls}>Оценка влияния</label>
-                      <input type="number" step="0.1" value={String(formData.impact_score)} onChange={e => handleChange('impact_score', e.target.value)} placeholder="0.0" className={inputCls} />
-                    </div>
                   </div>
+                  {Number(formData.probability) > 0 && Number(formData.impact) > 0 && (
+                    <div className="mt-3 p-3 bg-gray-50 rounded-lg">
+                      <p className="text-xs text-gray-500">
+                        Формула: ({Number(formData.probability)} × {Number(formData.impact)}) / {Number(formData.control_quality) || 1} = <strong>{((Number(formData.probability) * Number(formData.impact)) / (Number(formData.control_quality) || 1)).toFixed(1)}</strong> баллов
+                      </p>
+                    </div>
+                  )}
 
                   {Boolean(formData.risk_level) && (
                     <div className={`p-4 rounded-xl border-2 ${formData.risk_level === 'Экстремальные' ? 'bg-red-50 border-red-200' : formData.risk_level === 'Высокий' ? 'bg-orange-50 border-orange-200' : formData.risk_level === 'Средний' ? 'bg-yellow-50 border-yellow-200' : 'bg-green-50 border-green-200'}`}>
