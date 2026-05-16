@@ -887,13 +887,7 @@ export default function RegistryPage() {
                       </select>
                     </div>
                   </div>
-                  {Number(formData.probability) > 0 && Number(formData.impact) > 0 && (
-                    <div className="mt-3 p-3 bg-gray-50 rounded-lg">
-                      <p className="text-xs text-gray-500">
-                        Формула: ({Number(formData.probability)} × {Number(formData.impact)}) / {Number(formData.control_quality) || 1} = <strong>{((Number(formData.probability) * Number(formData.impact)) / (Number(formData.control_quality) || 1)).toFixed(1)}</strong> баллов
-                      </p>
-                    </div>
-                  )}
+
 
                   {Boolean(formData.risk_level) && (
                     <div className={`p-4 rounded-xl border-2 ${formData.risk_level === 'Экстремальные' ? 'bg-red-50 border-red-200' : formData.risk_level === 'Высокий' ? 'bg-orange-50 border-orange-200' : formData.risk_level === 'Средний' ? 'bg-yellow-50 border-yellow-200' : 'bg-green-50 border-green-200'}`}>
