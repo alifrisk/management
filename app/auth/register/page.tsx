@@ -2,9 +2,8 @@
 
 import { useState } from 'react'
 import Link from 'next/link'
-import Image from 'next/image'
 import { createClient } from '@/supabase/client'
-import { Loader2, AlertCircle, CheckCircle2 } from 'lucide-react'
+import { Loader2, AlertCircle, CheckCircle2, Shield } from 'lucide-react'
 import { DEPARTMENTS } from '@/lib/constants'
 
 export default function RegisterPage() {
@@ -61,10 +60,13 @@ export default function RegisterPage() {
     return (
       <div className="min-h-screen bg-gradient-to-br from-[#0f3d24] via-[#1B8A4C] to-[#2EAD62] flex items-center justify-center p-4">
         <div className="bg-white rounded-2xl shadow-2xl p-8 max-w-md w-full text-center">
-          <CheckCircle2 className="w-12 h-12 text-[#1B8A4C] mx-auto mb-4" />
+          <div className="inline-flex items-center justify-center w-16 h-16 bg-green-50 rounded-full mb-4">
+            <CheckCircle2 className="w-8 h-8 text-[#1B8A4C]" />
+          </div>
           <h2 className="text-xl font-semibold text-gray-900 mb-2">Проверьте почту!</h2>
           <p className="text-gray-500 text-sm mb-4">
-            Письмо отправлено на <strong>{formData.email}</strong>. Перейдите по ссылке для активации.
+            Письмо отправлено на <strong>{formData.email}</strong>.<br/>
+            Перейдите по ссылке для активации аккаунта.
           </p>
           <p className="text-xs text-gray-400 mb-6">После активации администратор назначит вам роль доступа.</p>
           <Link href="/auth/login" className="block w-full py-2.5 bg-[#1B8A4C] text-white rounded-lg font-medium text-center hover:bg-[#177040]">
@@ -79,24 +81,24 @@ export default function RegisterPage() {
     <div className="min-h-screen bg-gradient-to-br from-[#0f3d24] via-[#1B8A4C] to-[#2EAD62] flex items-center justify-center p-4">
       <div className="w-full max-w-md">
         <div className="text-center mb-6">
-          <div className="inline-flex items-center justify-center w-20 h-16 bg-white rounded-2xl shadow-xl mb-4 px-3">
-            <svg width="80" height="32" viewBox="0 0 200 80" fill="none" xmlns="http://www.w3.org/2000/svg">
-  <path d="M28 8C16 8 8 18 8 30C8 42 16 52 28 52C34 52 39 49 43 45L50 52H62V30C62 18 54 8 42 8H28ZM35 22C39.4 22 43 25.6 43 30C43 34.4 39.4 38 35 38C30.6 38 27 34.4 27 30C27 25.6 30.6 22 35 22Z" fill="#1B8A4C"/>
-  <text x="72" y="42" fontFamily="Arial, sans-serif" fontSize="36" fontWeight="700" fill="#1B8A4C">алиф</text>
-</svg>
+          <div className="inline-flex items-center justify-center w-16 h-16 bg-white rounded-2xl shadow-xl mb-4">
+            <Shield className="w-8 h-8 text-[#1B8A4C]" />
           </div>
           <h1 className="text-xl font-semibold text-white">Risk Management Platform</h1>
           <p className="text-green-200 text-sm mt-1">ОАО «Алиф Банк» · СУР</p>
         </div>
+
         <div className="bg-white rounded-2xl shadow-2xl p-8">
           <h2 className="text-lg font-semibold text-gray-900 mb-1">Регистрация</h2>
           <p className="text-sm text-gray-500 mb-5">Для сотрудников Алиф Банк</p>
+
           {error && (
             <div className="flex items-start gap-2 p-3 bg-red-50 border border-red-100 rounded-lg mb-4">
               <AlertCircle className="w-4 h-4 text-red-500 mt-0.5 flex-shrink-0" />
               <p className="text-sm text-red-600">{error}</p>
             </div>
           )}
+
           <form onSubmit={handleRegister} className="space-y-4">
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1.5">ФИО *</label>
@@ -108,7 +110,7 @@ export default function RegisterPage() {
             </div>
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1.5">Подразделение *</label>
-              <select name="department" value={formData.department} onChange={handleChange} required className="w-full px-4 py-2.5 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#1B8A4C] focus:border-transparent bg-white">
+              <select name="department" value={formData.department} onChange={handleChange} required className="w-full px-4 py-2.5 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#1B8A4C] bg-white">
                 <option value="">Выберите подразделение</option>
                 {DEPARTMENTS.map((dept) => (<option key={dept} value={dept}>{dept}</option>))}
               </select>
@@ -129,10 +131,12 @@ export default function RegisterPage() {
               {loading ? <><Loader2 className="w-4 h-4 animate-spin" /> Регистрация...</> : 'Зарегистрироваться'}
             </button>
           </form>
+
           <div className="mt-5 pt-4 border-t border-gray-100 text-center">
             <p className="text-sm text-gray-500">Уже есть аккаунт? <Link href="/auth/login" className="text-[#1B8A4C] font-medium">Войти</Link></p>
           </div>
         </div>
+
         <p className="text-center text-green-200/60 text-xs mt-4">© 2026 ОАО «Алиф Банк» · Служба управления рисками</p>
       </div>
     </div>
