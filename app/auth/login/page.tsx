@@ -115,8 +115,8 @@ export default function LoginPage() {
 
             <button
               type="submit"
-              disabled={loading || !email || !password}
-              className="w-full py-2.5 bg-[#1B8A4C] hover:bg-[#177040] disabled:bg-gray-300 disabled:cursor-not-allowed text-white font-medium rounded-lg transition-all flex items-center justify-center gap-2"
+              disabled={loading}
+              className="w-full py-2.5 bg-[#1B8A4C] hover:bg-[#177040] disabled:opacity-70 disabled:cursor-not-allowed text-white font-medium rounded-lg transition-all flex items-center justify-center gap-2"
             >
               {loading ? <><Loader2 className="w-4 h-4 animate-spin" /> Входим...</> : 'Войти'}
             </button>
