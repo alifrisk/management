@@ -895,9 +895,7 @@ export default function RegistryPage() {
                       <p className={`text-xl font-bold ${formData.risk_level === 'Экстремальные' ? 'text-red-700' : formData.risk_level === 'Высокий' ? 'text-orange-700' : formData.risk_level === 'Средний' ? 'text-yellow-700' : 'text-green-700'}`}>
                         {String(formData.risk_level || '')}
                       </p>
-                      <p className="text-xs text-gray-500 mt-1">
-                        Вероятность × Влияние = {Number(formData.probability) * Number(formData.impact)} баллов
-                      </p>
+
                     </div>
                   )}
                 </div>
