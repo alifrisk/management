@@ -1,0 +1,94 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
+
+@layer base {
+  :root {
+    --background: 0 0% 100%;
+    --foreground: 222.2 84% 4.9%;
+    --card: 0 0% 100%;
+    --card-foreground: 222.2 84% 4.9%;
+    --popover: 0 0% 100%;
+    --popover-foreground: 222.2 84% 4.9%;
+    --primary: 152 67% 32%;
+    --primary-foreground: 0 0% 100%;
+    --secondary: 210 40% 96.1%;
+    --secondary-foreground: 222.2 47.4% 11.2%;
+    --muted: 210 40% 96.1%;
+    --muted-foreground: 215.4 16.3% 46.9%;
+    --accent: 210 40% 96.1%;
+    --accent-foreground: 222.2 47.4% 11.2%;
+    --destructive: 0 84.2% 60.2%;
+    --destructive-foreground: 0 0% 100%;
+    --border: 214.3 31.8% 91.4%;
+    --input: 214.3 31.8% 91.4%;
+    --ring: 152 67% 32%;
+    --radius: 0.5rem;
+
+    /* Alif Bank custom vars */
+    --alif-green: #1B8A4C;
+    --alif-green-light: #2EAD62;
+    --alif-surface: #F5F8F6;
+    --sidebar-width: 260px;
+  }
+
+  * {
+    @apply border-border;
+  }
+
+  body {
+    @apply bg-background text-foreground;
+    font-family: 'Inter', system-ui, sans-serif;
+  }
+
+  /* Custom scrollbar */
+  ::-webkit-scrollbar {
+    width: 6px;
+    height: 6px;
+  }
+  ::-webkit-scrollbar-track {
+    background: #f1f5f9;
+  }
+  ::-webkit-scrollbar-thumb {
+    background: #cbd5e1;
+    border-radius: 3px;
+  }
+  ::-webkit-scrollbar-thumb:hover {
+    background: #94a3b8;
+  }
+}
+
+@layer utilities {
+  /* Animation utilities */
+  .animate-fade-in {
+    animation: fadeIn 0.3s ease-out;
+  }
+
+  @keyframes fadeIn {
+    from { opacity: 0; transform: translateY(8px); }
+    to   { opacity: 1; transform: translateY(0); }
+  }
+
+  /* Alif Green gradient */
+  .bg-alif-gradient {
+    background: linear-gradient(135deg, #1B8A4C 0%, #2EAD62 100%);
+  }
+
+  /* Status badges */
+  .badge-open    { @apply bg-blue-50  text-blue-700  border border-blue-200; }
+  .badge-process { @apply bg-yellow-50 text-yellow-700 border border-yellow-200; }
+  .badge-closed  { @apply bg-green-50 text-green-700 border border-green-200; }
+
+  /* Risk level colors */
+  .risk-low     { @apply bg-green-50  text-green-700  border border-green-200; }
+  .risk-medium  { @apply bg-yellow-50 text-yellow-700 border border-yellow-200; }
+  .risk-high    { @apply bg-orange-50 text-orange-700 border border-orange-200; }
+  .risk-extreme { @apply bg-red-50    text-red-700    border border-red-200; }
+
+  /* Card hover effect */
+  .card-hover {
+    @apply transition-all duration-200 hover:shadow-md hover:-translate-y-0.5;
+  }
+}
