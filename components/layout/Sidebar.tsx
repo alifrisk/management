@@ -28,7 +28,7 @@ const NAV_ITEMS = [
 export default function Sidebar({ user }: SidebarProps) {
   const pathname = usePathname()
   const isAdmin = user.role === 'admin'
-  const [openMenus, setOpenMenus] = useState<string[]>(['/operational-risk'])
+  const [openMenus, setOpenMenus] = useState<string[]>([])
   const [mobileOpen, setMobileOpen] = useState(false)
   const [showLogoutConfirm, setShowLogoutConfirm] = useState(false)
 
