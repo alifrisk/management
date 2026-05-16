@@ -27,7 +27,7 @@ export default function LoginPage() {
       } else if (signInError.message.includes('Email not confirmed')) {
         setError('Email не подтверждён. Проверьте корпоративную почту.')
       } else {
-        setError('Ошибка входа. Обратитесь к администратору.')
+        setError('Ошибка: ' + signInError.message)
       }
       setLoading(false)
       return
