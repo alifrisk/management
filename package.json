@@ -12,8 +12,7 @@
     "next": "14.2.5",
     "react": "^18",
     "react-dom": "^18",
-    "@supabase/supabase-js": "^2.39.0",
-"@supabase/ssr": "^0.1.0",
+    "@supabase/supabase-js": "^2.39.3",
     "recharts": "^2.12.7",
     "lucide-react": "^0.400.0",
     "clsx": "^2.1.1",
@@ -33,7 +32,8 @@
     "date-fns": "^3.6.0",
     "xlsx": "^0.18.5",
     "docx": "^8.5.0",
-    "nodemailer": "^6.9.14"
+    "nodemailer": "^6.9.14",
+    "tailwindcss-animate": "^1.0.7"
   },
   "devDependencies": {
     "typescript": "^5",
@@ -42,7 +42,6 @@
     "@types/react-dom": "^18",
     "@types/nodemailer": "^6.4.15",
     "tailwindcss": "^3.4.1",
-    "tailwindcss-animate": "^1.0.7",
     "postcss": "^8",
     "autoprefixer": "^10.0.1",
     "eslint": "^8",
