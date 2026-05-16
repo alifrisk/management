@@ -1,18 +1,19 @@
 'use client'
 
 import { useState } from 'react'
-import { useRouter } from 'next/navigation'
 import Link from 'next/link'
-import { createClient } from '@/supabase/client'
+import { createClient } from '@supabase/supabase-js'
 import { Eye, EyeOff, Loader2, AlertCircle } from 'lucide-react'
 
+const supabase = createClient(
+  process.env.NEXT_PUBLIC_SUPABASE_URL!,
+  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+)
+
 export default function LoginPage() {
-  const router = useRouter()
-  const supabase = createClient()
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [showPassword, setShowPassword] = useState(false)
-  const [rememberMe, setRememberMe] = useState(false)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
@@ -20,20 +21,21 @@ export default function LoginPage() {
     e.preventDefault()
     setLoading(true)
     setError(null)
-    const { error: signInError } = await supabase.auth.signInWithPassword({ email, password })
+
+    const { data, error: signInError } = await supabase.auth.signInWithPassword({
+      email,
+      password,
+    })
+
     if (signInError) {
-      if (signInError.message.includes('Invalid login credentials')) {
-        setError('Неверный email или пароль.')
-      } else if (signInError.message.includes('Email not confirmed')) {
-        setError('Email не подтверждён. Проверьте корпоративную почту.')
-      } else {
-        setError('Ошибка: ' + signInError.message)
-      }
+      setError('Ошибка: ' + signInError.message)
       setLoading(false)
       return
     }
-    router.push('/dashboard')
-    router.refresh()
+
+    if (data.session) {
+      window.location.href = '/dashboard'
+    }
   }
 
   return (
@@ -61,7 +63,9 @@ export default function LoginPage() {
 
           <form onSubmit={handleLogin} className="space-y-4">
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1.5">Корпоративный email</label>
+              <label className="block text-sm font-medium text-gray-700 mb-1.5">
+                Корпоративный email
+              </label>
               <input
                 type="email"
                 value={email}
@@ -83,31 +87,36 @@ export default function LoginPage() {
                   required
                   className="w-full px-4 py-2.5 pr-10 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#1B8A4C] focus:border-transparent transition-all"
                 />
-                <button type="button" onClick={() => setShowPassword(!showPassword)} className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600">
+                <button
+                  type="button"
+                  onClick={() => setShowPassword(!showPassword)}
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
+                >
                   {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
                 </button>
               </div>
             </div>
 
             <div className="flex items-center justify-between">
-              <label className="flex items-center gap-2 cursor-pointer">
-                <input type="checkbox" checked={rememberMe} onChange={(e) => setRememberMe(e.target.checked)} className="w-4 h-4 rounded border-gray-300 text-[#1B8A4C]" />
-                <span className="text-sm text-gray-600">Запомнить меня</span>
-              </label>
-              <Link href="/auth/forgot-password" className="text-sm text-[#1B8A4C] hover:text-[#177040] font-medium">Забыли пароль?</Link>
+              <span></span>
+              <Link
+                href="/auth/forgot-password"
+                className="text-sm text-[#1B8A4C] hover:text-[#177040] font-medium"
+              >
+                Забыли пароль?
+              </Link>
             </div>
 
-            <button type="submit" disabled={loading || !email || !password} className="w-full py-2.5 bg-[#1B8A4C] hover:bg-[#177040] disabled:bg-gray-300 disabled:cursor-not-allowed text-white font-medium rounded-lg transition-all flex items-center justify-center gap-2">
-              {loading ? <><Loader2 className="w-4 h-4 animate-spin" /> Входим...</> : 'Войти'}
+            <button
+              type="submit"
+              disabled={loading || !email || !password}
+              className="w-full py-2.5 bg-[#1B8A4C] hover:bg-[#177040] disabled:bg-gray-300 disabled:cursor-not-allowed text-white font-medium rounded-lg transition-all flex items-center justify-center gap-2"
+            >
+              {loading ? (
+                <><Loader2 className="w-4 h-4 animate-spin" /> Входим...</>
+              ) : 'Войти'}
             </button>
           </form>
-
-          <div className="mt-6 pt-5 border-t border-gray-100 text-center">
-            <p className="text-sm text-gray-500">
-              Нет аккаунта?{' '}
-              <Link href="/auth/register" className="text-[#1B8A4C] hover:text-[#177040] font-medium">Зарегистрироваться</Link>
-            </p>
-          </div>
         </div>
 
         <p className="text-center text-green-200/60 text-xs mt-6">
