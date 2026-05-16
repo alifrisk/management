@@ -2,7 +2,7 @@
 
 import { useState } from 'react'
 import { supabase } from '@/supabase/client'
-import { Loader2, CheckCircle2, AlertCircle } from 'lucide-react'
+import { Loader2, CheckCircle2, AlertCircle, FileText, Building2, Briefcase, AlertTriangle, Monitor, Calendar, DollarSign, Mail, ChevronRight } from 'lucide-react'
 import { BUSINESS_PROCESSES, RISK_FACTORS, SYSTEMS, DEPARTMENTS } from '@/lib/constants'
 
 export default function IncidentFormPage() {
@@ -63,21 +63,22 @@ export default function IncidentFormPage() {
 
   if (success) {
     return (
-      <div className="min-h-screen bg-[#F5F8F6] flex items-center justify-center p-4">
-        <div className="bg-white rounded-2xl shadow-lg p-8 max-w-md w-full text-center">
-          <div className="inline-flex items-center justify-center w-16 h-16 bg-green-50 rounded-full mb-4">
-            <CheckCircle2 className="w-8 h-8 text-[#1B8A4C]" />
+      <div className="min-h-screen flex items-center justify-center p-4" style={{background: 'linear-gradient(135deg, #0f3d24 0%, #1a7a43 50%, #1B8A4C 100%)'}}>
+        <div className="bg-white rounded-3xl shadow-2xl p-10 max-w-md w-full text-center">
+          <div className="inline-flex items-center justify-center w-20 h-20 bg-green-50 rounded-full mb-6">
+            <CheckCircle2 className="w-10 h-10 text-[#1B8A4C]" />
           </div>
-          <h2 className="text-xl font-semibold text-gray-900 mb-2">Анкета отправлена!</h2>
-          <p className="text-gray-500 text-sm mb-2">
-            Служба управления рисками получила уведомление и обработает инцидент в ближайшее время.
+          <h2 className="text-2xl font-bold text-gray-900 mb-3">Анкета отправлена!</h2>
+          <p className="text-gray-500 mb-2">
+            Служба управления рисками получила вашу анкету и обработает её в ближайшее время.
           </p>
+          <p className="text-sm text-gray-400 mb-8">Спасибо за своевременное уведомление!</p>
           <button
             onClick={() => {
               setSuccess(false)
               setFormData({ discovered_by: '', business_process: '', factor: '', cause: '', system: '', discovery_date: '', incident_date: '', loss_amount: '', recovery_amount: '', disclosure: '', department: '', submitted_by: '' })
             }}
-            className="mt-5 w-full py-2.5 bg-[#1B8A4C] text-white rounded-lg font-medium hover:bg-[#177040] transition-colors"
+            className="w-full py-3 bg-[#1B8A4C] text-white rounded-xl font-medium hover:bg-[#177040] transition-colors"
           >
             Заполнить ещё одну анкету
           </button>
@@ -86,108 +87,224 @@ export default function IncidentFormPage() {
     )
   }
 
-  const inputCls = "w-full px-4 py-2.5 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#1B8A4C] focus:border-transparent bg-white"
-  const labelCls = "block text-sm font-medium text-gray-700 mb-1.5"
+  const selectCls = "w-full px-4 py-3 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-[#1B8A4C] focus:border-transparent bg-white transition-all appearance-none"
+  const inputCls = "w-full px-4 py-3 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-[#1B8A4C] focus:border-transparent transition-all"
 
   return (
-    <div className="min-h-screen bg-[#F5F8F6] py-8 px-4">
-      <div className="max-w-xl mx-auto">
-        {/* Header */}
-        <div className="text-center mb-6">
-          <h1 className="text-xl font-semibold text-gray-900">Анкета операционного инцидента</h1>
-          <p className="text-gray-500 text-sm mt-1">ОАО «Алиф Банк» · Служба управления рисками</p>
+    <div className="min-h-screen" style={{background: 'linear-gradient(135deg, #0f3d24 0%, #1a7a43 60%, #1B8A4C 100%)'}}>
+      {/* Header */}
+      <div className="px-4 pt-10 pb-6 text-center">
+        <div className="inline-flex items-center gap-2 bg-white/10 backdrop-blur-sm rounded-full px-4 py-1.5 mb-4">
+          <FileText className="w-4 h-4 text-green-200" />
+          <span className="text-green-100 text-sm font-medium">Служба управления рисками</span>
         </div>
+        <h1 className="text-2xl font-bold text-white mb-1">Анкета операционного инцидента</h1>
+        <p className="text-green-200/70 text-sm">ОАО «Алиф Банк» — заполните все обязательные поля</p>
+      </div>
 
-        <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-6">
+      {/* Form Card */}
+      <div className="max-w-2xl mx-auto px-4 pb-10">
+        <div className="bg-white rounded-3xl shadow-2xl overflow-hidden">
+          
           {error && (
-            <div className="flex items-start gap-2 p-3 bg-red-50 border border-red-100 rounded-lg mb-5">
-              <AlertCircle className="w-4 h-4 text-red-500 mt-0.5 flex-shrink-0" />
+            <div className="mx-6 mt-6 flex items-start gap-2 p-4 bg-red-50 border border-red-100 rounded-xl">
+              <AlertCircle className="w-5 h-5 text-red-500 mt-0.5 flex-shrink-0" />
               <p className="text-sm text-red-600">{error}</p>
             </div>
           )}
 
-          <form onSubmit={handleSubmit} className="space-y-4">
-            <div>
-              <label className={labelCls}>ФИО обнаружившего инцидент *</label>
-              <input name="discovered_by" type="text" value={formData.discovered_by} onChange={handleChange} placeholder="Иванов Иван Иванович" required className={inputCls} />
-            </div>
-
-            <div>
-              <label className={labelCls}>Структурное подразделение *</label>
-              <select name="department" value={formData.department} onChange={handleChange} required className={inputCls}>
-                <option value="">Выберите подразделение</option>
-                {DEPARTMENTS.map(d => <option key={d} value={d}>{d}</option>)}
-              </select>
-            </div>
-
-            <div>
-              <label className={labelCls}>Бизнес-процесс *</label>
-              <select name="business_process" value={formData.business_process} onChange={handleChange} required className={inputCls}>
-                <option value="">Выберите бизнес-процесс</option>
-                {BUSINESS_PROCESSES.map(p => <option key={p} value={p}>{p}</option>)}
-              </select>
-            </div>
-
-            <div>
-              <label className={labelCls}>Фактор риска *</label>
-              <select name="factor" value={formData.factor} onChange={handleChange} required className={inputCls}>
-                <option value="">Выберите фактор</option>
-                {RISK_FACTORS.map(f => <option key={f} value={f}>{f}</option>)}
-              </select>
-            </div>
-
-            <div>
-              <label className={labelCls}>Система *</label>
-              <select name="system" value={formData.system} onChange={handleChange} required className={inputCls}>
-                <option value="">Выберите систему</option>
-                {SYSTEMS.map(s => <option key={s} value={s}>{s}</option>)}
-              </select>
-            </div>
-
-            <div>
-              <label className={labelCls}>Причина инцидента *</label>
-              <input name="cause" type="text" value={formData.cause} onChange={handleChange} placeholder="Кратко опишите причину" required className={inputCls} />
-            </div>
-
-            <div>
-              <label className={labelCls}>Описание инцидента *</label>
-              <textarea name="disclosure" value={formData.disclosure} onChange={handleChange} placeholder="Подробно опишите что произошло..." required rows={3} className={inputCls + ' resize-none'} />
-            </div>
-
-            <div className="grid grid-cols-2 gap-3">
-              <div>
-                <label className={labelCls}>Дата обнаружения *</label>
-                <input name="discovery_date" type="date" value={formData.discovery_date} onChange={handleChange} required className={inputCls} />
+          <form onSubmit={handleSubmit}>
+            
+            {/* Section 1: Кто обнаружил */}
+            <div className="px-6 pt-6 pb-4">
+              <div className="flex items-center gap-3 mb-4">
+                <div className="w-8 h-8 bg-[#1B8A4C]/10 rounded-lg flex items-center justify-center flex-shrink-0">
+                  <span className="text-[#1B8A4C] font-bold text-sm">1</span>
+                </div>
+                <div>
+                  <h3 className="font-semibold text-gray-900 text-sm">Информация об обнаружении</h3>
+                  <p className="text-xs text-gray-400">Кто и где обнаружил инцидент</p>
+                </div>
               </div>
-              <div>
-                <label className={labelCls}>Дата инцидента *</label>
-                <input name="incident_date" type="date" value={formData.incident_date} onChange={handleChange} required className={inputCls} />
+              <div className="space-y-3">
+                <div>
+                  <label className="block text-xs font-medium text-gray-500 mb-1.5 uppercase tracking-wide">ФИО обнаружившего *</label>
+                  <input name="discovered_by" type="text" value={formData.discovered_by} onChange={handleChange} placeholder="Иванов Иван Иванович" required className={inputCls} />
+                </div>
+                <div>
+                  <label className="block text-xs font-medium text-gray-500 mb-1.5 uppercase tracking-wide">Структурное подразделение *</label>
+                  <div className="relative">
+                    <Building2 className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 pointer-events-none" />
+                    <select name="department" value={formData.department} onChange={handleChange} required className={selectCls + ' pl-10'}>
+                      <option value="">Выберите подразделение</option>
+                      {DEPARTMENTS.map(d => <option key={d} value={d}>{d}</option>)}
+                    </select>
+                  </div>
+                </div>
               </div>
             </div>
 
-            <div className="grid grid-cols-2 gap-3">
-              <div>
-                <label className={labelCls}>Сумма ущерба (если есть)</label>
-                <input name="loss_amount" type="number" step="0.01" value={formData.loss_amount} onChange={handleChange} placeholder="0.00" className={inputCls} />
+            <div className="h-px bg-gray-100 mx-6" />
+
+            {/* Section 2: Детали инцидента */}
+            <div className="px-6 py-4">
+              <div className="flex items-center gap-3 mb-4">
+                <div className="w-8 h-8 bg-[#1B8A4C]/10 rounded-lg flex items-center justify-center flex-shrink-0">
+                  <span className="text-[#1B8A4C] font-bold text-sm">2</span>
+                </div>
+                <div>
+                  <h3 className="font-semibold text-gray-900 text-sm">Детали инцидента</h3>
+                  <p className="text-xs text-gray-400">Классификация и описание</p>
+                </div>
               </div>
-              <div>
-                <label className={labelCls}>Сумма восстановления</label>
-                <input name="recovery_amount" type="number" step="0.01" value={formData.recovery_amount} onChange={handleChange} placeholder="0.00" className={inputCls} />
+              <div className="space-y-3">
+                <div>
+                  <label className="block text-xs font-medium text-gray-500 mb-1.5 uppercase tracking-wide">Бизнес-процесс *</label>
+                  <div className="relative">
+                    <Briefcase className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 pointer-events-none" />
+                    <select name="business_process" value={formData.business_process} onChange={handleChange} required className={selectCls + ' pl-10'}>
+                      <option value="">Выберите бизнес-процесс</option>
+                      {BUSINESS_PROCESSES.map(p => <option key={p} value={p}>{p}</option>)}
+                    </select>
+                  </div>
+                </div>
+                <div>
+                  <label className="block text-xs font-medium text-gray-500 mb-1.5 uppercase tracking-wide">Фактор риска *</label>
+                  <div className="relative">
+                    <AlertTriangle className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 pointer-events-none" />
+                    <select name="factor" value={formData.factor} onChange={handleChange} required className={selectCls + ' pl-10'}>
+                      <option value="">Выберите фактор</option>
+                      {RISK_FACTORS.map(f => <option key={f} value={f}>{f}</option>)}
+                    </select>
+                  </div>
+                </div>
+                <div>
+                  <label className="block text-xs font-medium text-gray-500 mb-1.5 uppercase tracking-wide">Система *</label>
+                  <div className="relative">
+                    <Monitor className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 pointer-events-none" />
+                    <select name="system" value={formData.system} onChange={handleChange} required className={selectCls + ' pl-10'}>
+                      <option value="">Выберите систему</option>
+                      {SYSTEMS.map(s => <option key={s} value={s}>{s}</option>)}
+                    </select>
+                  </div>
+                </div>
+                <div>
+                  <label className="block text-xs font-medium text-gray-500 mb-1.5 uppercase tracking-wide">Причина инцидента *</label>
+                  <input name="cause" type="text" value={formData.cause} onChange={handleChange} placeholder="Кратко опишите причину" required className={inputCls} />
+                </div>
+                <div>
+                  <label className="block text-xs font-medium text-gray-500 mb-1.5 uppercase tracking-wide">Описание инцидента *</label>
+                  <textarea name="disclosure" value={formData.disclosure} onChange={handleChange} placeholder="Подробно опишите что произошло, какие последствия..." required rows={4} className={inputCls + ' resize-none'} />
+                </div>
               </div>
             </div>
 
-            <div>
-              <label className={labelCls}>Ваш email</label>
-              <input name="submitted_by" type="email" value={formData.submitted_by} onChange={handleChange} placeholder="имя@alif.tj" className={inputCls} />
+            <div className="h-px bg-gray-100 mx-6" />
+
+            {/* Section 3: Даты */}
+            <div className="px-6 py-4">
+              <div className="flex items-center gap-3 mb-4">
+                <div className="w-8 h-8 bg-[#1B8A4C]/10 rounded-lg flex items-center justify-center flex-shrink-0">
+                  <span className="text-[#1B8A4C] font-bold text-sm">3</span>
+                </div>
+                <div>
+                  <h3 className="font-semibold text-gray-900 text-sm">Временные рамки</h3>
+                  <p className="text-xs text-gray-400">Когда произошёл и обнаружен инцидент</p>
+                </div>
+              </div>
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-xs font-medium text-gray-500 mb-1.5 uppercase tracking-wide">Дата обнаружения *</label>
+                  <div className="relative">
+                    <Calendar className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 pointer-events-none" />
+                    <input name="discovery_date" type="date" value={formData.discovery_date} onChange={handleChange} required className={inputCls + ' pl-10'} />
+                  </div>
+                </div>
+                <div>
+                  <label className="block text-xs font-medium text-gray-500 mb-1.5 uppercase tracking-wide">Дата инцидента *</label>
+                  <div className="relative">
+                    <Calendar className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 pointer-events-none" />
+                    <input name="incident_date" type="date" value={formData.incident_date} onChange={handleChange} required className={inputCls + ' pl-10'} />
+                  </div>
+                </div>
+              </div>
             </div>
 
-            <button type="submit" disabled={loading} className="w-full py-3 bg-[#1B8A4C] hover:bg-[#177040] disabled:opacity-70 text-white font-medium rounded-lg transition-all flex items-center justify-center gap-2">
-              {loading ? <><Loader2 className="w-4 h-4 animate-spin" /> Отправляем...</> : 'Отправить анкету в СУР'}
-            </button>
+            <div className="h-px bg-gray-100 mx-6" />
+
+            {/* Section 4: Финансы */}
+            <div className="px-6 py-4">
+              <div className="flex items-center gap-3 mb-4">
+                <div className="w-8 h-8 bg-[#1B8A4C]/10 rounded-lg flex items-center justify-center flex-shrink-0">
+                  <span className="text-[#1B8A4C] font-bold text-sm">4</span>
+                </div>
+                <div>
+                  <h3 className="font-semibold text-gray-900 text-sm">Финансовый ущерб</h3>
+                  <p className="text-xs text-gray-400">Заполните если есть финансовые потери</p>
+                </div>
+              </div>
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-xs font-medium text-gray-500 mb-1.5 uppercase tracking-wide">Сумма ущерба</label>
+                  <div className="relative">
+                    <DollarSign className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 pointer-events-none" />
+                    <input name="loss_amount" type="number" step="0.01" value={formData.loss_amount} onChange={handleChange} placeholder="0.00" className={inputCls + ' pl-10'} />
+                  </div>
+                </div>
+                <div>
+                  <label className="block text-xs font-medium text-gray-500 mb-1.5 uppercase tracking-wide">Сумма восстановления</label>
+                  <div className="relative">
+                    <DollarSign className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 pointer-events-none" />
+                    <input name="recovery_amount" type="number" step="0.01" value={formData.recovery_amount} onChange={handleChange} placeholder="0.00" className={inputCls + ' pl-10'} />
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <div className="h-px bg-gray-100 mx-6" />
+
+            {/* Section 5: Контакт */}
+            <div className="px-6 py-4">
+              <div className="flex items-center gap-3 mb-4">
+                <div className="w-8 h-8 bg-[#1B8A4C]/10 rounded-lg flex items-center justify-center flex-shrink-0">
+                  <span className="text-[#1B8A4C] font-bold text-sm">5</span>
+                </div>
+                <div>
+                  <h3 className="font-semibold text-gray-900 text-sm">Ваши контакты</h3>
+                  <p className="text-xs text-gray-400">Для обратной связи</p>
+                </div>
+              </div>
+              <div>
+                <label className="block text-xs font-medium text-gray-500 mb-1.5 uppercase tracking-wide">Корпоративный email</label>
+                <div className="relative">
+                  <Mail className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 pointer-events-none" />
+                  <input name="submitted_by" type="email" value={formData.submitted_by} onChange={handleChange} placeholder="имя@alif.tj" className={inputCls + ' pl-10'} />
+                </div>
+              </div>
+            </div>
+
+            {/* Submit Button */}
+            <div className="px-6 pb-6">
+              <button
+                type="submit"
+                disabled={loading}
+                className="w-full py-4 bg-[#1B8A4C] hover:bg-[#177040] disabled:opacity-70 text-white font-semibold rounded-xl transition-all flex items-center justify-center gap-2 text-base shadow-lg shadow-green-900/20"
+              >
+                {loading ? (
+                  <><Loader2 className="w-5 h-5 animate-spin" /> Отправляем анкету...</>
+                ) : (
+                  <>Отправить в СУР <ChevronRight className="w-5 h-5" /></>
+                )}
+              </button>
+              <p className="text-center text-xs text-gray-400 mt-3">
+                Поля отмеченные * обязательны для заполнения
+              </p>
+            </div>
+
           </form>
         </div>
 
-        <p className="text-center text-gray-400 text-xs mt-4">
+        <p className="text-center text-white/30 text-xs mt-4">
           © 2026 ОАО «Алиф Банк» · Служба управления рисками · Конфиденциально
         </p>
       </div>
