@@ -58,7 +58,7 @@ export default function RegisterPage() {
           department: formData.department,
           position: formData.position,
         },
-        emailRedirectTo: `${window.location.origin}/auth/callback`,
+        emailRedirectTo: `https://alif-risk-platform.vercel.app/auth/callback`,
       },
     })
 
