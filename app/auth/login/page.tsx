@@ -181,7 +181,7 @@ export default function LoginPage() {
 
         {/* Footer */}
         <p className="text-center text-green-200/60 text-xs mt-6">
-          © 2024 ОАО «Алиф Банк» · Служба управления рисками
+          © 2026 ОАО «Алиф Банк» · Служба управления рисками
         </p>
       </div>
     </div>
