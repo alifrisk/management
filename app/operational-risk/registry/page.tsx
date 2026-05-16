@@ -572,7 +572,7 @@ export default function RegistryPage() {
                       <label className={labelCls}>Категория инцидентов (Уровень 2) *</label>
                       <select value={String(formData.event_category_l2)} onChange={e => handleChange('event_category_l2', e.target.value)} className={inputCls}>
                         <option value="">Выберите категорию</option>
-                        {formData.event_category_l1 && EVENT_CATEGORIES_L2[String(formData.event_category_l1)]?.map(c => <option key={c} value={c}>{c}</option>)}
+                        {formData.event_category_l1 && (EVENT_CATEGORIES_L2[String(formData.event_category_l1)] || []).map((c: string) => <option key={c} value={c}>{c}</option>)}
                       </select>
                     </div>
                     <div>
