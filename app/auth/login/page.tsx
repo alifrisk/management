@@ -48,7 +48,10 @@ export default function LoginPage() {
       <div className="relative w-full max-w-md">
         <div className="text-center mb-8">
           <div className="inline-flex items-center justify-center w-20 h-16 bg-white rounded-2xl shadow-xl mb-4 px-3">
-            <Image src="/alif-logo.png" alt="Алиф Банк" width={100} height={40} className="object-contain" />
+            <svg width="80" height="32" viewBox="0 0 200 80" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <path d="M28 8C16 8 8 18 8 30C8 42 16 52 28 52C34 52 39 49 43 45L50 52H62V30C62 18 54 8 42 8H28ZM35 22C39.4 22 43 25.6 43 30C43 34.4 39.4 38 35 38C30.6 38 27 34.4 27 30C27 25.6 30.6 22 35 22Z" fill="#1B8A4C"/>
+  <text x="72" y="42" fontFamily="Arial, sans-serif" fontSize="36" fontWeight="700" fill="#1B8A4C">алиф</text>
+</svg>
           </div>
           <h1 className="text-2xl font-semibold text-white tracking-tight">
             Risk Management Platform
