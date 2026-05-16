@@ -572,7 +572,7 @@ export default function RegistryPage() {
                       <label className={labelCls}>Категория инцидентов (Уровень 2) *</label>
                       <select value={String(formData.event_category_l2)} onChange={e => handleChange('event_category_l2', e.target.value)} className={inputCls}>
                         <option value="">Выберите категорию</option>
-                        {Boolean(formData.event_category_l1) && (EVENT_CATEGORIES_L2[String(formData.event_category_l1)] || []).map((c: string) => <option key={c} value={c}>{c}</option>)}
+                        {(EVENT_CATEGORIES_L2[String(formData.event_category_l1)] || []).map((c: string) => <option key={c} value={c}>{c}</option>)}
                       </select>
                     </div>
                     <div>
@@ -689,7 +689,7 @@ export default function RegistryPage() {
                     <label className={labelCls}>Сумма возврата</label>
                     <input type="number" min="0" step="0.01" value={String(formData.recovery_amount)} onChange={e => handleChange('recovery_amount', e.target.value)} placeholder="0.00" className={inputCls} />
                   </div>
-                  {formData.loss_amount_tjs && formData.recovery_amount && (
+                  {Boolean(formData.loss_amount_tjs) && Boolean(formData.recovery_amount) && (
                     <div className="lg:col-span-2 grid grid-cols-2 gap-4">
                       <div className="bg-gray-50 rounded-lg p-3">
                         <p className="text-xs text-gray-500">Остаток</p>
@@ -778,11 +778,11 @@ export default function RegistryPage() {
                     </div>
                   </div>
 
-                  {formData.risk_level && (
+                  {Boolean(formData.risk_level) && (
                     <div className={`p-4 rounded-xl border-2 ${formData.risk_level === 'Экстремальные' ? 'bg-red-50 border-red-200' : formData.risk_level === 'Высокий' ? 'bg-orange-50 border-orange-200' : formData.risk_level === 'Средний' ? 'bg-yellow-50 border-yellow-200' : 'bg-green-50 border-green-200'}`}>
                       <p className="text-xs text-gray-500 mb-1">Степень риска (автоматически)</p>
                       <p className={`text-xl font-bold ${formData.risk_level === 'Экстремальные' ? 'text-red-700' : formData.risk_level === 'Высокий' ? 'text-orange-700' : formData.risk_level === 'Средний' ? 'text-yellow-700' : 'text-green-700'}`}>
-                        {String(formData.risk_level)}
+                        {String(formData.risk_level || '')}
                       </p>
                       <p className="text-xs text-gray-500 mt-1">
                         Вероятность × Влияние = {Number(formData.probability) * Number(formData.impact)} баллов
