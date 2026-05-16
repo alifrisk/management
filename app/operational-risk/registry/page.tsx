@@ -256,12 +256,22 @@ export default function RegistryPage() {
           return prev
         }
       }
+      // Сумма восстановления не может быть больше суммы ущерба
+      if (field === 'recovery_amount' && prev.loss_amount_tjs && Number(value) > Number(prev.loss_amount_tjs)) {
+        alert('Сумма восстановления не может быть больше суммы ущерба!')
+        return prev
+      }
       if (field === 'probability' || field === 'impact' || field === 'control_quality') {
         const p = Number(field === 'probability' ? value : prev.probability) || 0
         const i = Number(field === 'impact' ? value : prev.impact) || 0
-        const c = Number(field === 'control_quality' ? value : prev.control_quality) || 1
-        const score = (p * i) / c
-        updated.risk_level = score <= 3 ? 'Низкий' : score <= 6 ? 'Средний' : score <= 12 ? 'Высокий' : 'Экстремальные'
+        const c = Number(field === 'control_quality' ? value : prev.control_quality) || 0
+        // Рассчитываем только когда выбраны ВСЕ ТРИ
+        if (p > 0 && i > 0 && c > 0) {
+          const score = (p * i) / c
+          updated.risk_level = score <= 3 ? 'Низкий' : score <= 6 ? 'Средний' : score <= 12 ? 'Высокий' : 'Экстремальные'
+        } else {
+          updated.risk_level = ''
+        }
         updated.probability_score = p
         updated.impact_score = i
       }
@@ -272,6 +282,18 @@ export default function RegistryPage() {
   async function handleSave() {
     setSaving(true)
     setError(null)
+
+    // Валидация обязательных полей
+    if (!formData.event_category_l1 || !formData.business_process || !formData.factor || 
+        !formData.system || !formData.cause || !formData.department || 
+        !formData.discovered_by || !formData.disclosure || 
+        !formData.discovery_date || !formData.incident_date ||
+        !formData.incident_status) {
+      setError('Заполните все обязательные поля во всех этапах перед сохранением.')
+      setSaving(false)
+      return
+    }
+
     const payload: Record<string, unknown> = {
       event_category_l1: formData.event_category_l1,
       event_category_l2: formData.event_category_l2,
