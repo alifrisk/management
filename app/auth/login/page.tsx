@@ -5,14 +5,8 @@ import Link from 'next/link'
 import { supabase } from '@/supabase/client'
 import { Eye, EyeOff, Loader2, AlertCircle } from 'lucide-react'
 
-async function redirectByRole(email: string) {
-  const { data: profile } = await supabase
-    .from('user_profiles')
-    .select('role')
-    .eq('email', email)
-    .single()
-  
-  if (profile?.role === 'admin') {
+function redirectByRole(role: string | undefined) {
+  if (role === 'admin') {
     window.location.href = '/dashboard'
   } else {
     window.location.href = '/incident-form'
@@ -27,9 +21,10 @@ export default function LoginPage() {
   const [error, setError] = useState<string | null>(null)
 
   useEffect(() => {
-    supabase.auth.getSession().then(async ({ data: { session } }) => {
-      if (session?.user?.email) {
-        await redirectByRole(session.user.email)
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      if (session) {
+        const role = session.user.user_metadata?.role
+        redirectByRole(role)
       } else {
         setLoading(false)
       }
@@ -53,8 +48,9 @@ export default function LoginPage() {
       return
     }
 
-    if (data.session?.user?.email) {
-      await redirectByRole(data.session.user.email)
+    if (data.session) {
+      const role = data.session.user.user_metadata?.role
+      redirectByRole(role)
     }
   }
 
