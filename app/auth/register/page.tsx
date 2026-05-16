@@ -3,7 +3,7 @@
 import { useState } from 'react'
 import Link from 'next/link'
 import { createClient } from '@/supabase/client'
-import { Loader2, AlertCircle, CheckCircle2, Shield } from 'lucide-react'
+import { Loader2, AlertCircle, CheckCircle2 } from 'lucide-react'
 import { DEPARTMENTS } from '@/lib/constants'
 
 export default function RegisterPage() {
@@ -81,11 +81,8 @@ export default function RegisterPage() {
     <div className="min-h-screen bg-gradient-to-br from-[#0f3d24] via-[#1B8A4C] to-[#2EAD62] flex items-center justify-center p-4">
       <div className="w-full max-w-md">
         <div className="text-center mb-6">
-          <div className="inline-flex items-center justify-center w-16 h-16 bg-white rounded-2xl shadow-xl mb-4">
-            <Shield className="w-8 h-8 text-[#1B8A4C]" />
-          </div>
           <h1 className="text-xl font-semibold text-white">Risk Management Platform</h1>
-          <p className="text-green-200 text-sm mt-1">ОАО «Алиф Банк» · СУР</p>
+          <p className="text-green-200 text-sm mt-2">Служба управления рисками · ОАО «Алиф Банк»</p>
         </div>
 
         <div className="bg-white rounded-2xl shadow-2xl p-8">
