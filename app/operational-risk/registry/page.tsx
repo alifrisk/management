@@ -68,6 +68,103 @@ interface IncidentForm {
   created_at: string
 }
 
+
+const EVENT_CATEGORIES_L3_MAP: Record<string, string[]> = {
+  'Воровство и мошенничество': [
+    'Мошенничество, кредитное мошенничество / кража денег со счетов',
+    'Грубое нарушение внутренних Политик и Процедур Банка',
+    'Воровство, вымогательство, хищения, грабеж',
+    'Присвоение активов (погашения клиентов, выданных кредитов, вкладов клиентов)',
+    'Умышленное уничтожение активов',
+    'Подделка',
+    'Использование чужих документов и т.д.',
+    'Преднамеренное несоблюдение налогового законодательства или уклонение от налогов',
+    'Получения взяток',
+    'Мошенничество',
+    'Воровство и грабеж',
+    'Предоставление поддельных документов',
+  ],
+  'Неразрешенная деятельность': [
+    'Нарушение требований конфиденциальности',
+    'Неразрешенные типы транзакций (преднамеренная потеря)',
+  ],
+  'Безопасность систем': [
+    'Вред от хакерских атак',
+    'Кража информации, повлекшая за собой убытки',
+  ],
+  'Взаимоотношения с сотрудниками': [
+    'Вопросы оплаты труда, вознаграждения и выходные пособия',
+    'Организация трудовой деятельности',
+  ],
+  'Безопасная среда': [
+    'Инциденты/Риски, связанные с обстоятельствами по несчастным случаям',
+    'Инциденты/Риски, связанные с охраной здоровья и безопасностью труда',
+    'Инциденты/Риски, связанные с Компенсацией сотрудникам',
+  ],
+  'Дискриминация': ['Все типы дискриминации'],
+  'Приемлемость, раскрытие, фидуциарные отношения': [
+    'Нарушения сотрудниками требований внутренних Политик и Процедур',
+    'Проблемы раскрытия информации (знай своего клиента)',
+    'Нарушение требований раскрытия информации розничным клиентам',
+    'Нарушения, связанные с раскрытием конфиденциальной информации',
+    'Агрессивные продажи',
+    'Искусственное завышение комиссионных',
+    'Злоупотребление конфиденциальной информации',
+  ],
+  'Неправильная деловая или рыночная практика': [
+    'Нарушение/невыполнение Антимонопольного законодательства',
+    'Инсайдерский трейдинг',
+    'Деятельность без лицензии',
+    'Отмывание денег',
+  ],
+  'Недостатки продуктов': ['Дефекты продуктов (контрафактная продукция и т.д.)'],
+  'Выбор, спонсорство и риски': [
+    'Неудача в исследовании клиента согласно принятым принципам',
+    'Превышение лимита подверженности риску на клиента',
+  ],
+  'Консалтинговые услуги': ['Разногласия в оценках результатов консалтинговых услуг'],
+  'Катастрофы и прочие события': [
+    'Ущерб от природных катастроф, человеческие потери от воздействия внешних источников',
+    'Умышленный ущерб активам Банка сотрудниками',
+  ],
+  'Cистемы': [
+    'Программное обеспечение',
+    'Аппаратное обеспечение',
+    'Телекоммуникации',
+    'Сбои в энергоснабжении и предоставлении коммунальных услуг',
+  ],
+  'Исполнение и поддержание операции': [
+    'Неправильная коммуникация',
+    'Ошибки при вводе, загрузке или поддержании данных',
+    'Нарушение сроков или обязательств',
+    'Неправильное функционирование систем или моделей',
+    'Бухгалтерские ошибки/ошибки в транзакциях',
+    'Прочие ошибки при выполнении задач',
+    'Срыв доставки',
+    'Срывы в управлении залогом',
+  ],
+  'Мониторинг и отчетность': [
+    'Несоблюдение обязательной отчетности',
+    'Несвоевременное проведение мониторинга',
+    'Неточная внешняя отчетность, повлекшая убытки',
+  ],
+  'Привлечение клиентов и ведение документации': ['Отсутствующая или неполная юридическая документация'],
+  'Управление клиентскими счетами': [
+    'Неавторизованный доступ к счетам',
+    'Неправильные клиентские записи, повлекшие убытки',
+    'Ущерб или убытки клиентов в результате халатности',
+  ],
+  'Торговые контрагенты': [
+    'Действие контрагентов выше полномочий, установленных в рамках подписанного договора',
+    'Конфликты с контрагентами',
+    'Нарушение лимитов контрагентов',
+  ],
+  'Поставщики и подрядчики': [
+    'Инциденты, связанные с аутсорсингом',
+    'Конфликты с поставщиками',
+  ],
+}
+
 const EMPTY_FORM = {
   event_category_l1: '',
   event_category_l2: '',
@@ -406,6 +503,9 @@ export default function RegistryPage() {
                     <td className="px-4 py-3 text-gray-900 whitespace-nowrap font-medium">
                       {incident.loss_amount_tjs ? new Intl.NumberFormat('ru-RU').format(incident.loss_amount_tjs) : '—'}
                     </td>
+                    <td className="px-4 py-3 text-green-700 whitespace-nowrap font-medium">
+                      {incident.recovery_amount ? new Intl.NumberFormat('ru-RU').format(incident.recovery_amount) : '—'}
+                    </td>
                     <td className="px-4 py-3">
                       {incident.risk_level ? (
                         <span className={`inline-flex px-2 py-0.5 rounded-full text-xs font-medium ${getRiskBg(incident.risk_level)}`}>
@@ -577,7 +677,10 @@ export default function RegistryPage() {
                     </div>
                     <div>
                       <label className={labelCls}>Пример действий (Уровень 3)</label>
-                      <input type="text" value={String(formData.event_category_l3)} onChange={e => handleChange('event_category_l3', e.target.value)} placeholder="Описание действия" className={inputCls} />
+                      <select value={String(formData.event_category_l3)} onChange={e => handleChange('event_category_l3', e.target.value)} className={inputCls}>
+                        <option value="">Выберите действие</option>
+                        {(EVENT_CATEGORIES_L3_MAP[String(formData.event_category_l2)] || []).map((c: string) => <option key={c} value={c}>{c}</option>)}
+                      </select>
                     </div>
                     <div>
                       <label className={labelCls}>Бизнес-процесс *</label>
@@ -612,7 +715,7 @@ export default function RegistryPage() {
                       <input type="number" min="1" value={String(formData.repeat_count)} onChange={e => handleChange('repeat_count', e.target.value)} className={inputCls} />
                     </div>
                     <div>
-                      <label className={labelCls}>Подразделение *</label>
+                      <label className={labelCls}>Место происшествия *</label>
                       <select value={String(formData.department)} onChange={e => handleChange('department', e.target.value)} className={inputCls}>
                         <option value="">Выберите подразделение</option>
                         {DEPARTMENTS.map(d => <option key={d} value={d}>{d}</option>)}
@@ -621,10 +724,6 @@ export default function RegistryPage() {
                     <div>
                       <label className={labelCls}>Сотрудник допустивший инцидент (чел. фактор)</label>
                       <input type="text" value={String(formData.employee_involved)} onChange={e => handleChange('employee_involved', e.target.value)} placeholder="ФИО сотрудника" className={inputCls} />
-                    </div>
-                    <div>
-                      <label className={labelCls}>Место происшествия</label>
-                      <input type="text" value={String(formData.incident_location)} onChange={e => handleChange('incident_location', e.target.value)} placeholder="Место" className={inputCls} />
                     </div>
                     <div>
                       <label className={labelCls}>Причины *</label>
@@ -714,7 +813,10 @@ export default function RegistryPage() {
                   <div>
                     <label className={labelCls}>Статус работы с инцидентом *</label>
                     <select value={String(formData.incident_status)} onChange={e => handleChange('incident_status', e.target.value)} className={inputCls}>
-                      {INCIDENT_STATUSES.map(s => <option key={s} value={s}>{s}</option>)}
+                      <option value="">Выберите статус</option>
+                      <option value="Открыт">Открыт</option>
+                      <option value="В процессе">В процессе</option>
+                      <option value="Закрыт">Закрыт</option>
                     </select>
                   </div>
                   <div>
