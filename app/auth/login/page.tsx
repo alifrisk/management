@@ -4,7 +4,7 @@ import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { createClient } from '@/supabase/client'
-import { Eye, EyeOff, Loader2, AlertCircle, Shield } from 'lucide-react'
+import { Eye, EyeOff, Loader2, AlertCircle } from 'lucide-react'
 
 export default function LoginPage() {
   const router = useRouter()
@@ -40,13 +40,10 @@ export default function LoginPage() {
     <div className="min-h-screen bg-gradient-to-br from-[#0f3d24] via-[#1B8A4C] to-[#2EAD62] flex items-center justify-center p-4">
       <div className="relative w-full max-w-md">
         <div className="text-center mb-8">
-          <div className="inline-flex items-center justify-center w-16 h-16 bg-white rounded-2xl shadow-xl mb-4">
-            <Shield className="w-8 h-8 text-[#1B8A4C]" />
-          </div>
           <h1 className="text-2xl font-semibold text-white tracking-tight">
             Risk Management Platform
           </h1>
-          <p className="text-green-200 text-sm mt-1">
+          <p className="text-green-200 text-sm mt-2">
             Служба управления рисками · ОАО «Алиф Банк»
           </p>
         </div>
