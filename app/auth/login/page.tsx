@@ -5,26 +5,33 @@ import Link from 'next/link'
 import { supabase } from '@/supabase/client'
 import { Eye, EyeOff, Loader2, AlertCircle } from 'lucide-react'
 
+async function redirectByRole(email: string) {
+  const { data: profile } = await supabase
+    .from('user_profiles')
+    .select('role')
+    .eq('email', email)
+    .single()
+  
+  if (profile?.role === 'admin') {
+    window.location.href = '/dashboard'
+  } else {
+    window.location.href = '/incident-form'
+  }
+}
+
 export default function LoginPage() {
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [showPassword, setShowPassword] = useState(false)
-  const [loading, setLoading] = useState(false)
+  const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
 
   useEffect(() => {
     supabase.auth.getSession().then(async ({ data: { session } }) => {
-      if (session) {
-        const { data: profile } = await supabase
-          .from('user_profiles')
-          .select('role')
-          .eq('id', session.user.id)
-          .single()
-        if (profile?.role === 'admin') {
-          window.location.href = '/dashboard'
-        } else {
-          window.location.href = '/incident-form'
-        }
+      if (session?.user?.email) {
+        await redirectByRole(session.user.email)
+      } else {
+        setLoading(false)
       }
     })
   }, [])
@@ -46,19 +53,17 @@ export default function LoginPage() {
       return
     }
 
-    if (data.session) {
-      const { data: profile } = await supabase
-        .from('user_profiles')
-        .select('role')
-        .eq('id', data.session.user.id)
-        .single()
-
-      if (profile?.role === 'admin') {
-        window.location.href = '/dashboard'
-      } else {
-        window.location.href = '/incident-form'
-      }
+    if (data.session?.user?.email) {
+      await redirectByRole(data.session.user.email)
     }
+  }
+
+  if (loading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center" style={{background: 'linear-gradient(135deg, #0f3d24 0%, #1a7a43 50%, #1B8A4C 100%)'}}>
+        <Loader2 className="w-8 h-8 text-white animate-spin" />
+      </div>
+    )
   }
 
   return (
