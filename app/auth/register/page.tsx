@@ -2,12 +2,11 @@
 
 import { useState } from 'react'
 import Link from 'next/link'
-import { createClient } from '@/supabase/client'
+import { supabase } from '@/supabase/client'
 import { Loader2, AlertCircle, CheckCircle2 } from 'lucide-react'
 import { DEPARTMENTS } from '@/lib/constants'
 
 export default function RegisterPage() {
-  const supabase = createClient()
   const [formData, setFormData] = useState({
     email: '', password: '', confirmPassword: '',
     full_name: '', department: '', position: '',
