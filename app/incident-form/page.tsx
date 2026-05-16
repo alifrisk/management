@@ -1,7 +1,7 @@
 'use client'
 
 import { useState } from 'react'
-import { createClient } from '@/supabase/client'
+import { supabase } from '@/supabase/client'
 import { Shield, Loader2, CheckCircle2, AlertCircle } from 'lucide-react'
 import {
   BUSINESS_PROCESSES,
@@ -11,7 +11,7 @@ import {
 } from '@/lib/constants'
 
 export default function IncidentFormPage() {
-  const supabase = createClient()
+  
 
   const [formData, setFormData] = useState({
     discovered_by: '',
