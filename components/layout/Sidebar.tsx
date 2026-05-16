@@ -30,6 +30,7 @@ export default function Sidebar({ user }: SidebarProps) {
   const isAdmin = user.role === 'admin'
   const [openMenus, setOpenMenus] = useState<string[]>(['/operational-risk'])
   const [mobileOpen, setMobileOpen] = useState(false)
+  const [showLogoutConfirm, setShowLogoutConfirm] = useState(false)
 
   function toggleMenu(href: string) {
     setOpenMenus(prev => prev.includes(href) ? prev.filter(h => h !== href) : [...prev, href])
@@ -100,16 +101,10 @@ export default function Sidebar({ user }: SidebarProps) {
         {isAdmin && (
           <div className="pt-3 mt-3 border-t border-white/10">
             <p className="text-green-300/50 text-xs font-medium px-3 mb-2 uppercase tracking-wider">Администрирование</p>
-            <Link href="/admin/users" onClick={() => setMobileOpen(false)}
-              className={cn('flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm transition-all',
-                pathname.startsWith('/admin/users') ? 'bg-white/20 text-white font-medium' : 'text-green-100 hover:bg-white/10 hover:text-white'
-              )}>
+            <Link href="/admin/users" className={cn('flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm transition-all', pathname.startsWith('/admin/users') ? 'bg-white/20 text-white font-medium' : 'text-green-100 hover:bg-white/10 hover:text-white')}>
               <Users className="w-4 h-4 text-green-200" /> Пользователи
             </Link>
-            <Link href="/admin/settings" onClick={() => setMobileOpen(false)}
-              className={cn('flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm transition-all',
-                pathname.startsWith('/admin/settings') ? 'bg-white/20 text-white font-medium' : 'text-green-100 hover:bg-white/10 hover:text-white'
-              )}>
+            <Link href="/admin/settings" className={cn('flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm transition-all', pathname.startsWith('/admin/settings') ? 'bg-white/20 text-white font-medium' : 'text-green-100 hover:bg-white/10 hover:text-white')}>
               <Settings className="w-4 h-4 text-green-200" /> Настройки
             </Link>
           </div>
@@ -125,11 +120,35 @@ export default function Sidebar({ user }: SidebarProps) {
             <p className="text-white text-sm font-medium truncate">{user.full_name || user.email}</p>
             <p className="text-green-200/60 text-xs">{user.role === 'admin' ? 'Администратор' : 'Риск-координатор'}</p>
           </div>
-          <button onClick={handleLogout} title="Выйти" className="flex-shrink-0 text-green-200/60 hover:text-white transition-colors">
+          <button onClick={() => setShowLogoutConfirm(true)} title="Выйти" className="flex-shrink-0 text-green-200/60 hover:text-white transition-colors">
             <LogOut className="w-4 h-4" />
           </button>
         </div>
       </div>
+
+      {/* Logout confirmation */}
+      {showLogoutConfirm && (
+        <div className="absolute inset-0 bg-black/60 flex items-end justify-center p-4 z-50">
+          <div className="bg-white rounded-2xl p-6 w-full max-w-xs">
+            <h3 className="font-semibold text-gray-900 mb-1">Выйти из системы?</h3>
+            <p className="text-sm text-gray-500 mb-4">Вы уверены что хотите выйти?</p>
+            <div className="flex gap-3">
+              <button
+                onClick={() => setShowLogoutConfirm(false)}
+                className="flex-1 py-2 border border-gray-200 rounded-lg text-sm font-medium text-gray-600 hover:bg-gray-50"
+              >
+                Отмена
+              </button>
+              <button
+                onClick={handleLogout}
+                className="flex-1 py-2 bg-red-500 hover:bg-red-600 rounded-lg text-sm font-medium text-white"
+              >
+                Выйти
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 
@@ -139,10 +158,10 @@ export default function Sidebar({ user }: SidebarProps) {
         <Menu className="w-5 h-5" />
       </button>
       {mobileOpen && <div className="lg:hidden fixed inset-0 z-40 bg-black/50" onClick={() => setMobileOpen(false)} />}
-      <aside className={cn('lg:hidden fixed left-0 top-0 h-full z-50 w-64 bg-alif-gradient shadow-2xl transition-transform duration-300', mobileOpen ? 'translate-x-0' : '-translate-x-full')}>
+      <aside className={cn('lg:hidden fixed left-0 top-0 h-full z-50 w-64 shadow-2xl transition-transform duration-300 relative', mobileOpen ? 'translate-x-0' : '-translate-x-full')} style={{background: 'linear-gradient(135deg, #155d35 0%, #1a7a43 100%)'}}>
         {sidebarContent}
       </aside>
-      <aside className="hidden lg:flex flex-col w-64 bg-alif-gradient min-h-screen flex-shrink-0">
+      <aside className="hidden lg:flex flex-col w-64 min-h-screen flex-shrink-0 relative" style={{background: 'linear-gradient(135deg, #155d35 0%, #1a7a43 100%)'}}>
         {sidebarContent}
       </aside>
     </>
