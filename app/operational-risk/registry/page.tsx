@@ -497,7 +497,8 @@ export default function RegistryPage() {
                 <th className="text-left px-4 py-3 text-xs font-medium text-gray-500 uppercase whitespace-nowrap">Фактор</th>
                 <th className="text-left px-4 py-3 text-xs font-medium text-gray-500 uppercase whitespace-nowrap">Система</th>
                 <th className="text-left px-4 py-3 text-xs font-medium text-gray-500 uppercase whitespace-nowrap">Ущерб (TJS)</th>
-                <th className="text-left px-4 py-3 text-xs font-medium text-gray-500 uppercase whitespace-nowrap">Риск</th>
+                <th className="text-left px-4 py-3 text-xs font-medium text-gray-500 uppercase whitespace-nowrap">Возврат (TJS)</th>
+                <th className="text-left px-4 py-3 text-xs font-medium text-gray-500 uppercase whitespace-nowrap">Уровень риска</th>
                 <th className="text-left px-4 py-3 text-xs font-medium text-gray-500 uppercase whitespace-nowrap">Статус</th>
                 <th className="text-left px-4 py-3 text-xs font-medium text-gray-500 uppercase whitespace-nowrap">Действия</th>
               </tr>
@@ -516,7 +517,7 @@ export default function RegistryPage() {
                     <td className="px-4 py-3 text-gray-600 max-w-[150px] truncate" title={incident.business_process}>{incident.business_process}</td>
                     <td className="px-4 py-3 text-gray-600 whitespace-nowrap">{incident.factor}</td>
                     <td className="px-4 py-3 text-gray-600 whitespace-nowrap">{incident.system}</td>
-                    <td className="px-4 py-3 text-gray-900 whitespace-nowrap font-medium">
+                    <td className="px-4 py-3 text-red-600 whitespace-nowrap font-medium">
                       {incident.loss_amount_tjs ? new Intl.NumberFormat('ru-RU').format(incident.loss_amount_tjs) : '—'}
                     </td>
                     <td className="px-4 py-3 text-green-700 whitespace-nowrap font-medium">
@@ -527,7 +528,7 @@ export default function RegistryPage() {
                         <span className={`inline-flex px-2 py-0.5 rounded-full text-xs font-medium ${getRiskBg(incident.risk_level)}`}>
                           {incident.risk_level}
                         </span>
-                      ) : '—'}
+                      ) : <span className="text-gray-400">—</span>}
                     </td>
                     <td className="px-4 py-3">
                       <span className={`inline-flex px-2 py-0.5 rounded-full text-xs font-medium ${getStatusBg(incident.incident_status)}`}>
