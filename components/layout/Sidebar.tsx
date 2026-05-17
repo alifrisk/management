@@ -36,10 +36,6 @@ export default function Sidebar({ user }: SidebarProps) {
     setOpenMenus(prev => prev.includes(href) ? prev.filter(h => h !== href) : [...prev, href])
   }
 
-  async function handleLogout() {
-    setShowLogoutConfirm(true)
-  }
-
   async function confirmLogout() {
     await supabase.auth.signOut()
     window.location.href = '/auth/login'
@@ -50,7 +46,7 @@ export default function Sidebar({ user }: SidebarProps) {
     : user.email[0].toUpperCase()
 
   const sidebarContent = (
-    <div className="flex flex-col h-full">
+    <div className="flex flex-col h-full relative">
       <div className="flex items-center gap-3 px-4 py-5 border-b border-white/10">
         <div className="min-w-0 flex-1">
           <div className="text-white font-semibold text-sm leading-tight">Risk Management</div>
@@ -130,11 +126,35 @@ export default function Sidebar({ user }: SidebarProps) {
             <p className="text-white text-sm font-medium truncate">{user.full_name || user.email}</p>
             <p className="text-green-200/60 text-xs">{user.role === 'admin' ? 'Администратор' : 'Риск-координатор'}</p>
           </div>
-          <button onClick={confirmLogout} title="Выйти" className="flex-shrink-0 text-green-200/60 hover:text-white transition-colors">
+          <button onClick={() => setShowLogoutConfirm(true)} title="Выйти" className="flex-shrink-0 text-green-200/60 hover:text-white transition-colors">
             <LogOut className="w-4 h-4" />
           </button>
         </div>
       </div>
+
+      {/* Logout confirmation dialog */}
+      {showLogoutConfirm && (
+        <div className="absolute inset-0 bg-black/70 flex items-end justify-center p-4 rounded-none z-50">
+          <div className="bg-white rounded-2xl p-6 w-full">
+            <h3 className="font-semibold text-gray-900 mb-1 text-sm">Выйти из системы?</h3>
+            <p className="text-xs text-gray-500 mb-4">Вы уверены что хотите выйти?</p>
+            <div className="flex gap-2">
+              <button
+                onClick={() => setShowLogoutConfirm(false)}
+                className="flex-1 py-2 border border-gray-200 rounded-lg text-xs font-medium text-gray-600 hover:bg-gray-50"
+              >
+                Отмена
+              </button>
+              <button
+                onClick={confirmLogout}
+                className="flex-1 py-2 bg-red-500 hover:bg-red-600 rounded-lg text-xs font-medium text-white"
+              >
+                Выйти
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 
