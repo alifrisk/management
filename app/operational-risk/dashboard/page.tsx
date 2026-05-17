@@ -39,7 +39,7 @@ export default function DashboardPage() {
   const [year, setYear] = useState(new Date().getFullYear())
   const [filterMonth, setFilterMonth] = useState('')
 
-  const [prevIncidents, setPrevIncidents] = useState<Incident[]>([])
+  const [prevIncidents, setPrevIncidents] = useState<{loss_amount_tjs: number; recovery_amount: number; risk_level: string; incident_status: string}[]>([])
 
   const fetchData = useCallback(async () => {
     setLoading(true)
