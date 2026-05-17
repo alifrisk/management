@@ -6,7 +6,7 @@ import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend,
   PieChart, Pie, Cell, LineChart, Line, ResponsiveContainer, LabelList
 } from 'recharts'
-import { TrendingDown, TrendingUp, Shield, AlertTriangle, Download, Filter } from 'lucide-react'
+import { Shield } from 'lucide-react'
 
 const COLORS = ['#1B8A4C', '#2EAD62', '#F59E0B', '#EF4444', '#8B5CF6', '#06B6D4', '#F97316', '#EC4899']
 const RISK_COLORS: Record<string, string> = {
@@ -37,7 +37,6 @@ export default function DashboardPage() {
   const [incidents, setIncidents] = useState<Incident[]>([])
   const [loading, setLoading] = useState(true)
   const [year, setYear] = useState(new Date().getFullYear())
-  const [filterDept, setFilterDept] = useState('')
   const [filterMonth, setFilterMonth] = useState('')
 
   const fetchData = useCallback(async () => {
@@ -48,7 +47,6 @@ export default function DashboardPage() {
       .gte('discovery_date', `${year}-01-01`)
       .lte('discovery_date', `${year}-12-31`)
 
-    if (filterDept) query = query.eq('department', filterDept)
     if (filterMonth) {
       const monthNum = String(parseInt(filterMonth)).padStart(2, '0')
       query = query.gte('discovery_date', `${year}-${monthNum}-01`).lte('discovery_date', `${year}-${monthNum}-31`)
@@ -57,13 +55,12 @@ export default function DashboardPage() {
     const { data } = await query
     setIncidents(data || [])
     setLoading(false)
-  }, [year, filterDept, filterMonth])
+  }, [year, filterMonth])
 
-  useEffect(() => { fetchData() }, [fetchData, filterMonth])
+  useEffect(() => { fetchData() }, [fetchData])
 
   const fmt = (n: number) => new Intl.NumberFormat('ru-RU').format(Math.round(n))
 
-  // Stats
   const total = incidents.length
   const totalLoss = incidents.reduce((s, i) => s + (i.loss_amount_tjs || 0), 0)
   const totalRecovery = incidents.reduce((s, i) => s + (i.recovery_amount || 0), 0)
@@ -71,34 +68,68 @@ export default function DashboardPage() {
   const extreme = incidents.filter(i => i.risk_level === 'Экстремальные').length
   const open = incidents.filter(i => i.incident_status === 'Открыт').length
 
-  // By factor
-  const factorData = ['Риск систем', 'Риск человеческого фактора', 'Риск внутренний процесс', 'Юридический риск', 'Внешний риск'].map(f => ({
-    name: f.replace('Риск ', '').replace(' фактора', ''),
-    count: incidents.filter(i => i.factor === f).length,
-    loss: incidents.filter(i => i.factor === f).reduce((s, i) => s + (i.loss_amount_tjs || 0), 0),
-  })).filter(d => d.count > 0)
+  // By month
+  const monthData = MONTHS.map((month, idx) => {
+    const m = incidents.filter(i => i.discovery_date && new Date(i.discovery_date).getMonth() === idx)
+    return {
+      name: month.slice(0, 3),
+      count: m.length,
+      loss: Math.round(m.reduce((s, i) => s + (i.loss_amount_tjs || 0), 0)),
+      recovery: Math.round(m.reduce((s, i) => s + (i.recovery_amount || 0), 0)),
+    }
+  })
+
+  // By business process - loss + recovery
+  const bpData = Object.entries(
+    incidents.reduce((acc, i) => {
+      if (!i.business_process) return acc
+      if (!acc[i.business_process]) acc[i.business_process] = { loss: 0, recovery: 0, count: 0 }
+      acc[i.business_process].loss += i.loss_amount_tjs || 0
+      acc[i.business_process].recovery += i.recovery_amount || 0
+      acc[i.business_process].count += 1
+      return acc
+    }, {} as Record<string, { loss: number; recovery: number; count: number }>)
+  ).sort((a, b) => b[1].loss - a[1].loss).slice(0, 10).map(([name, v]) => ({
+    name: name.length > 22 ? name.slice(0, 22) + '…' : name,
+    loss: Math.round(v.loss),
+    recovery: Math.round(v.recovery),
+    count: v.count,
+  }))
+
+  // By system - loss + recovery
+  const systemData = Object.entries(
+    incidents.reduce((acc, i) => {
+      if (!i.system) return acc
+      if (!acc[i.system]) acc[i.system] = { loss: 0, recovery: 0, count: 0 }
+      acc[i.system].loss += i.loss_amount_tjs || 0
+      acc[i.system].recovery += i.recovery_amount || 0
+      acc[i.system].count += 1
+      return acc
+    }, {} as Record<string, { loss: number; recovery: number; count: number }>)
+  ).sort((a, b) => b[1].loss - a[1].loss).slice(0, 8).map(([name, v]) => ({
+    name,
+    loss: Math.round(v.loss),
+    recovery: Math.round(v.recovery),
+    count: v.count,
+  }))
+
+  // By factor - loss + recovery
+  const factorData = ['Риск систем', 'Риск человеческого фактора', 'Риск внутренний процесс', 'Юридический риск', 'Внешний риск'].map(f => {
+    const m = incidents.filter(i => i.factor === f)
+    return {
+      name: f.replace('Риск ', '').replace(' фактора', '').replace(' процесс', ''),
+      count: m.length,
+      loss: Math.round(m.reduce((s, i) => s + (i.loss_amount_tjs || 0), 0)),
+      recovery: Math.round(m.reduce((s, i) => s + (i.recovery_amount || 0), 0)),
+    }
+  }).filter(d => d.count > 0)
 
   // By risk level
   const riskData = ['Низкий', 'Средний', 'Высокий', 'Экстремальные'].map(r => ({
     name: r,
     count: incidents.filter(i => i.risk_level === r).length,
-    loss: incidents.filter(i => i.risk_level === r).reduce((s, i) => s + (i.loss_amount_tjs || 0), 0),
+    loss: Math.round(incidents.filter(i => i.risk_level === r).reduce((s, i) => s + (i.loss_amount_tjs || 0), 0)),
   })).filter(d => d.count > 0)
-
-  // By month
-  const monthData = MONTHS.map((month, idx) => {
-    const monthIncidents = incidents.filter(i => {
-      if (!i.discovery_date) return false
-      const m = new Date(i.discovery_date).getMonth()
-      return m === idx
-    })
-    return {
-      name: month.slice(0, 3),
-      count: monthIncidents.length,
-      loss: monthIncidents.reduce((s, i) => s + (i.loss_amount_tjs || 0), 0),
-      recovery: monthIncidents.reduce((s, i) => s + (i.recovery_amount || 0), 0),
-    }
-  })
 
   // By status
   const statusData = ['Открыт', 'В процессе', 'Закрыт'].map(s => ({
@@ -106,89 +137,56 @@ export default function DashboardPage() {
     value: incidents.filter(i => i.incident_status === s).length,
   })).filter(d => d.value > 0)
 
-  // By client work status
-  const clientStatusData = ['В процессе обзвона', 'В ожидании возмещения', 'Возмещенно', 'Невозмещаемый', 'Нефинансовый инцидент', 'Процесс возмещения не начался', 'Процесс возмещения не идет'].map(s => ({
-    name: s.length > 20 ? s.slice(0, 20) + '...' : s,
-    fullName: s,
-    count: incidents.filter(i => i.client_work_status === s).length,
-  })).filter(d => d.count > 0)
-
   // By frequency
   const frequencyData = ['Часто повторяющиеся', 'Редко повторяющиеся', 'Единичный случай'].map(f => ({
     name: f,
     value: incidents.filter(i => i.frequency === f).length,
   })).filter(d => d.value > 0)
 
-  // By system
-  const systemData = Object.entries(
-    incidents.reduce((acc, i) => {
-      if (i.system) acc[i.system] = (acc[i.system] || 0) + 1
-      return acc
-    }, {} as Record<string, number>)
-  ).sort((a, b) => b[1] - a[1]).slice(0, 8).map(([name, count]) => ({ name, count }))
+  // Client status
+  const clientStatusData = ['В процессе обзвона', 'В ожидании возмещения', 'Возмещенно', 'Невозмещаемый', 'Нефинансовый инцидент', 'Процесс возмещения не начался', 'Процесс возмещения не идет'].map(s => ({
+    name: s.length > 22 ? s.slice(0, 22) + '…' : s,
+    count: incidents.filter(i => i.client_work_status === s).length,
+  })).filter(d => d.count > 0)
 
-  // By top business processes
-  const bpData = Object.entries(
-    incidents.reduce((acc, i) => {
-      if (i.business_process) acc[i.business_process] = (acc[i.business_process] || 0) + 1
-      return acc
-    }, {} as Record<string, number>)
-  ).sort((a, b) => b[1] - a[1]).slice(0, 10).map(([name, count]) => ({
-    name: name.length > 20 ? name.slice(0, 20) + '...' : name,
-    count
-  }))
-
-  // By top departments
+  // Department
   const deptData = Object.entries(
-    incidents.reduce((acc, i) => {
-      if (i.department) acc[i.department] = (acc[i.department] || 0) + 1
-      return acc
-    }, {} as Record<string, number>)
+    incidents.reduce((acc, i) => { if (i.department) acc[i.department] = (acc[i.department] || 0) + 1; return acc }, {} as Record<string, number>)
   ).sort((a, b) => b[1] - a[1]).slice(0, 10).map(([name, count]) => ({
-    name: name.length > 25 ? name.slice(0, 25) + '...' : name,
-    count
+    name: name.length > 25 ? name.slice(0, 25) + '…' : name, count
   }))
 
-  const cardCls = "bg-white rounded-xl border border-gray-100 shadow-sm p-5"
-  const titleCls = "text-sm font-semibold text-gray-700 mb-4"
+  const card = "bg-white rounded-xl border border-gray-100 shadow-sm p-5"
+  const title = "text-sm font-semibold text-gray-700 mb-4"
 
-  if (loading) {
-    return (
-      <div className="flex items-center justify-center h-64">
-        <div className="text-gray-400 text-sm">Загрузка данных...</div>
-      </div>
-    )
-  }
+  if (loading) return (
+    <div className="flex items-center justify-center h-64">
+      <div className="text-gray-400 text-sm">Загрузка...</div>
+    </div>
+  )
 
   return (
     <div className="max-w-7xl mx-auto space-y-5">
-      {/* Header */}
+      {/* Header + Filters */}
       <div className="flex items-center justify-between flex-wrap gap-3">
         <div>
           <h1 className="text-xl font-semibold text-gray-900">Дашборд — Операционный риск</h1>
-          <p className="text-sm text-gray-500 mt-0.5">Аналитика инцидентов за {year} год</p>
+          <p className="text-sm text-gray-500 mt-0.5">
+            Аналитика за {year}{filterMonth ? ` · ${MONTHS[parseInt(filterMonth) - 1]}` : ''}
+          </p>
         </div>
         <div className="flex items-center gap-2">
-          <select
-            value={year}
-            onChange={e => { setYear(Number(e.target.value)); setFilterMonth('') }}
-            className="px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#1B8A4C] bg-white"
-          >
+          <select value={year} onChange={e => { setYear(Number(e.target.value)); setFilterMonth('') }}
+            className="px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#1B8A4C] bg-white">
             {[2026, 2025, 2024, 2023].map(y => <option key={y} value={y}>{y}</option>)}
           </select>
-          <select
-            value={filterMonth}
-            onChange={e => setFilterMonth(e.target.value)}
-            className="px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#1B8A4C] bg-white"
-          >
+          <select value={filterMonth} onChange={e => setFilterMonth(e.target.value)}
+            className="px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#1B8A4C] bg-white">
             <option value="">Все месяцы</option>
             {MONTHS.map((m, i) => <option key={i} value={String(i + 1)}>{m}</option>)}
           </select>
           {filterMonth && (
-            <button
-              onClick={() => setFilterMonth('')}
-              className="px-3 py-2 border border-gray-200 rounded-lg text-sm text-gray-500 hover:bg-gray-50"
-            >
+            <button onClick={() => setFilterMonth('')} className="px-3 py-2 border border-gray-200 rounded-lg text-sm text-gray-500 hover:bg-gray-50">
               Сбросить
             </button>
           )}
@@ -197,130 +195,125 @@ export default function DashboardPage() {
 
       {/* KPI Cards */}
       <div className="grid grid-cols-2 lg:grid-cols-6 gap-3">
-        <div className={cardCls + ' lg:col-span-1'}>
-          <p className="text-xs text-gray-500 mb-1">Всего инцидентов</p>
-          <p className="text-3xl font-bold text-gray-900">{total}</p>
-        </div>
-        <div className={cardCls + ' lg:col-span-1'}>
-          <p className="text-xs text-gray-500 mb-1">Открытые</p>
-          <p className="text-3xl font-bold text-blue-600">{open}</p>
-        </div>
-        <div className={cardCls + ' lg:col-span-1'}>
-          <p className="text-xs text-gray-500 mb-1">Экстремальные</p>
-          <p className="text-3xl font-bold text-red-600">{extreme}</p>
-        </div>
-        <div className={cardCls + ' lg:col-span-1'}>
-          <p className="text-xs text-gray-500 mb-1">Ущерб (TJS)</p>
-          <p className="text-2xl font-bold text-red-600">{fmt(totalLoss)}</p>
-        </div>
-        <div className={cardCls + ' lg:col-span-1'}>
-          <p className="text-xs text-gray-500 mb-1">Возврат (TJS)</p>
-          <p className="text-2xl font-bold text-[#1B8A4C]">{fmt(totalRecovery)}</p>
-        </div>
-        <div className={cardCls + ' lg:col-span-1'}>
-          <p className="text-xs text-gray-500 mb-1">Возвратность</p>
-          <p className="text-2xl font-bold text-[#1B8A4C]">{recoveryRate}%</p>
-        </div>
+        {[
+          { label: 'Всего инцидентов', value: total, color: 'text-gray-900' },
+          { label: 'Открытые', value: open, color: 'text-blue-600' },
+          { label: 'Экстремальные', value: extreme, color: 'text-red-600' },
+          { label: 'Ущерб (TJS)', value: fmt(totalLoss), color: 'text-red-600' },
+          { label: 'Возврат (TJS)', value: fmt(totalRecovery), color: 'text-[#1B8A4C]' },
+          { label: 'Возвратность', value: `${recoveryRate}%`, color: 'text-[#1B8A4C]' },
+        ].map(k => (
+          <div key={k.label} className={card}>
+            <p className="text-xs text-gray-500 mb-1">{k.label}</p>
+            <p className={`text-2xl font-bold ${k.color}`}>{k.value}</p>
+          </div>
+        ))}
       </div>
 
-      {/* Row 1: Monthly trend + Status pie */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
-        <div className={cardCls + ' lg:col-span-2'}>
-          <p className={titleCls}>Динамика инцидентов по месяцам</p>
-          <ResponsiveContainer width="100%" height={220}>
-            <LineChart data={monthData}>
-              <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
-              <XAxis dataKey="name" tick={{ fontSize: 11 }} />
-              <YAxis tick={{ fontSize: 11 }} />
-              <Tooltip />
-              <Legend />
-              <Line type="monotone" dataKey="count" name="Кол-во" stroke="#1B8A4C" strokeWidth={2} dot={{ r: 4 }} />
-            </LineChart>
-          </ResponsiveContainer>
-        </div>
-        <div className={cardCls}>
-          <p className={titleCls}>По статусу инцидентов</p>
-          <ResponsiveContainer width="100%" height={220}>
-            <PieChart>
-              <Pie data={statusData} dataKey="value" nameKey="name" cx="50%" cy="50%" outerRadius={80} label={({ name, value }) => value > 0 ? `${name}: ${value}` : ''}>
-                {statusData.map((_, i) => <Cell key={i} fill={['#3B82F6', '#F59E0B', '#1B8A4C'][i]} />)}
-              </Pie>
-              <Tooltip />
-            </PieChart>
-          </ResponsiveContainer>
-        </div>
+      {/* PRIORITY 1: Ущерб и возврат по месяцам + количество */}
+      <div className={card}>
+        <p className={title}>Ущерб, возврат и количество инцидентов по месяцам</p>
+        <ResponsiveContainer width="100%" height={250}>
+          <BarChart data={monthData}>
+            <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
+            <XAxis dataKey="name" tick={{ fontSize: 11 }} />
+            <YAxis yAxisId="left" tick={{ fontSize: 11 }} />
+            <YAxis yAxisId="right" orientation="right" tick={{ fontSize: 11 }} />
+            <Tooltip formatter={(v: number) => fmt(v)} />
+            <Legend />
+            <Bar yAxisId="left" dataKey="loss" name="Ущерб (TJS)" fill="#EF4444" radius={[4,4,0,0]} />
+            <Bar yAxisId="left" dataKey="recovery" name="Возврат (TJS)" fill="#1B8A4C" radius={[4,4,0,0]} />
+            <Line yAxisId="right" type="monotone" data={monthData} dataKey="count" name="Кол-во" stroke="#8B5CF6" strokeWidth={2} dot={{ r: 4 }} />
+          </BarChart>
+        </ResponsiveContainer>
       </div>
 
-      {/* Row 2: By factor + By risk level */}
+      {/* PRIORITY 2 & 3: Ущерб по бизнес-процессам и системам */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-        <div className={cardCls}>
-          <p className={titleCls}>Количество инцидентов по факторам</p>
-          <ResponsiveContainer width="100%" height={220}>
-            <BarChart data={factorData} layout="vertical">
+        <div className={card}>
+          <p className={title}>Ущерб и возврат по бизнес-процессам (TJS)</p>
+          <ResponsiveContainer width="100%" height={280}>
+            <BarChart data={bpData} layout="vertical">
               <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
-              <XAxis type="number" tick={{ fontSize: 11 }} />
-              <YAxis dataKey="name" type="category" tick={{ fontSize: 10 }} width={120} />
-              <Tooltip />
-              <Bar dataKey="count" name="Количество" fill="#1B8A4C" radius={[0, 4, 4, 0]}>
-                <LabelList dataKey="count" position="right" style={{ fontSize: 11 }} />
-              </Bar>
+              <XAxis type="number" tick={{ fontSize: 10 }} tickFormatter={v => fmt(v)} />
+              <YAxis dataKey="name" type="category" tick={{ fontSize: 9 }} width={150} />
+              <Tooltip formatter={(v: number) => fmt(v)} />
+              <Legend />
+              <Bar dataKey="loss" name="Ущерб" fill="#EF4444" radius={[0,4,4,0]} />
+              <Bar dataKey="recovery" name="Возврат" fill="#1B8A4C" radius={[0,4,4,0]} />
             </BarChart>
           </ResponsiveContainer>
         </div>
-        <div className={cardCls}>
-          <p className={titleCls}>По степени риска</p>
+        <div className={card}>
+          <p className={title}>Ущерб и возврат по системам (TJS)</p>
+          <ResponsiveContainer width="100%" height={280}>
+            <BarChart data={systemData} layout="vertical">
+              <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
+              <XAxis type="number" tick={{ fontSize: 10 }} tickFormatter={v => fmt(v)} />
+              <YAxis dataKey="name" type="category" tick={{ fontSize: 9 }} width={130} />
+              <Tooltip formatter={(v: number) => fmt(v)} />
+              <Legend />
+              <Bar dataKey="loss" name="Ущерб" fill="#EF4444" radius={[0,4,4,0]} />
+              <Bar dataKey="recovery" name="Возврат" fill="#1B8A4C" radius={[0,4,4,0]} />
+            </BarChart>
+          </ResponsiveContainer>
+        </div>
+      </div>
+
+      {/* PRIORITY 4: Ущерб по факторам */}
+      <div className={card}>
+        <p className={title}>Ущерб и возврат по факторам риска (TJS)</p>
+        <ResponsiveContainer width="100%" height={220}>
+          <BarChart data={factorData} layout="vertical">
+            <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
+            <XAxis type="number" tick={{ fontSize: 11 }} tickFormatter={v => fmt(v)} />
+            <YAxis dataKey="name" type="category" tick={{ fontSize: 10 }} width={120} />
+            <Tooltip formatter={(v: number) => fmt(v)} />
+            <Legend />
+            <Bar dataKey="loss" name="Ущерб" fill="#EF4444" radius={[0,4,4,0]} />
+            <Bar dataKey="recovery" name="Возврат" fill="#1B8A4C" radius={[0,4,4,0]} />
+          </BarChart>
+        </ResponsiveContainer>
+      </div>
+
+      {/* Secondary: Risk level + Status */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+        <div className={card}>
+          <p className={title}>По степени риска</p>
           <ResponsiveContainer width="100%" height={220}>
             <BarChart data={riskData}>
               <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
               <XAxis dataKey="name" tick={{ fontSize: 11 }} />
               <YAxis tick={{ fontSize: 11 }} />
               <Tooltip />
-              <Bar dataKey="count" name="Количество" radius={[4, 4, 0, 0]}>
+              <Bar dataKey="count" name="Количество" radius={[4,4,0,0]}>
                 {riskData.map((entry, i) => <Cell key={i} fill={RISK_COLORS[entry.name] || '#6B7280'} />)}
                 <LabelList dataKey="count" position="top" style={{ fontSize: 11 }} />
               </Bar>
             </BarChart>
           </ResponsiveContainer>
         </div>
-      </div>
-
-      {/* Row 3: Monthly loss + recovery */}
-      <div className={cardCls}>
-        <p className={titleCls}>Ущерб и возврат по месяцам (TJS)</p>
-        <ResponsiveContainer width="100%" height={220}>
-          <BarChart data={monthData}>
-            <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
-            <XAxis dataKey="name" tick={{ fontSize: 11 }} />
-            <YAxis tick={{ fontSize: 11 }} />
-            <Tooltip formatter={(v: number) => fmt(v)} />
-            <Legend />
-            <Bar dataKey="loss" name="Ущерб" fill="#EF4444" radius={[4, 4, 0, 0]} />
-            <Bar dataKey="recovery" name="Возврат" fill="#1B8A4C" radius={[4, 4, 0, 0]} />
-          </BarChart>
-        </ResponsiveContainer>
-      </div>
-
-      {/* Row 4: By system + By frequency */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-        <div className={cardCls}>
-          <p className={titleCls}>По системам</p>
-          <ResponsiveContainer width="100%" height={220}>
-            <BarChart data={systemData} layout="vertical">
-              <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
-              <XAxis type="number" tick={{ fontSize: 11 }} />
-              <YAxis dataKey="name" type="category" tick={{ fontSize: 10 }} width={130} />
-              <Tooltip />
-              <Bar dataKey="count" name="Количество" fill="#2EAD62" radius={[0, 4, 4, 0]}>
-                <LabelList dataKey="count" position="right" style={{ fontSize: 11 }} />
-              </Bar>
-            </BarChart>
-          </ResponsiveContainer>
-        </div>
-        <div className={cardCls}>
-          <p className={titleCls}>По частоте повторений</p>
+        <div className={card}>
+          <p className={title}>По статусу инцидентов</p>
           <ResponsiveContainer width="100%" height={220}>
             <PieChart>
-              <Pie data={frequencyData} dataKey="value" nameKey="name" cx="50%" cy="50%" outerRadius={80} label={({ name, value }) => `${value}`}>
+              <Pie data={statusData} dataKey="value" nameKey="name" cx="50%" cy="45%" outerRadius={75}>
+                {statusData.map((_, i) => <Cell key={i} fill={['#3B82F6','#F59E0B','#1B8A4C'][i]} />)}
+              </Pie>
+              <Tooltip />
+              <Legend />
+            </PieChart>
+          </ResponsiveContainer>
+        </div>
+      </div>
+
+      {/* Frequency + Client status */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+        <div className={card}>
+          <p className={title}>По частоте повторений</p>
+          <ResponsiveContainer width="100%" height={220}>
+            <PieChart>
+              <Pie data={frequencyData} dataKey="value" nameKey="name" cx="50%" cy="45%" outerRadius={75}>
                 {frequencyData.map((_, i) => <Cell key={i} fill={COLORS[i]} />)}
               </Pie>
               <Tooltip />
@@ -328,61 +321,42 @@ export default function DashboardPage() {
             </PieChart>
           </ResponsiveContainer>
         </div>
+        <div className={card}>
+          <p className={title}>По статусу работы с клиентами</p>
+          <ResponsiveContainer width="100%" height={220}>
+            <BarChart data={clientStatusData} layout="vertical">
+              <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
+              <XAxis type="number" tick={{ fontSize: 11 }} />
+              <YAxis dataKey="name" type="category" tick={{ fontSize: 9 }} width={150} />
+              <Tooltip />
+              <Bar dataKey="count" name="Количество" fill="#F59E0B" radius={[0,4,4,0]}>
+                <LabelList dataKey="count" position="right" style={{ fontSize: 11 }} />
+              </Bar>
+            </BarChart>
+          </ResponsiveContainer>
+        </div>
       </div>
 
-      {/* Row 5: By business process */}
-      <div className={cardCls}>
-        <p className={titleCls}>Топ бизнес-процессов по количеству инцидентов</p>
-        <ResponsiveContainer width="100%" height={250}>
-          <BarChart data={bpData} layout="vertical">
+      {/* Department */}
+      <div className={card}>
+        <p className={title}>Топ подразделений по количеству инцидентов</p>
+        <ResponsiveContainer width="100%" height={280}>
+          <BarChart data={deptData} layout="vertical">
             <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
             <XAxis type="number" tick={{ fontSize: 11 }} />
-            <YAxis dataKey="name" type="category" tick={{ fontSize: 10 }} width={180} />
+            <YAxis dataKey="name" type="category" tick={{ fontSize: 9 }} width={180} />
             <Tooltip />
-            <Bar dataKey="count" name="Количество" fill="#1B8A4C" radius={[0, 4, 4, 0]}>
+            <Bar dataKey="count" name="Количество" fill="#8B5CF6" radius={[0,4,4,0]}>
               <LabelList dataKey="count" position="right" style={{ fontSize: 11 }} />
             </Bar>
           </BarChart>
         </ResponsiveContainer>
       </div>
 
-      {/* Row 6: By department + client status */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-        <div className={cardCls}>
-          <p className={titleCls}>Топ подразделений по инцидентам</p>
-          <ResponsiveContainer width="100%" height={280}>
-            <BarChart data={deptData} layout="vertical">
-              <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
-              <XAxis type="number" tick={{ fontSize: 11 }} />
-              <YAxis dataKey="name" type="category" tick={{ fontSize: 9 }} width={170} />
-              <Tooltip />
-              <Bar dataKey="count" name="Количество" fill="#8B5CF6" radius={[0, 4, 4, 0]}>
-                <LabelList dataKey="count" position="right" style={{ fontSize: 11 }} />
-              </Bar>
-            </BarChart>
-          </ResponsiveContainer>
-        </div>
-        <div className={cardCls}>
-          <p className={titleCls}>По статусу работы с клиентами</p>
-          <ResponsiveContainer width="100%" height={280}>
-            <BarChart data={clientStatusData} layout="vertical">
-              <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
-              <XAxis type="number" tick={{ fontSize: 11 }} />
-              <YAxis dataKey="name" type="category" tick={{ fontSize: 9 }} width={150} />
-              <Tooltip formatter={(v, n, p) => [v, p.payload.fullName]} />
-              <Bar dataKey="count" name="Количество" fill="#F59E0B" radius={[0, 4, 4, 0]}>
-                <LabelList dataKey="count" position="right" style={{ fontSize: 11 }} />
-              </Bar>
-            </BarChart>
-          </ResponsiveContainer>
-        </div>
-      </div>
-
       {total === 0 && (
         <div className="text-center py-16 text-gray-400">
           <Shield className="w-12 h-12 mx-auto mb-3 opacity-30" />
           <p>Нет данных за {year} год</p>
-          <p className="text-sm mt-1">Добавьте инциденты в реестр</p>
         </div>
       )}
     </div>
