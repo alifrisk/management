@@ -106,8 +106,7 @@ export async function POST(request: Request) {
       {
         properties: {
           page: {
-            size: { width: 16838, height: 11906 },
-            orientation: PageOrientation.LANDSCAPE,
+            size: { width: 16838, height: 11906, orientation: PageOrientation.LANDSCAPE },
             margin: { top: 851, right: 851, bottom: 851, left: 851 }
           }
         },
