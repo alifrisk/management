@@ -476,14 +476,14 @@ export default function RegistryPage() {
     URL.revokeObjectURL(url)
   }
 
-  // Отчёт НБТ — генерируется прямо в браузере
-  function generateNBTReport(incident: Incident) {
+  // Отчёт НБТ — генерирует Word документ через API
+  async function generateNBTReport(incident: Incident) {
     if (!incident.loss_amount_tjs || incident.loss_amount_tjs < 5000) {
       alert('Отчёт НБТ формируется только для инцидентов с ущербом от 5 000 TJS!')
       return
     }
-    const incidentDate = incident.incident_date
-      ? new Date(incident.incident_date).toLocaleDateString('ru-RU')
+    const discoveryDate = incident.discovery_date
+      ? new Date(incident.discovery_date).toLocaleDateString('ru-RU')
       : '—'
     const loss = incident.loss_amount_tjs
       ? new Intl.NumberFormat('ru-RU').format(incident.loss_amount_tjs)
@@ -522,7 +522,7 @@ td.left{text-align:left}
 <div class="center">Замима</div>
 <div class="center">Ҳисобот оид ба ҳодисаҳои хавфҳои амалиётӣ,<br>
 ки ба зарар дар ҳаҷми 5000 сомонӣ ва зиёда аз он оварда расонидаанд<br>
-дар ҶСК "Алиф Бонк" барои "${incidentDate}"</div>
+дар ҶСК "Алиф Бонк" барои "${discoveryDate}"</div>
 <table>
 <thead>
 <tr>
@@ -545,7 +545,7 @@ td.left{text-align:left}
 <td>1</td>
 <td class="left">${description}</td>
 <td>${department}</td>
-<td>${incidentDate}</td>
+<td>${discoveryDate}</td>
 <td>${loss}</td>
 <td>—</td><td>—</td><td>—</td><td>—</td><td>—</td><td>—</td>
 <td>${recovery}</td>
@@ -562,13 +562,23 @@ td.left{text-align:left}
 </div>
 </body></html>`
 
-    const blob = new Blob([html], { type: 'text/html;charset=utf-8;' })
-    const url = URL.createObjectURL(blob)
-    const a = document.createElement('a')
-    a.href = url
-    a.download = `NBT_OR_${incident.incident_number}_${new Date().toISOString().split('T')[0]}.html`
-    a.click()
-    URL.revokeObjectURL(url)
+    try {
+      const res = await fetch('/api/export/nbt-report', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ incident }),
+      })
+      if (!res.ok) throw new Error('Ошибка сервера')
+      const blob = await res.blob()
+      const url = URL.createObjectURL(blob)
+      const a = document.createElement('a')
+      a.href = url
+      a.download = `NBT_OR_${incident.incident_number}_${new Date().toISOString().split('T')[0]}.docx`
+      a.click()
+      URL.revokeObjectURL(url)
+    } catch {
+      alert('Ошибка при генерации отчёта НБТ')
+    }
   }
 
   const getRiskBg = (level: string) => {
@@ -863,7 +873,12 @@ td.left{text-align:left}
                 <h2 className="text-lg font-semibold text-gray-900">{editingId ? 'Редактировать инцидент' : 'Новый инцидент'}</h2>
                 <p className="text-sm text-gray-500 mt-0.5">Реестр операционных инцидентов</p>
               </div>
-              <button onClick={() => { setShowModal(false); setFormData(EMPTY_FORM); setEditingId(null) }} className="text-gray-400 hover:text-gray-600"><X className="w-5 h-5" /></button>
+              <button onClick={() => {
+                if (Object.values(formData).some(v => v !== '' && v !== 1 && v !== 'Открыт' && v !== 'TJS')) {
+                  if (!confirm('Закрыть без сохранения? Данные будут потеряны.')) return
+                }
+                setShowModal(false); setFormData(EMPTY_FORM); setEditingId(null)
+              }} className="text-gray-400 hover:text-gray-600"><X className="w-5 h-5" /></button>
             </div>
 
             {/* Tabs */}
@@ -982,7 +997,7 @@ td.left{text-align:left}
                   </div>
                   <div>
                     <label className={labelCls}>Дата обнаружения *</label>
-                    <input type="date" value={String(formData.discovery_date)} onChange={e => handleChange('discovery_date', e.target.value)} className={inputCls} />
+                    <input type="date" value={String(formData.discovery_date)} max={new Date().toISOString().split('T')[0]} onChange={e => handleChange('discovery_date', e.target.value)} className={inputCls} />
                   </div>
                   <div>
                     <label className={labelCls}>Фактическая дата инцидента *</label>
