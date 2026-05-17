@@ -72,8 +72,11 @@ export async function POST(request: Request) {
     const makeNB = (children: InstanceType<typeof Paragraph>[]) =>
       new TableCell({ borders: noborders, children })
 
+    const { PageOrientation } = await import('docx')
+
     const doc = new Document({
-      sections: [{
+      sections: [
+      {
         properties: {
           page: {
             size: { width: 11906, height: 16838 },
@@ -98,7 +101,17 @@ export async function POST(request: Request) {
           makePara(''),
           makePara('Иҷрокунанда: Камила Мародмамадова', { after: 60 }),
           makePara('Тел.: +992884034004', { after: 60 }),
-          new Paragraph({ pageBreakBefore: true, children: [new TextRun('')] }),
+        ]
+      },
+      {
+        properties: {
+          page: {
+            size: { width: 16838, height: 11906 },
+            orientation: PageOrientation.LANDSCAPE,
+            margin: { top: 851, right: 851, bottom: 851, left: 851 }
+          }
+        },
+        children: [
           makePara('Замима', { right: true, bold: true }),
           makePara('Ҳисобот оид ба ҳодисаҳои хавфҳои амалиётӣ,', { center: true, bold: true, after: 60 }),
           makePara('ки ба зарар дар ҳаҷми 5000 сомонӣ ва зиёда аз он оварда расонидаанд', { center: true, bold: true, after: 60 }),
@@ -158,12 +171,13 @@ export async function POST(request: Request) {
             ]
           }),
         ]
-      }]
+      }
+      ]
     })
 
     const buffer = await Packer.toBuffer(doc)
 
-    return new NextResponse(new Uint8Array(buffer), {
+    return new NextResponse(buffer, {
       headers: {
         'Content-Type': 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
         'Content-Disposition': `attachment; filename="NBT_OR_${incident.incident_number}_${new Date().toISOString().split('T')[0]}.docx"`,
