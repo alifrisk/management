@@ -1,4 +1,6 @@
 import { NextResponse } from 'next/server'
+import { readFileSync } from 'fs'
+import { join } from 'path'
 
 interface CellOpts {
   noBorder?: boolean
@@ -39,8 +41,17 @@ export async function POST(request: Request) {
 
     const {
       Document, Packer, Paragraph, TextRun, Table, TableRow, TableCell,
-      AlignmentType, BorderStyle, WidthType, VerticalAlign, ShadingType
+      AlignmentType, BorderStyle, WidthType, VerticalAlign, ShadingType, ImageRun
     } = await import('docx')
+
+    // Read logo from public folder
+    let logoData: Buffer | null = null
+    try {
+      const logoPath = join(process.cwd(), 'public', 'nbt-header.png')
+      logoData = readFileSync(logoPath)
+    } catch {
+      // Logo not found - continue without it
+    }
 
     const b = { style: BorderStyle.SINGLE, size: 4, color: '000000' }
     const borders = { top: b, bottom: b, left: b, right: b }
@@ -84,6 +95,16 @@ export async function POST(request: Request) {
           }
         },
         children: [
+          // Logo header if available
+          ...(logoData ? [new Paragraph({
+            alignment: AlignmentType.CENTER,
+            spacing: { after: 200 },
+            children: [new ImageRun({
+              data: logoData,
+              transformation: { width: 500, height: 80 },
+            })]
+          })] : []),
+
           new Table({
             width: { size: 9354, type: WidthType.DXA },
             columnWidths: [4677, 4677],
