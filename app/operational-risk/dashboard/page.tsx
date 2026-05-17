@@ -4,7 +4,7 @@ import { useState, useEffect, useCallback } from 'react'
 import { supabase } from '@/supabase/client'
 import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend,
-  PieChart, Pie, Cell, LineChart, Line, ResponsiveContainer, LabelList
+  PieChart, Pie, Cell, LineChart, Line, ComposedChart, ResponsiveContainer, LabelList
 } from 'recharts'
 import { Shield } from 'lucide-react'
 
@@ -39,6 +39,8 @@ export default function DashboardPage() {
   const [year, setYear] = useState(new Date().getFullYear())
   const [filterMonth, setFilterMonth] = useState('')
 
+  const [prevIncidents, setPrevIncidents] = useState<Incident[]>([])
+
   const fetchData = useCallback(async () => {
     setLoading(true)
     let query = supabase
@@ -52,8 +54,17 @@ export default function DashboardPage() {
       query = query.gte('discovery_date', `${year}-${monthNum}-01`).lte('discovery_date', `${year}-${monthNum}-31`)
     }
 
-    const { data } = await query
+    // Fetch previous year for comparison
+    const [{ data }, { data: prevData }] = await Promise.all([
+      query,
+      supabase.from('operational_incidents')
+        .select('loss_amount_tjs, recovery_amount, risk_level, incident_status')
+        .gte('discovery_date', `${year - 1}-01-01`)
+        .lte('discovery_date', `${year - 1}-12-31`)
+    ])
+
     setIncidents(data || [])
+    setPrevIncidents(prevData || [])
     setLoading(false)
   }, [year, filterMonth])
 
@@ -68,7 +79,19 @@ export default function DashboardPage() {
   const extreme = incidents.filter(i => i.risk_level === 'Экстремальные').length
   const open = incidents.filter(i => i.incident_status === 'Открыт').length
 
-  // By month
+  // Previous period comparison
+  const prevLoss = prevIncidents.reduce((s, i) => s + (i.loss_amount_tjs || 0), 0)
+  const prevCount = prevIncidents.length
+  const lossDiff = prevLoss > 0 ? ((totalLoss - prevLoss) / prevLoss * 100).toFixed(1) : null
+  const countDiff = prevCount > 0 ? ((total - prevCount) / prevCount * 100).toFixed(1) : null
+
+  // Top 3 most expensive incidents (need full data - use from incidents)
+  const top3 = [...incidents]
+    .sort((a, b) => (b.loss_amount_tjs || 0) - (a.loss_amount_tjs || 0))
+    .slice(0, 3)
+
+  // By month - if specific month selected, highlight it
+
   const monthData = MONTHS.map((month, idx) => {
     const m = incidents.filter(i => i.discovery_date && new Date(i.discovery_date).getMonth() === idx)
     return {
@@ -193,38 +216,79 @@ export default function DashboardPage() {
         </div>
       </div>
 
-      {/* KPI Cards */}
+      {/* KPI Cards with comparison */}
       <div className="grid grid-cols-2 lg:grid-cols-6 gap-3">
-        {[
-          { label: 'Всего инцидентов', value: total, color: 'text-gray-900' },
-          { label: 'Открытые', value: open, color: 'text-blue-600' },
-          { label: 'Экстремальные', value: extreme, color: 'text-red-600' },
-          { label: 'Ущерб (TJS)', value: fmt(totalLoss), color: 'text-red-600' },
-          { label: 'Возврат (TJS)', value: fmt(totalRecovery), color: 'text-[#1B8A4C]' },
-          { label: 'Возвратность', value: `${recoveryRate}%`, color: 'text-[#1B8A4C]' },
-        ].map(k => (
-          <div key={k.label} className={card}>
-            <p className="text-xs text-gray-500 mb-1">{k.label}</p>
-            <p className={`text-2xl font-bold ${k.color}`}>{k.value}</p>
-          </div>
-        ))}
+        <div className={card}>
+          <p className="text-xs text-gray-500 mb-1">Всего инцидентов</p>
+          <p className="text-2xl font-bold text-gray-900">{total}</p>
+          {countDiff && <p className={`text-xs mt-1 font-medium ${parseFloat(countDiff) > 0 ? 'text-red-500' : 'text-green-600'}`}>
+            {parseFloat(countDiff) > 0 ? '▲' : '▼'} {Math.abs(parseFloat(countDiff))}% vs {year-1}
+          </p>}
+        </div>
+        <div className={card}>
+          <p className="text-xs text-gray-500 mb-1">Открытые</p>
+          <p className="text-2xl font-bold text-blue-600">{open}</p>
+        </div>
+        <div className={card}>
+          <p className="text-xs text-gray-500 mb-1">Экстремальные</p>
+          <p className="text-2xl font-bold text-red-600">{extreme}</p>
+        </div>
+        <div className={card}>
+          <p className="text-xs text-gray-500 mb-1">Ущерб (TJS)</p>
+          <p className="text-2xl font-bold text-red-600">{fmt(totalLoss)}</p>
+          {lossDiff && <p className={`text-xs mt-1 font-medium ${parseFloat(lossDiff) > 0 ? 'text-red-500' : 'text-green-600'}`}>
+            {parseFloat(lossDiff) > 0 ? '▲' : '▼'} {Math.abs(parseFloat(lossDiff))}% vs {year-1}
+          </p>}
+        </div>
+        <div className={card}>
+          <p className="text-xs text-gray-500 mb-1">Возврат (TJS)</p>
+          <p className="text-2xl font-bold text-[#1B8A4C]">{fmt(totalRecovery)}</p>
+        </div>
+        <div className={card}>
+          <p className="text-xs text-gray-500 mb-1">Возвратность</p>
+          <p className="text-2xl font-bold text-[#1B8A4C]">{recoveryRate}%</p>
+        </div>
       </div>
+
+      {/* Top 3 most expensive incidents */}
+      {top3.length > 0 && (
+        <div className={card}>
+          <p className={title}>🔴 Топ 3 крупнейших инцидента по ущербу</p>
+          <div className="space-y-3">
+            {top3.map((inc, i) => (
+              <div key={i} className="flex items-center justify-between p-3 bg-red-50 rounded-lg border border-red-100">
+                <div className="flex items-center gap-3">
+                  <span className={`w-7 h-7 rounded-full flex items-center justify-center text-white text-sm font-bold ${i === 0 ? 'bg-red-600' : i === 1 ? 'bg-orange-500' : 'bg-yellow-500'}`}>{i+1}</span>
+                  <div>
+                    <p className="text-sm font-medium text-gray-900">{inc.business_process || '—'}</p>
+                    <p className="text-xs text-gray-500">{inc.department} · {inc.discovery_date ? new Date(inc.discovery_date).toLocaleDateString('ru-RU') : '—'}</p>
+                  </div>
+                </div>
+                <div className="text-right">
+                  <p className="text-sm font-bold text-red-600">{fmt(inc.loss_amount_tjs || 0)} TJS</p>
+                  <p className="text-xs text-green-600">возврат: {fmt(inc.recovery_amount || 0)} TJS</p>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
 
       {/* PRIORITY 1: Ущерб и возврат по месяцам + количество */}
       <div className={card}>
         <p className={title}>Ущерб, возврат и количество инцидентов по месяцам</p>
         <ResponsiveContainer width="100%" height={250}>
-          <BarChart data={monthData}>
+          <ComposedChart data={filterMonth ? monthData.filter((_,i) => i === parseInt(filterMonth) - 1) : monthData}>
             <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
             <XAxis dataKey="name" tick={{ fontSize: 11 }} />
-            <YAxis yAxisId="left" tick={{ fontSize: 11 }} />
+            <YAxis yAxisId="left" tick={{ fontSize: 11 }} tickFormatter={v => fmt(v)} />
             <YAxis yAxisId="right" orientation="right" tick={{ fontSize: 11 }} />
-            <Tooltip formatter={(v: number) => fmt(v)} />
+            <Tooltip formatter={(v: number, name: string) => name === 'Кол-во' ? [v, name] : [fmt(v), name]} />
             <Legend />
             <Bar yAxisId="left" dataKey="loss" name="Ущерб (TJS)" fill="#EF4444" radius={[4,4,0,0]} />
             <Bar yAxisId="left" dataKey="recovery" name="Возврат (TJS)" fill="#1B8A4C" radius={[4,4,0,0]} />
-            <Line yAxisId="right" type="monotone" data={monthData} dataKey="count" name="Кол-во" stroke="#8B5CF6" strokeWidth={2} dot={{ r: 4 }} />
-          </BarChart>
+            <Line yAxisId="right" type="monotone" dataKey="count" name="Кол-во" stroke="#8B5CF6" strokeWidth={2} dot={{ r: 5 }} />
+          </ComposedChart>
         </ResponsiveContainer>
       </div>
 
