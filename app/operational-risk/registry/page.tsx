@@ -407,30 +407,66 @@ export default function RegistryPage() {
 
   // Экспорт в Excel
   function exportToExcel() {
-    const headers = ['№', 'Дата инцидента', 'Категория Ур.1', 'Категория Ур.2', 'Бизнес-процесс', 'Фактор', 'Система', 'Причина', 'Обнаружил', 'Подразделение', 'Дата обнаружения', 'Ущерб (TJS)', 'Возврат (TJS)', 'Остаток', 'Уровень риска', 'Статус', 'Раскрытие', 'Планы мероприятий', 'Фактическое исполнение', 'Ответственный']
+    // Этап 1: Классификация
+    const headers = [
+      '№ инцидента',
+      // Этап 1
+      'Категория Ур.1', 'Категория Ур.2', 'Пример действий Ур.3',
+      'Бизнес-процесс', 'Фактор риска', 'Система', 'Причина',
+      'Частота', 'Кол-во повторений', 'Место происшествия',
+      'Сотрудник (чел. фактор)', 'Описание кейса',
+      // Этап 2
+      'Обнаружил (ФИО)', 'Дата обнаружения', 'Дата инцидента', 'Раскрытие',
+      'Ссылка/ID транзакции', 'Кол-во транзакций',
+      // Этап 3
+      'Сумма ущерба', 'Валюта', 'Сумма ущерба (TJS)', 'Сумма возврата (TJS)', 'Остаток (TJS)', 'Уровень возврата (%)',
+      // Этап 4
+      'Статус инцидента', 'Статус работы с клиентом',
+      'Планы мероприятий', 'Фактическое исполнение',
+      'Ответственный', 'Статус контроля',
+      // Этап 5
+      'Вероятность', 'Влияние', 'Контроль и регулирование', 'Уровень риска',
+    ]
     const rows = filtered.map(i => [
       i.incident_number,
-      i.incident_date || '',
       i.event_category_l1?.replace(/_/g, ' ') || '',
       i.event_category_l2 || '',
+      i.event_category_l3 || '',
       i.business_process || '',
       i.factor || '',
       i.system || '',
       i.cause || '',
-      i.discovered_by || '',
+      i.frequency || '',
+      i.repeat_count || 1,
       i.department || '',
+      i.employee_involved || '',
+      i.case_description || '',
+      i.discovered_by || '',
       i.discovery_date || '',
-      i.loss_amount_tjs || 0,
-      i.recovery_amount || 0,
-      i.remainder || 0,
-      i.risk_level || '',
-      i.incident_status || '',
+      i.incident_date || '',
       i.disclosure || '',
+      i.system_link || '',
+      i.transaction_count || '',
+      i.loss_amount || '',
+      i.currency || 'TJS',
+      i.loss_amount_tjs || '',
+      i.recovery_amount || '',
+      i.remainder || '',
+      i.recovery_rate ? `${i.recovery_rate}%` : '',
+      i.incident_status || '',
+      i.client_work_status || '',
       i.plans || '',
       i.actual_execution || '',
       i.responsible || '',
+      i.control_status || '',
+      i.probability || '',
+      i.impact || '',
+      i.control_quality || '',
+      i.risk_level || '',
     ])
-    const csvContent = [headers, ...rows].map(row => row.map(cell => `"${String(cell).replace(/"/g, '""')}"`).join(',')).join('\n')
+    const csvContent = [headers, ...rows]
+      .map(row => row.map(cell => `"${String(cell).replace(/"/g, '""')}"`).join(','))
+      .join('\n')
     const blob = new Blob(['\uFEFF' + csvContent], { type: 'text/csv;charset=utf-8;' })
     const url = URL.createObjectURL(blob)
     const a = document.createElement('a')
@@ -446,7 +482,7 @@ export default function RegistryPage() {
       alert('Отчёт НБТ формируется только для инцидентов с ущербом от 5 000 TJS!')
       return
     }
-    const res = await fetch('/api/export/nbt-report', {
+    const res = await fetch(`${window.location.origin}/api/export/nbt-report`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ incident }),
