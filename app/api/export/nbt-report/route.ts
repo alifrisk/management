@@ -3,12 +3,11 @@ import { readFileSync } from 'fs'
 import { join } from 'path'
 
 interface CellOpts {
-  noBorder?: boolean
-  rowSpan?: number
-  colSpan?: number
   gray?: boolean
   bold?: boolean
   left?: boolean
+  colSpan?: number
+  rowSpan?: number
 }
 
 interface ParaOpts {
@@ -16,8 +15,8 @@ interface ParaOpts {
   center?: boolean
   after?: number
   indent?: boolean
-  size?: number
   bold?: boolean
+  size?: number
 }
 
 export async function POST(request: Request) {
@@ -44,15 +43,6 @@ export async function POST(request: Request) {
       AlignmentType, BorderStyle, WidthType, VerticalAlign, ShadingType, ImageRun
     } = await import('docx')
 
-    // Read logo from public folder
-    let logoData: Buffer | null = null
-    try {
-      const logoPath = join(process.cwd(), 'public', 'nbt-header.png')
-      logoData = readFileSync(logoPath)
-    } catch {
-      // Logo not found - continue without it
-    }
-
     const b = { style: BorderStyle.SINGLE, size: 4, color: '000000' }
     const borders = { top: b, bottom: b, left: b, right: b }
     const nob = { style: BorderStyle.NONE, size: 0, color: 'FFFFFF' }
@@ -60,7 +50,7 @@ export async function POST(request: Request) {
 
     const makeCell = (text: string, opts: CellOpts = {}) =>
       new TableCell({
-        borders: opts.noBorder ? noborders : borders,
+        borders,
         rowSpan: opts.rowSpan,
         columnSpan: opts.colSpan,
         verticalAlign: VerticalAlign.CENTER,
@@ -83,76 +73,114 @@ export async function POST(request: Request) {
     const makeNB = (children: InstanceType<typeof Paragraph>[]) =>
       new TableCell({ borders: noborders, children })
 
+    // Read logo
+    let logoData: Buffer | null = null
+    try {
+      logoData = readFileSync(join(process.cwd(), 'public', 'nbt-header.png'))
+    } catch { /* no logo */ }
+
+    // ==================
+    // SECTION 1: Portrait - Letter
+    // ==================
+    const section1Children = [
+      ...(logoData ? [new Paragraph({
+        alignment: AlignmentType.LEFT,
+        spacing: { after: 300 },
+        children: [new ImageRun({ data: logoData, transformation: { width: 600, height: 100 } })]
+      })] : []),
+
+      new Table({
+        width: { size: 9354, type: WidthType.DXA },
+        columnWidths: [4677, 4677],
+        rows: [new TableRow({ children: [makeNB([makePara('')]), makeNB([makePara('Ба Бонки миллии Тоҷикистон', { right: true, bold: true })])] })]
+      }),
+      makePara(''),
+      makePara('ҶСК «Алиф Бонк» (минбаъд дар матн - "Бонк") ба Шумо эҳтироми худро баён намуда, ҳисоботи умумии мониторинги хавфи амалиётиро оид ба ҳодисаҳои дорои хавфи амалиётии моддӣ, ки боиси зарар дар ҳаҷми 5 000 сомонӣ ва зиёда аз он оварда расонидаанд, мувофиқи банди 54-и Дастурамали №240 Бонки миллии Тоҷикистон барои санаи ҷорӣ пешниҳод менамояд.', { indent: true }),
+      makePara('Замимаи №1 дар ҳаҷми 1 варақ', { after: 240 }),
+      makePara('Бо эҳтиром,', { after: 480 }),
+      new Table({
+        width: { size: 9354, type: WidthType.DXA },
+        columnWidths: [4677, 4677],
+        rows: [new TableRow({ children: [makeNB([makePara('Раиси Бонк')]), makeNB([makePara('Атобек Гуланор', { right: true })])] })]
+      }),
+      makePara(''),
+      makePara('Иҷрокунанда: Камила Мародмамадова', { after: 60 }),
+      makePara('Тел.: +992884034004', { after: 60 }),
+    ]
+
+    // ==================
+    // SECTION 2: Landscape - Table (Annex)
+    // ==================
+    const section2Children = [
+      makePara('Замима', { right: true, bold: true }),
+      makePara('Ҳисобот оид ба ҳодисаҳои хавфҳои амалиётӣ,', { center: true, bold: true, after: 60 }),
+      makePara('ки ба зарар дар ҳаҷми 5000 сомонӣ ва зиёда аз он оварда расонидаанд', { center: true, bold: true, after: 60 }),
+      makePara(`дар ҶСК "Алиф Бонк" барои "${discoveryDate}"`, { center: true, bold: true, after: 200 }),
+
+      new Table({
+        width: { size: 14400, type: WidthType.DXA },
+        columnWidths: [400, 2200, 1200, 900, 600, 600, 600, 600, 600, 600, 600, 1200, 1300],
+        rows: [
+          // Header
+          new TableRow({ tableHeader: true, children: [
+            makeCell('№', { gray: true, bold: true }),
+            makeCell('Муҳтавои ҳодисаҳои хавфи амалиётӣ (сабабҳои зарар)', { gray: true, bold: true }),
+            makeCell('Ҷойе', { gray: true, bold: true }),
+            makeCell('Санаи ҳодиса', { gray: true, bold: true }),
+            makeCell('Ҷаримаҳо', { gray: true, bold: true }),
+            makeCell('Хароҷоти судӣ', { gray: true, bold: true }),
+            makeCell('Ҷуброни кормандон', { gray: true, bold: true }),
+            makeCell('Ҷуброни муштариён', { gray: true, bold: true }),
+            makeCell('Дороиҳо', { gray: true, bold: true }),
+            makeCell('Хароҷоти бартараф', { gray: true, bold: true }),
+            makeCell('Зарарҳои дигар', { gray: true, bold: true }),
+            makeCell('Шакл ва ҳаҷми пайомадҳо (бо сомонӣ)', { gray: true, bold: true }),
+            makeCell('Маблағҳои барқароршуда', { gray: true, bold: true }),
+          ]}),
+          // Data row
+          new TableRow({ children: [
+            makeCell('1'),
+            makeCell(description, { left: true }),
+            makeCell(department),
+            makeCell(incidentDate),
+            makeCell(''), makeCell(''), makeCell(''), makeCell(''), makeCell(''), makeCell(''), makeCell(''),
+            makeCell(loss),
+            makeCell(recovery),
+          ]}),
+          // Total row
+          new TableRow({ children: [
+            new TableCell({
+              borders,
+              columnSpan: 11,
+              children: [new Paragraph({ alignment: AlignmentType.RIGHT, children: [new TextRun({ text: 'Ҳамагӣ:', size: 14, bold: true, font: 'Times New Roman' })] })]
+            }),
+            makeCell(loss, { bold: true }),
+            makeCell(recovery, { bold: true }),
+          ]}),
+        ]
+      }),
+    ]
+
     const doc = new Document({
       sections: [
-      {
-        properties: {
-          page: {
-            size: { width: 11906, height: 16838 },
-            margin: { top: 1134, right: 851, bottom: 1134, left: 1701 }
-          }
+        {
+          properties: {
+            page: {
+              size: { width: 11906, height: 16838 },
+              margin: { top: 2836, right: 850, bottom: 1134, left: 1418 }
+            }
+          },
+          children: section1Children
         },
-        children: [
-          // Logo header if available
-          ...(logoData ? [new Paragraph({
-            alignment: AlignmentType.LEFT,
-            spacing: { after: 300 },
-            children: [new ImageRun({
-              data: logoData,
-              transformation: { width: 600, height: 100 },
-            })]
-          })] : []),
-
-          new Table({
-            width: { size: 13500, type: WidthType.DXA },
-            columnWidths: [400, 2000, 1200, 900, 600, 600, 600, 600, 600, 600, 600, 1000, 1200],
-            rows: [
-              // Single header row
-              new TableRow({ tableHeader: true, children: [
-                makeCell('№', { gray: true, bold: true }),
-                makeCell('Муҳтавои ҳодисаҳои хавфи амалиётӣ (сабабҳои зарар)', { gray: true, bold: true }),
-                makeCell('Ҷойе', { gray: true, bold: true }),
-                makeCell('Санаи ҳодиса', { gray: true, bold: true }),
-                makeCell('Ҷаримаҳо', { gray: true, bold: true }),
-                makeCell('Хароҷоти судӣ', { gray: true, bold: true }),
-                makeCell('Ҷуброни кормандон', { gray: true, bold: true }),
-                makeCell('Ҷуброни муштариён', { gray: true, bold: true }),
-                makeCell('Дороиҳо', { gray: true, bold: true }),
-                makeCell('Хароҷоти бартараф', { gray: true, bold: true }),
-                makeCell('Зарарҳои дигар', { gray: true, bold: true }),
-                makeCell('Шакл ва ҳаҷми пайомадҳо (бо сомонӣ)', { gray: true, bold: true }),
-                makeCell('Маблағҳои барқароршуда', { gray: true, bold: true }),
-              ]}),
-              // Data row - 13 cells matching 13 columns
-              new TableRow({ children: [
-                makeCell('1'),
-                makeCell(description, { left: true }),
-                makeCell(department),
-                makeCell(discoveryDate),
-                makeCell(''),
-                makeCell(''),
-                makeCell(''),
-                makeCell(''),
-                makeCell(''),
-                makeCell(''),
-                makeCell(''),
-                makeCell(loss),
-                makeCell(recovery),
-              ]}),
-              // Total row
-              new TableRow({ children: [
-                new TableCell({
-                  borders,
-                  columnSpan: 11,
-                  children: [new Paragraph({ alignment: AlignmentType.RIGHT, children: [new TextRun({ text: 'Ҳамагӣ:', size: 14, bold: true, font: 'Times New Roman' })] })]
-                }),
-                makeCell(loss, { bold: true }),
-                makeCell(recovery, { bold: true }),
-              ]}),
-            ]
-          }),
-        ]
-      }
+        {
+          properties: {
+            page: {
+              size: { width: 16838, height: 11906 },
+              margin: { top: 1418, right: 2836, bottom: 850, left: 1134 }
+            }
+          },
+          children: section2Children
+        }
       ]
     })
 
