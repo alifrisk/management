@@ -83,8 +83,6 @@ export async function POST(request: Request) {
     const makeNB = (children: InstanceType<typeof Paragraph>[]) =>
       new TableCell({ borders: noborders, children })
 
-    const { PageOrientation } = await import('docx')
-
     const doc = new Document({
       sections: [
       {
@@ -97,11 +95,11 @@ export async function POST(request: Request) {
         children: [
           // Logo header if available
           ...(logoData ? [new Paragraph({
-            alignment: AlignmentType.CENTER,
-            spacing: { after: 200 },
+            alignment: AlignmentType.LEFT,
+            spacing: { after: 300 },
             children: [new ImageRun({
               data: logoData,
-              transformation: { width: 500, height: 80 },
+              transformation: { width: 600, height: 100 },
             })]
           })] : []),
 
@@ -127,8 +125,8 @@ export async function POST(request: Request) {
       {
         properties: {
           page: {
-            size: { width: 16838, height: 11906, orientation: PageOrientation.LANDSCAPE },
-            margin: { top: 851, right: 851, bottom: 851, left: 851 }
+            size: { width: 16838, height: 11906 },
+            margin: { top: 1418, right: 2836, bottom: 850, left: 1134 }
           }
         },
         children: [
