@@ -476,27 +476,99 @@ export default function RegistryPage() {
     URL.revokeObjectURL(url)
   }
 
-  // Отчёт НБТ
-  async function generateNBTReport(incident: Incident) {
+  // Отчёт НБТ — генерируется прямо в браузере
+  function generateNBTReport(incident: Incident) {
     if (!incident.loss_amount_tjs || incident.loss_amount_tjs < 5000) {
       alert('Отчёт НБТ формируется только для инцидентов с ущербом от 5 000 TJS!')
       return
     }
-    const res = await fetch(`${window.location.origin}/api/export/nbt-report`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ incident }),
-    })
-    const data = await res.json()
-    if (data.html) {
-      const blob = new Blob([data.html], { type: 'text/html;charset=utf-8;' })
-      const url = URL.createObjectURL(blob)
-      const a = document.createElement('a')
-      a.href = url
-      a.download = `${data.filename}.html`
-      a.click()
-      URL.revokeObjectURL(url)
-    }
+    const incidentDate = incident.incident_date
+      ? new Date(incident.incident_date).toLocaleDateString('ru-RU')
+      : '—'
+    const loss = incident.loss_amount_tjs
+      ? new Intl.NumberFormat('ru-RU').format(incident.loss_amount_tjs)
+      : '—'
+    const recovery = incident.recovery_amount
+      ? new Intl.NumberFormat('ru-RU').format(incident.recovery_amount)
+      : '—'
+    const description = incident.case_description || incident.disclosure || incident.cause || '—'
+    const department = incident.department || '—'
+
+    const html = `<!DOCTYPE html>
+<html><head><meta charset="UTF-8">
+<style>
+body{font-family:'Times New Roman',serif;font-size:12pt;margin:2.5cm;line-height:1.6}
+.right{text-align:right;margin-bottom:30px}
+p{text-align:justify;margin:10px 0}
+table{width:100%;border-collapse:collapse;margin-top:15px;font-size:9pt}
+th,td{border:1px solid #000;padding:5px 6px;text-align:center;vertical-align:middle}
+th{background:#f0f0f0;font-weight:bold}
+td.left{text-align:left}
+.center{text-align:center;font-weight:bold;margin:12px 0}
+.sig{margin-top:30px}
+</style></head><body>
+<div class="right"><strong>Ба Бонки миллии Тоҷикистон</strong></div>
+<p>ҶСК «Алиф Бонк» (минбаъд дар матн - "Бонк") ба Шумо эҳтироми худро баён намуда, ҳисоботи умумии мониторинги хавфи амалиётиро оид ба ҳодисаҳои дорои хавфи амалиётии моддӣ, ки боиси зарар дар ҳаҷми 5 000 сомонӣ ва зиёда аз он оварда расонидаанд, мувофиқи банди 54-и Дастурамали №240 Бонки миллии Тоҷикистон барои санаи ҷорӣ пешниҳод менамояд.</p>
+<p>Замимаи №1 дар ҳаҷми 1 варақ</p>
+<div class="sig">
+<p>Бо эҳтиром,</p>
+<table style="border:none;margin-top:10px"><tr style="border:none">
+<td style="border:none">Раиси Бонк</td>
+<td style="border:none;text-align:right">Атобек Гуланор</td>
+</tr></table>
+<p>Иҷрокунанда: _______________<br>Тел.: _______________</p>
+</div>
+<div style="page-break-before:always">
+<div class="center">Замима</div>
+<div class="center">Ҳисобот оид ба ҳодисаҳои хавфҳои амалиётӣ,<br>
+ки ба зарар дар ҳаҷми 5000 сомонӣ ва зиёда аз он оварда расонидаанд<br>
+дар ҶСК "Алиф Бонк" барои "${incidentDate}"</div>
+<table>
+<thead>
+<tr>
+<th rowspan="2">№</th>
+<th rowspan="2">Муҳтавои ҳодисаҳои хавфи амалиётӣ (сабабҳои зарар)</th>
+<th rowspan="2">Ҷойе</th>
+<th rowspan="2">Санаи ҳодиса</th>
+<th colspan="8">Шакл ва ҳаҷми пайомадҳо (бо сомонӣ)</th>
+<th rowspan="2">Маблағҳои барқароршуда</th>
+</tr>
+<tr>
+<th>Ҷаримаҳо</th><th>Хароҷоти судӣ</th><th>Ҷуброни кормандон</th>
+<th>Ҷуброни муштариён</th><th>Дороиҳо</th><th>Хароҷоти бартараф</th>
+<th>Зарарҳои дигар</th><th>Коҳиши арзиш</th>
+</tr>
+<tr><th>р/т</th><th>1</th><th>2</th><th>3</th><th>4</th><th>5</th><th>6</th><th>7</th><th>8</th><th>9</th><th>10</th><th>11</th></tr>
+</thead>
+<tbody>
+<tr>
+<td>1</td>
+<td class="left">${description}</td>
+<td>${department}</td>
+<td>${incidentDate}</td>
+<td>${loss}</td>
+<td>—</td><td>—</td><td>—</td><td>—</td><td>—</td><td>—</td>
+<td>${recovery}</td>
+</tr>
+<tr>
+<td colspan="3"><strong>Ҳамагӣ</strong></td>
+<td></td>
+<td><strong>${loss}</strong></td>
+<td></td><td></td><td></td><td></td><td></td><td></td>
+<td><strong>${recovery}</strong></td>
+</tr>
+</tbody>
+</table>
+</div>
+</body></html>`
+
+    const blob = new Blob([html], { type: 'text/html;charset=utf-8;' })
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = \`NBT_OR_\${incident.incident_number}_\${new Date().toISOString().split('T')[0]}.html\`
+    a.click()
+    URL.revokeObjectURL(url)
   }
 
   const getRiskBg = (level: string) => {
