@@ -159,15 +159,7 @@ export async function POST(request: Request) {
                 makeCell('Коҳиши арзиши дороиҳо', { gray: true, bold: true }),
                 makeCell('Дигар ҳодисаҳои хавфҳои амалиётӣ', { gray: true, bold: true }),
               ]}),
-              // Header row 3 - numbers
-              new TableRow({ tableHeader: true, children: [
-                makeCell('р/т', { gray: true }),
-                makeCell('1', { gray: true }), makeCell('2', { gray: true }), makeCell('3', { gray: true }),
-                makeCell('4', { gray: true }), makeCell('5', { gray: true }), makeCell('6', { gray: true }),
-                makeCell('7', { gray: true }), makeCell('8', { gray: true }), makeCell('9', { gray: true }),
-                makeCell('10', { gray: true }), makeCell('11', { gray: true }), makeCell('12', { gray: true }),
-                makeCell('13', { gray: true }),
-              ]}),
+
               // Data row
               new TableRow({ children: [
                 makeCell('1'),
