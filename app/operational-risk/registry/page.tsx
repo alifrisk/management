@@ -343,11 +343,19 @@ export default function RegistryPage() {
     }
 
     if (err) { setError('Ошибка сохранения: ' + err.message); setSaving(false); return }
+    // Если инцидент создан из анкеты — помечаем анкету как обработанную
+    if (!editingId && formData._form_id) {
+      await supabase
+        .from('incident_forms')
+        .update({ status: 'processed' })
+        .eq('id', formData._form_id)
+    }
     setShowModal(false)
     setFormData(EMPTY_FORM)
     setEditingId(null)
     setActiveTab(1)
     fetchIncidents()
+    fetchPendingForms()
     setSaving(false)
   }
 
@@ -376,6 +384,8 @@ export default function RegistryPage() {
   }
 
   async function processForm(form: IncidentForm) {
+    // Заполняем форму данными из анкеты
+    // Статус анкеты НЕ меняем до сохранения инцидента
     setFormData({
       ...EMPTY_FORM,
       discovered_by: form.discovered_by,
@@ -389,9 +399,8 @@ export default function RegistryPage() {
       recovery_amount: form.recovery_amount || '',
       disclosure: form.disclosure,
       department: form.department,
-    })
-    await supabase.from('incident_forms').update({ status: 'processed' }).eq('id', form.id)
-    fetchPendingForms()
+      _form_id: form.id, // Сохраняем ID анкеты для обработки после сохранения
+    } as Record<string, unknown>)
     setShowFormsModal(false)
     setActiveTab(1)
     setShowModal(true)
