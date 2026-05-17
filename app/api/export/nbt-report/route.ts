@@ -104,80 +104,48 @@ export async function POST(request: Request) {
           })] : []),
 
           new Table({
-            width: { size: 9354, type: WidthType.DXA },
-            columnWidths: [4677, 4677],
-            rows: [new TableRow({ children: [makeNB([makePara('')]), makeNB([makePara('Ба Бонки миллии Тоҷикистон', { right: true, bold: true })])] })]
-          }),
-          makePara(''),
-          makePara('ҶСК «Алиф Бонк» (минбаъд дар матн - "Бонк") ба Шумо эҳтироми худро баён намуда, ҳисоботи умумии мониторинги хавфи амалиётиро оид ба ҳодисаҳои дорои хавфи амалиётии моддӣ, ки боиси зарар дар ҳаҷми 5 000 сомонӣ ва зиёда аз он оварда расонидаанд, мувофиқи банди 54-и Дастурамали №240 Бонки миллии Тоҷикистон барои санаи ҷорӣ пешниҳод менамояд.', { indent: true }),
-          makePara('Замимаи №1 дар ҳаҷми 1 варақ', { after: 240 }),
-          makePara('Бо эҳтиром,', { after: 480 }),
-          new Table({
-            width: { size: 9354, type: WidthType.DXA },
-            columnWidths: [4677, 4677],
-            rows: [new TableRow({ children: [makeNB([makePara('Раиси Бонк')]), makeNB([makePara('Атобек Гуланор', { right: true })])] })]
-          }),
-          makePara(''),
-          makePara('Иҷрокунанда: Камила Мародмамадова', { after: 60 }),
-          makePara('Тел.: +992884034004', { after: 60 }),
-        ]
-      },
-      {
-        properties: {
-          page: {
-            size: { width: 16838, height: 11906 },
-            margin: { top: 1418, right: 2836, bottom: 850, left: 1134 }
-          }
-        },
-        children: [
-          makePara('Замима', { right: true, bold: true }),
-          makePara('Ҳисобот оид ба ҳодисаҳои хавфҳои амалиётӣ,', { center: true, bold: true, after: 60 }),
-          makePara('ки ба зарар дар ҳаҷми 5000 сомонӣ ва зиёда аз он оварда расонидаанд', { center: true, bold: true, after: 60 }),
-          makePara(`дар ҶСК "Алиф Бонк" барои "${discoveryDate}"`, { center: true, bold: true, after: 200 }),
-          new Table({
-            width: { size: 11150, type: WidthType.DXA },
-            columnWidths: [350, 2500, 1200, 900, 500, 500, 500, 500, 500, 500, 500, 1000, 1200],
+            width: { size: 13500, type: WidthType.DXA },
+            columnWidths: [400, 2000, 1200, 900, 600, 600, 600, 600, 600, 600, 600, 1000, 1200],
             rows: [
-              // Header row 1
+              // Single header row
               new TableRow({ tableHeader: true, children: [
-                makeCell('№', { rowSpan: 3, gray: true, bold: true }),
-                makeCell('Муҳтавои ҳодисаҳои хавфи амалиётӣ, ки ба зарари ташкилоти қарзӣ оварда расонидаанд (сабабҳои зарар)', { rowSpan: 3, gray: true, bold: true }),
-                makeCell('Ҷойе, ки дар он ҳодисаҳои хавфи амалиётӣ рӯй додаанд', { rowSpan: 3, gray: true, bold: true }),
-                makeCell('Санаи рӯй додани ҳодисаи хавфи амалиётӣ', { rowSpan: 3, gray: true, bold: true }),
-                makeCell('Шакл ва ҳаҷми пайомадҳо аз ба вуқуъ омадани ҳодисаҳои хавфҳои амалиётӣ (бо сомонӣ)', { colSpan: 8, gray: true, bold: true }),
-                makeCell('Маблағҳои барқароршуда аз руи ҳодисаҳои хавфи амалиётӣ', { rowSpan: 3, gray: true, bold: true }),
-              ]}),
-              // Header row 2
-              new TableRow({ tableHeader: true, children: [
-                makeCell('Ҷаримаҳои рӯёнидашуда', { gray: true, bold: true }),
-                makeCell('Хароҷотҳои судӣ', { gray: true, bold: true }),
-                makeCell('Ҷуброни ғайрисудии кормандон', { gray: true, bold: true }),
-                makeCell('Ҷуброни ғайрисудии муштариён', { gray: true, bold: true }),
-                makeCell('Дороиҳои моддӣ', { gray: true, bold: true }),
-                makeCell('Хароҷотҳои бартараф', { gray: true, bold: true }),
+                makeCell('№', { gray: true, bold: true }),
+                makeCell('Муҳтавои ҳодисаҳои хавфи амалиётӣ (сабабҳои зарар)', { gray: true, bold: true }),
+                makeCell('Ҷойе', { gray: true, bold: true }),
+                makeCell('Санаи ҳодиса', { gray: true, bold: true }),
+                makeCell('Ҷаримаҳо', { gray: true, bold: true }),
+                makeCell('Хароҷоти судӣ', { gray: true, bold: true }),
+                makeCell('Ҷуброни кормандон', { gray: true, bold: true }),
+                makeCell('Ҷуброни муштариён', { gray: true, bold: true }),
+                makeCell('Дороиҳо', { gray: true, bold: true }),
+                makeCell('Хароҷоти бартараф', { gray: true, bold: true }),
                 makeCell('Зарарҳои дигар', { gray: true, bold: true }),
-                makeCell('Коҳиши арзиш', { gray: true, bold: true }),
+                makeCell('Шакл ва ҳаҷми пайомадҳо (бо сомонӣ)', { gray: true, bold: true }),
+                makeCell('Маблағҳои барқароршуда', { gray: true, bold: true }),
               ]}),
-
-              // Data row
+              // Data row - 13 cells matching 13 columns
               new TableRow({ children: [
                 makeCell('1'),
                 makeCell(description, { left: true }),
                 makeCell(department),
                 makeCell(discoveryDate),
-                makeCell(''), makeCell(''), makeCell(''), makeCell(''), makeCell(''), makeCell(''), makeCell(''),
+                makeCell(''),
+                makeCell(''),
+                makeCell(''),
+                makeCell(''),
+                makeCell(''),
+                makeCell(''),
+                makeCell(''),
                 makeCell(loss),
                 makeCell(recovery),
               ]}),
-              // Total row - Ҳамагӣ
+              // Total row
               new TableRow({ children: [
                 new TableCell({
                   borders,
-                  columnSpan: 3,
-                  children: [new Paragraph({ alignment: AlignmentType.CENTER, children: [new TextRun({ text: 'Ҳамагӣ', size: 14, bold: true, font: 'Times New Roman' })] })]
+                  columnSpan: 11,
+                  children: [new Paragraph({ alignment: AlignmentType.RIGHT, children: [new TextRun({ text: 'Ҳамагӣ:', size: 14, bold: true, font: 'Times New Roman' })] })]
                 }),
-                makeCell(''),
-                makeCell(''), makeCell(''), makeCell(''), makeCell(''), makeCell(''), makeCell(''), makeCell(''),
                 makeCell(loss, { bold: true }),
                 makeCell(recovery, { bold: true }),
               ]}),
