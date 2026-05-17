@@ -38,6 +38,7 @@ export default function DashboardPage() {
   const [loading, setLoading] = useState(true)
   const [year, setYear] = useState(new Date().getFullYear())
   const [filterDept, setFilterDept] = useState('')
+  const [filterMonth, setFilterMonth] = useState('')
 
   const fetchData = useCallback(async () => {
     setLoading(true)
@@ -48,13 +49,17 @@ export default function DashboardPage() {
       .lte('discovery_date', `${year}-12-31`)
 
     if (filterDept) query = query.eq('department', filterDept)
+    if (filterMonth) {
+      const monthNum = String(parseInt(filterMonth)).padStart(2, '0')
+      query = query.gte('discovery_date', `${year}-${monthNum}-01`).lte('discovery_date', `${year}-${monthNum}-31`)
+    }
 
     const { data } = await query
     setIncidents(data || [])
     setLoading(false)
-  }, [year, filterDept])
+  }, [year, filterDept, filterMonth])
 
-  useEffect(() => { fetchData() }, [fetchData])
+  useEffect(() => { fetchData() }, [fetchData, filterMonth])
 
   const fmt = (n: number) => new Intl.NumberFormat('ru-RU').format(Math.round(n))
 
@@ -166,11 +171,27 @@ export default function DashboardPage() {
         <div className="flex items-center gap-2">
           <select
             value={year}
-            onChange={e => setYear(Number(e.target.value))}
+            onChange={e => { setYear(Number(e.target.value)); setFilterMonth('') }}
             className="px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#1B8A4C] bg-white"
           >
             {[2026, 2025, 2024, 2023].map(y => <option key={y} value={y}>{y}</option>)}
           </select>
+          <select
+            value={filterMonth}
+            onChange={e => setFilterMonth(e.target.value)}
+            className="px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#1B8A4C] bg-white"
+          >
+            <option value="">Все месяцы</option>
+            {MONTHS.map((m, i) => <option key={i} value={String(i + 1)}>{m}</option>)}
+          </select>
+          {filterMonth && (
+            <button
+              onClick={() => setFilterMonth('')}
+              className="px-3 py-2 border border-gray-200 rounded-lg text-sm text-gray-500 hover:bg-gray-50"
+            >
+              Сбросить
+            </button>
+          )}
         </div>
       </div>
 
@@ -221,7 +242,7 @@ export default function DashboardPage() {
           <p className={titleCls}>По статусу инцидентов</p>
           <ResponsiveContainer width="100%" height={220}>
             <PieChart>
-              <Pie data={statusData} dataKey="value" nameKey="name" cx="50%" cy="50%" outerRadius={80} label={({ name, value }) => `${name}: ${value}`}>
+              <Pie data={statusData} dataKey="value" nameKey="name" cx="50%" cy="50%" outerRadius={80} label={({ name, value }) => value > 0 ? `${name}: ${value}` : ''}>
                 {statusData.map((_, i) => <Cell key={i} fill={['#3B82F6', '#F59E0B', '#1B8A4C'][i]} />)}
               </Pie>
               <Tooltip />
