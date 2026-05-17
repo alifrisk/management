@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useCallback } from 'react'
 import { supabase } from '@/supabase/client'
-import { Plus, Search, Filter, Download, Eye, Edit2, Trash2, Bell, ChevronDown, X, CheckCircle2, Clock, AlertCircle } from 'lucide-react'
+import { Plus, Search, Filter, Download, Eye, Edit2, Trash2, Bell, X, CheckCircle2, Clock, AlertCircle, FileWarning } from 'lucide-react'
 import { formatDate, formatCurrency, getRiskLevelColor, getStatusColor, cn } from '@/lib/utils'
 import { BUSINESS_PROCESSES, RISK_FACTORS, SYSTEMS, DEPARTMENTS, INCIDENT_STATUSES, EVENT_CATEGORIES_L1, EVENT_CATEGORIES_L2, CURRENCIES, PROBABILITY_SCORES, IMPACT_SCORES, CONTROL_SCORES, INCIDENT_FREQUENCIES, CLIENT_WORK_STATUSES, MONTHS } from '@/lib/constants'
 
@@ -405,6 +405,64 @@ export default function RegistryPage() {
     String(i.incident_number).includes(search)
   )
 
+  // Экспорт в Excel
+  function exportToExcel() {
+    const headers = ['№', 'Дата инцидента', 'Категория Ур.1', 'Категория Ур.2', 'Бизнес-процесс', 'Фактор', 'Система', 'Причина', 'Обнаружил', 'Подразделение', 'Дата обнаружения', 'Ущерб (TJS)', 'Возврат (TJS)', 'Остаток', 'Уровень риска', 'Статус', 'Раскрытие', 'Планы мероприятий', 'Фактическое исполнение', 'Ответственный']
+    const rows = filtered.map(i => [
+      i.incident_number,
+      i.incident_date || '',
+      i.event_category_l1?.replace(/_/g, ' ') || '',
+      i.event_category_l2 || '',
+      i.business_process || '',
+      i.factor || '',
+      i.system || '',
+      i.cause || '',
+      i.discovered_by || '',
+      i.department || '',
+      i.discovery_date || '',
+      i.loss_amount_tjs || 0,
+      i.recovery_amount || 0,
+      i.remainder || 0,
+      i.risk_level || '',
+      i.incident_status || '',
+      i.disclosure || '',
+      i.plans || '',
+      i.actual_execution || '',
+      i.responsible || '',
+    ])
+    const csvContent = [headers, ...rows].map(row => row.map(cell => `"${String(cell).replace(/"/g, '""')}"`).join(',')).join('\n')
+    const blob = new Blob(['\uFEFF' + csvContent], { type: 'text/csv;charset=utf-8;' })
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = `Реестр_инцидентов_${new Date().toISOString().split('T')[0]}.csv`
+    a.click()
+    URL.revokeObjectURL(url)
+  }
+
+  // Отчёт НБТ
+  async function generateNBTReport(incident: Incident) {
+    if (!incident.loss_amount_tjs || incident.loss_amount_tjs < 5000) {
+      alert('Отчёт НБТ формируется только для инцидентов с ущербом от 5 000 TJS!')
+      return
+    }
+    const res = await fetch('/api/export/nbt-report', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ incident }),
+    })
+    const data = await res.json()
+    if (data.html) {
+      const blob = new Blob([data.html], { type: 'text/html;charset=utf-8;' })
+      const url = URL.createObjectURL(blob)
+      const a = document.createElement('a')
+      a.href = url
+      a.download = `${data.filename}.html`
+      a.click()
+      URL.revokeObjectURL(url)
+    }
+  }
+
   const getRiskBg = (level: string) => {
     if (level === 'Экстремальные') return 'bg-red-100 text-red-800'
     if (level === 'Высокий') return 'bg-orange-100 text-orange-800'
@@ -436,6 +494,12 @@ export default function RegistryPage() {
               {pendingForms.length} новых анкет
             </button>
           )}
+          <button
+            onClick={exportToExcel}
+            className="flex items-center gap-2 px-3 py-2 border border-gray-200 rounded-lg text-sm font-medium text-gray-600 hover:bg-gray-50 transition-colors"
+          >
+            <Download className="w-4 h-4" /> Экспорт Excel
+          </button>
           <button
             onClick={() => { setFormData(EMPTY_FORM); setEditingId(null); setActiveTab(1); setShowModal(true) }}
             className="flex items-center gap-2 px-4 py-2 bg-[#1B8A4C] text-white rounded-lg text-sm font-medium hover:bg-[#177040] transition-colors"
@@ -513,7 +577,7 @@ export default function RegistryPage() {
             <thead>
               <tr className="bg-gray-50 border-b border-gray-100">
                 <th className="text-left px-4 py-3 text-xs font-medium text-gray-500 uppercase whitespace-nowrap">№</th>
-                <th className="text-left px-4 py-3 text-xs font-medium text-gray-500 uppercase whitespace-nowrap">Дата</th>
+                <th className="text-left px-4 py-3 text-xs font-medium text-gray-500 uppercase whitespace-nowrap">Дата обнаружения</th>
                 <th className="text-left px-4 py-3 text-xs font-medium text-gray-500 uppercase whitespace-nowrap">Категория</th>
                 <th className="text-left px-4 py-3 text-xs font-medium text-gray-500 uppercase whitespace-nowrap">Бизнес-процесс</th>
                 <th className="text-left px-4 py-3 text-xs font-medium text-gray-500 uppercase whitespace-nowrap">Фактор</th>
@@ -534,7 +598,7 @@ export default function RegistryPage() {
                 filtered.map(incident => (
                   <tr key={incident.id} className="hover:bg-gray-50 transition-colors">
                     <td className="px-4 py-3 font-medium text-gray-900">#{incident.incident_number}</td>
-                    <td className="px-4 py-3 text-gray-600 whitespace-nowrap">{formatDate(incident.incident_date)}</td>
+                    <td className="px-4 py-3 text-gray-600 whitespace-nowrap">{formatDate(incident.discovery_date)}</td>
                     <td className="px-4 py-3 text-gray-600 max-w-[150px] truncate" title={incident.event_category_l1}>{incident.event_category_l1?.replace(/_/g, ' ')}</td>
                     <td className="px-4 py-3 text-gray-600 max-w-[150px] truncate" title={incident.business_process}>{incident.business_process}</td>
                     <td className="px-4 py-3 text-gray-600 whitespace-nowrap">{incident.factor}</td>
@@ -559,9 +623,12 @@ export default function RegistryPage() {
                     </td>
                     <td className="px-4 py-3">
                       <div className="flex items-center gap-1">
-                        <button onClick={() => setViewingIncident(incident)} className="p-1.5 text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"><Eye className="w-3.5 h-3.5" /></button>
-                        <button onClick={() => openEdit(incident)} className="p-1.5 text-gray-400 hover:text-[#1B8A4C] hover:bg-green-50 rounded-lg transition-colors"><Edit2 className="w-3.5 h-3.5" /></button>
-                        <button onClick={() => handleDelete(incident.id)} className="p-1.5 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"><Trash2 className="w-3.5 h-3.5" /></button>
+                        <button onClick={() => setViewingIncident(incident)} title="Просмотр" className="p-1.5 text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"><Eye className="w-3.5 h-3.5" /></button>
+                        <button onClick={() => openEdit(incident)} title="Редактировать" className="p-1.5 text-gray-400 hover:text-[#1B8A4C] hover:bg-green-50 rounded-lg transition-colors"><Edit2 className="w-3.5 h-3.5" /></button>
+                        {incident.loss_amount_tjs && incident.loss_amount_tjs >= 5000 && (
+                          <button onClick={() => generateNBTReport(incident)} title="Отчёт НБТ (OR 24h)" className="p-1.5 text-gray-400 hover:text-orange-600 hover:bg-orange-50 rounded-lg transition-colors"><FileWarning className="w-3.5 h-3.5" /></button>
+                        )}
+                        <button onClick={() => handleDelete(incident.id)} title="Удалить" className="p-1.5 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"><Trash2 className="w-3.5 h-3.5" /></button>
                       </div>
                     </td>
                   </tr>
@@ -623,16 +690,20 @@ export default function RegistryPage() {
                   ['Фактор', viewingIncident.factor],
                   ['Система', viewingIncident.system],
                   ['Причина', viewingIncident.cause],
+                  ['Частота', viewingIncident.frequency],
                   ['Обнаружил', viewingIncident.discovered_by],
-                  ['Подразделение', viewingIncident.department],
+                  ['Место происшествия', viewingIncident.department],
                   ['Дата обнаружения', formatDate(viewingIncident.discovery_date)],
                   ['Дата инцидента', formatDate(viewingIncident.incident_date)],
                   ['Сумма ущерба', viewingIncident.loss_amount_tjs ? `${new Intl.NumberFormat('ru-RU').format(viewingIncident.loss_amount_tjs)} TJS` : '—'],
                   ['Возврат', viewingIncident.recovery_amount ? `${new Intl.NumberFormat('ru-RU').format(viewingIncident.recovery_amount)} TJS` : '—'],
                   ['Вероятность', viewingIncident.probability || '—'],
                   ['Влияние', viewingIncident.impact || '—'],
+                  ['Контроль', viewingIncident.control_quality || '—'],
                   ['Уровень риска', viewingIncident.risk_level || '—'],
-                  ['Статус', viewingIncident.incident_status],
+                  ['Статус инцидента', viewingIncident.incident_status],
+                  ['Статус клиента', viewingIncident.client_work_status || '—'],
+                  ['Ответственный', viewingIncident.responsible || '—'],
                 ].map(([label, value]) => (
                   <div key={label}>
                     <p className="text-xs text-gray-500">{label}</p>
@@ -644,6 +715,24 @@ export default function RegistryPage() {
                 <div>
                   <p className="text-xs text-gray-500">Раскрытие</p>
                   <p className="text-sm text-gray-900 mt-0.5 bg-gray-50 rounded-lg p-3">{viewingIncident.disclosure}</p>
+                </div>
+              )}
+              {viewingIncident.plans && (
+                <div>
+                  <p className="text-xs text-gray-500">Планы мероприятий</p>
+                  <p className="text-sm text-gray-900 mt-0.5 bg-blue-50 rounded-lg p-3">{viewingIncident.plans}</p>
+                </div>
+              )}
+              {viewingIncident.actual_execution && (
+                <div>
+                  <p className="text-xs text-gray-500">Фактическое исполнение</p>
+                  <p className="text-sm text-gray-900 mt-0.5 bg-green-50 rounded-lg p-3">{viewingIncident.actual_execution}</p>
+                </div>
+              )}
+              {viewingIncident.control_status && (
+                <div>
+                  <p className="text-xs text-gray-500">Статус контроля</p>
+                  <p className="text-sm text-gray-900 mt-0.5 bg-gray-50 rounded-lg p-3">{viewingIncident.control_status}</p>
                 </div>
               )}
             </div>
