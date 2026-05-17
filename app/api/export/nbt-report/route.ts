@@ -86,7 +86,7 @@ export async function POST(request: Request) {
       ...(logoData ? [new Paragraph({
         alignment: AlignmentType.LEFT,
         spacing: { after: 300 },
-        children: [new ImageRun({ data: logoData, transformation: { width: 600, height: 100 } })]
+        children: [new ImageRun({ data: logoData, transformation: { width: 750, height: 120 } })]
       })] : []),
 
       new Table({
