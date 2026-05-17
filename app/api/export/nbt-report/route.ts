@@ -161,28 +161,27 @@ export async function POST(request: Request) {
               ]}),
 
               // Data row
+              // Col1=№, Col2=Описание, Col3=Место, Col4=Дата, Col5-12=Виды ущерба (пусто), Col13=Ущерб, Col14=Возврат
               new TableRow({ children: [
                 makeCell('1'),
                 makeCell(description, { left: true }),
                 makeCell(department),
-                makeCell(incidentDate),
-                makeCell(loss),
+                makeCell(discoveryDate),
                 makeCell(''), makeCell(''), makeCell(''), makeCell(''), makeCell(''), makeCell(''), makeCell(''), makeCell(''),
+                makeCell(loss),
                 makeCell(recovery),
               ]}),
               // Total row
               new TableRow({ children: [
                 new TableCell({
                   borders,
-                  columnSpan: 3,
+                  columnSpan: 2,
                   children: [new Paragraph({ alignment: AlignmentType.CENTER, children: [new TextRun({ text: 'Ҳамагӣ', size: 14, bold: true, font: 'Times New Roman' })] })]
                 }),
                 makeCell(''),
-                new TableCell({
-                  borders,
-                  columnSpan: 9,
-                  children: [new Paragraph({ alignment: AlignmentType.CENTER, children: [new TextRun({ text: loss, size: 14, bold: true, font: 'Times New Roman' })] })]
-                }),
+                makeCell(''),
+                makeCell(''), makeCell(''), makeCell(''), makeCell(''), makeCell(''), makeCell(''), makeCell(''), makeCell(''),
+                makeCell(loss, { bold: true }),
                 makeCell(recovery, { bold: true }),
               ]}),
             ]
