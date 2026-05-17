@@ -238,7 +238,7 @@ export default function IncidentFormPage() {
                   <label className="block text-xs font-medium text-gray-500 mb-1.5 uppercase tracking-wide">Дата обнаружения *</label>
                   <div className="relative">
                     <Calendar className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 pointer-events-none" />
-                    <input name="discovery_date" type="date" value={formData.discovery_date} onChange={handleChange} required className={inputCls + ' pl-10'} />
+                    <input name="discovery_date" type="date" value={formData.discovery_date} max={new Date().toISOString().split('T')[0]} onChange={handleChange} required className={inputCls + ' pl-10'} />
                   </div>
                 </div>
                 <div>
