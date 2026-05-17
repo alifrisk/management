@@ -135,43 +135,50 @@ export async function POST(request: Request) {
           makePara('ки ба зарар дар ҳаҷми 5000 сомонӣ ва зиёда аз он оварда расонидаанд', { center: true, bold: true, after: 60 }),
           makePara(`дар ҶСК "Алиф Бонк" барои "${discoveryDate}"`, { center: true, bold: true, after: 200 }),
           new Table({
-            width: { size: 9354, type: WidthType.DXA },
-            columnWidths: [400, 1600, 900, 800, 550, 550, 550, 550, 550, 550, 550, 550, 800],
+            width: { size: 13800, type: WidthType.DXA },
+            columnWidths: [350, 2200, 1100, 900, 700, 700, 700, 700, 700, 700, 700, 700, 700, 1200, 0],
             rows: [
+              // Header row 1
               new TableRow({ tableHeader: true, children: [
                 makeCell('№', { rowSpan: 3, gray: true, bold: true }),
-                makeCell('Муҳтавои ҳодисаҳои хавфи амалиётӣ (сабабҳои зарар)', { rowSpan: 3, gray: true, bold: true }),
-                makeCell('Ҷойе', { rowSpan: 3, gray: true, bold: true }),
-                makeCell('Санаи ҳодиса', { rowSpan: 3, gray: true, bold: true }),
-                makeCell('Шакл ва ҳаҷми пайомадҳо (бо сомонӣ)', { colSpan: 8, gray: true, bold: true }),
-                makeCell('Маблағҳои барқароршуда', { rowSpan: 3, gray: true, bold: true }),
+                makeCell('Муҳтавои ҳодисаҳои хавфи амалиётӣ, ки ба зарари ташкилоти қарзӣ оварда расонидаанд (сабабҳои зарар)', { rowSpan: 3, gray: true, bold: true }),
+                makeCell('Ҷойе, ки дар он ҳодисаҳои хавфи амалиётӣ рӯй додаанд', { rowSpan: 3, gray: true, bold: true }),
+                makeCell('Санаи рӯй додани ҳодисаи хавфи амалиётӣ', { rowSpan: 3, gray: true, bold: true }),
+                makeCell('Шакл ва ҳаҷми пайомадҳо аз ба вуқуъ омадани ҳодисаҳои хавфҳои амалиётӣ (бо сомонӣ)', { colSpan: 9, gray: true, bold: true }),
+                makeCell('Маблағҳои барқароршуда аз руи ҳодисаҳои хавфи амалиётӣ', { rowSpan: 3, gray: true, bold: true }),
               ]}),
+              // Header row 2
               new TableRow({ tableHeader: true, children: [
-                makeCell('Ҷаримаҳо', { gray: true, bold: true }),
-                makeCell('Хароҷоти судӣ', { gray: true, bold: true }),
-                makeCell('Ҷуброни кормандон', { gray: true, bold: true }),
-                makeCell('Ҷуброни муштариён', { gray: true, bold: true }),
-                makeCell('Дороиҳо', { gray: true, bold: true }),
-                makeCell('Хароҷоти бартараф', { gray: true, bold: true }),
-                makeCell('Зарарҳои дигар', { gray: true, bold: true }),
-                makeCell('Коҳиши арзиш', { gray: true, bold: true }),
+                makeCell('Ҷаримаҳои рӯёнидашуда, ки дар асоси қонунгузорӣ муқаррар шудаанд', { gray: true, bold: true }),
+                makeCell('Хароҷотҳои судӣ ва ҷаримаҳои дар асоси қарори суд ситонидашуда', { gray: true, bold: true }),
+                makeCell('Ҷуброни ғайрисудии кормандон', { gray: true, bold: true }),
+                makeCell('Ҷуброни ғайрисудии муштариён', { gray: true, bold: true }),
+                makeCell('Дороиҳои моддии пеш аз муҳлат аз ҳисоб баровардашуда', { gray: true, bold: true }),
+                makeCell('Хароҷотҳои бо бартараф намудани натиҷаҳои ба амал омадани хавфи амалиётӣ алоқаманд', { gray: true, bold: true }),
+                makeCell('Зарарҳои дигари аз ҳисоби захира пӯшониданашуда', { gray: true, bold: true }),
+                makeCell('Коҳиши арзиши дороиҳо', { gray: true, bold: true }),
+                makeCell('Дигар ҳодисаҳои хавфҳои амалиётӣ', { gray: true, bold: true }),
               ]}),
+              // Header row 3 - numbers
               new TableRow({ tableHeader: true, children: [
                 makeCell('р/т', { gray: true }),
                 makeCell('1', { gray: true }), makeCell('2', { gray: true }), makeCell('3', { gray: true }),
                 makeCell('4', { gray: true }), makeCell('5', { gray: true }), makeCell('6', { gray: true }),
                 makeCell('7', { gray: true }), makeCell('8', { gray: true }), makeCell('9', { gray: true }),
-                makeCell('10', { gray: true }), makeCell('11', { gray: true }),
+                makeCell('10', { gray: true }), makeCell('11', { gray: true }), makeCell('12', { gray: true }),
+                makeCell('13', { gray: true }),
               ]}),
+              // Data row
               new TableRow({ children: [
                 makeCell('1'),
                 makeCell(description, { left: true }),
                 makeCell(department),
                 makeCell(incidentDate),
                 makeCell(loss),
-                makeCell(''), makeCell(''), makeCell(''), makeCell(''), makeCell(''), makeCell(''), makeCell(''),
+                makeCell(''), makeCell(''), makeCell(''), makeCell(''), makeCell(''), makeCell(''), makeCell(''), makeCell(''),
                 makeCell(recovery),
               ]}),
+              // Total row
               new TableRow({ children: [
                 new TableCell({
                   borders,
@@ -181,7 +188,7 @@ export async function POST(request: Request) {
                 makeCell(''),
                 new TableCell({
                   borders,
-                  columnSpan: 8,
+                  columnSpan: 9,
                   children: [new Paragraph({ alignment: AlignmentType.CENTER, children: [new TextRun({ text: loss, size: 14, bold: true, font: 'Times New Roman' })] })]
                 }),
                 makeCell(recovery, { bold: true }),
