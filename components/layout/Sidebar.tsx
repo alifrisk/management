@@ -28,14 +28,19 @@ const NAV_ITEMS = [
 export default function Sidebar({ user }: SidebarProps) {
   const pathname = usePathname()
   const isAdmin = user.role === 'admin'
-  const [openMenus, setOpenMenus] = useState<string[]>(['/operational-risk'])
+  const [openMenus, setOpenMenus] = useState<string[]>([])
   const [mobileOpen, setMobileOpen] = useState(false)
+  const [showLogoutConfirm, setShowLogoutConfirm] = useState(false)
 
   function toggleMenu(href: string) {
     setOpenMenus(prev => prev.includes(href) ? prev.filter(h => h !== href) : [...prev, href])
   }
 
   async function handleLogout() {
+    setShowLogoutConfirm(true)
+  }
+
+  async function confirmLogout() {
     await supabase.auth.signOut()
     window.location.href = '/auth/login'
   }
@@ -125,7 +130,7 @@ export default function Sidebar({ user }: SidebarProps) {
             <p className="text-white text-sm font-medium truncate">{user.full_name || user.email}</p>
             <p className="text-green-200/60 text-xs">{user.role === 'admin' ? 'Администратор' : 'Риск-координатор'}</p>
           </div>
-          <button onClick={handleLogout} title="Выйти" className="flex-shrink-0 text-green-200/60 hover:text-white transition-colors">
+          <button onClick={confirmLogout} title="Выйти" className="flex-shrink-0 text-green-200/60 hover:text-white transition-colors">
             <LogOut className="w-4 h-4" />
           </button>
         </div>
@@ -139,10 +144,10 @@ export default function Sidebar({ user }: SidebarProps) {
         <Menu className="w-5 h-5" />
       </button>
       {mobileOpen && <div className="lg:hidden fixed inset-0 z-40 bg-black/50" onClick={() => setMobileOpen(false)} />}
-      <aside className={cn('lg:hidden fixed left-0 top-0 h-full z-50 w-64 bg-alif-gradient shadow-2xl transition-transform duration-300', mobileOpen ? 'translate-x-0' : '-translate-x-full')}>
+      <aside className={cn('lg:hidden fixed left-0 top-0 h-full z-50 w-64 shadow-2xl transition-transform duration-300', mobileOpen ? 'translate-x-0' : '-translate-x-full')} style={{ background: "linear-gradient(135deg, #0d3320 0%, #145c32 100%)" }}>
         {sidebarContent}
       </aside>
-      <aside className="hidden lg:flex flex-col w-64 bg-alif-gradient flex-shrink-0 sticky top-0 h-screen overflow-y-auto">
+      <aside className="hidden lg:flex flex-col w-64 flex-shrink-0 sticky top-0 h-screen overflow-y-auto" style={{ background: "linear-gradient(135deg, #0d3320 0%, #145c32 100%)" }}>
         {sidebarContent}
       </aside>
     </>
