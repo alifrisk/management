@@ -135,8 +135,8 @@ export async function POST(request: Request) {
           makePara('ки ба зарар дар ҳаҷми 5000 сомонӣ ва зиёда аз он оварда расонидаанд', { center: true, bold: true, after: 60 }),
           makePara(`дар ҶСК "Алиф Бонк" барои "${discoveryDate}"`, { center: true, bold: true, after: 200 }),
           new Table({
-            width: { size: 13800, type: WidthType.DXA },
-            columnWidths: [350, 2200, 1100, 900, 700, 700, 700, 700, 700, 700, 700, 700, 700, 1200, 0],
+            width: { size: 11150, type: WidthType.DXA },
+            columnWidths: [350, 2500, 1200, 900, 500, 500, 500, 500, 500, 500, 500, 1000, 1200],
             rows: [
               // Header row 1
               new TableRow({ tableHeader: true, children: [
@@ -144,43 +144,40 @@ export async function POST(request: Request) {
                 makeCell('Муҳтавои ҳодисаҳои хавфи амалиётӣ, ки ба зарари ташкилоти қарзӣ оварда расонидаанд (сабабҳои зарар)', { rowSpan: 3, gray: true, bold: true }),
                 makeCell('Ҷойе, ки дар он ҳодисаҳои хавфи амалиётӣ рӯй додаанд', { rowSpan: 3, gray: true, bold: true }),
                 makeCell('Санаи рӯй додани ҳодисаи хавфи амалиётӣ', { rowSpan: 3, gray: true, bold: true }),
-                makeCell('Шакл ва ҳаҷми пайомадҳо аз ба вуқуъ омадани ҳодисаҳои хавфҳои амалиётӣ (бо сомонӣ)', { colSpan: 9, gray: true, bold: true }),
+                makeCell('Шакл ва ҳаҷми пайомадҳо аз ба вуқуъ омадани ҳодисаҳои хавфҳои амалиётӣ (бо сомонӣ)', { colSpan: 8, gray: true, bold: true }),
                 makeCell('Маблағҳои барқароршуда аз руи ҳодисаҳои хавфи амалиётӣ', { rowSpan: 3, gray: true, bold: true }),
               ]}),
               // Header row 2
               new TableRow({ tableHeader: true, children: [
-                makeCell('Ҷаримаҳои рӯёнидашуда, ки дар асоси қонунгузорӣ муқаррар шудаанд', { gray: true, bold: true }),
-                makeCell('Хароҷотҳои судӣ ва ҷаримаҳои дар асоси қарори суд ситонидашуда', { gray: true, bold: true }),
+                makeCell('Ҷаримаҳои рӯёнидашуда', { gray: true, bold: true }),
+                makeCell('Хароҷотҳои судӣ', { gray: true, bold: true }),
                 makeCell('Ҷуброни ғайрисудии кормандон', { gray: true, bold: true }),
                 makeCell('Ҷуброни ғайрисудии муштариён', { gray: true, bold: true }),
-                makeCell('Дороиҳои моддии пеш аз муҳлат аз ҳисоб баровардашуда', { gray: true, bold: true }),
-                makeCell('Хароҷотҳои бо бартараф намудани натиҷаҳои ба амал омадани хавфи амалиётӣ алоқаманд', { gray: true, bold: true }),
-                makeCell('Зарарҳои дигари аз ҳисоби захира пӯшониданашуда', { gray: true, bold: true }),
-                makeCell('Коҳиши арзиши дороиҳо', { gray: true, bold: true }),
-                makeCell('Дигар ҳодисаҳои хавфҳои амалиётӣ', { gray: true, bold: true }),
+                makeCell('Дороиҳои моддӣ', { gray: true, bold: true }),
+                makeCell('Хароҷотҳои бартараф', { gray: true, bold: true }),
+                makeCell('Зарарҳои дигар', { gray: true, bold: true }),
+                makeCell('Коҳиши арзиш', { gray: true, bold: true }),
               ]}),
 
               // Data row
-              // Col1=№, Col2=Описание, Col3=Место, Col4=Дата, Col5-12=Виды ущерба (пусто), Col13=Ущерб, Col14=Возврат
               new TableRow({ children: [
                 makeCell('1'),
                 makeCell(description, { left: true }),
                 makeCell(department),
                 makeCell(discoveryDate),
-                makeCell(''), makeCell(''), makeCell(''), makeCell(''), makeCell(''), makeCell(''), makeCell(''), makeCell(''),
+                makeCell(''), makeCell(''), makeCell(''), makeCell(''), makeCell(''), makeCell(''), makeCell(''),
                 makeCell(loss),
                 makeCell(recovery),
               ]}),
-              // Total row
+              // Total row - Ҳамагӣ
               new TableRow({ children: [
                 new TableCell({
                   borders,
-                  columnSpan: 2,
+                  columnSpan: 3,
                   children: [new Paragraph({ alignment: AlignmentType.CENTER, children: [new TextRun({ text: 'Ҳамагӣ', size: 14, bold: true, font: 'Times New Roman' })] })]
                 }),
                 makeCell(''),
-                makeCell(''),
-                makeCell(''), makeCell(''), makeCell(''), makeCell(''), makeCell(''), makeCell(''), makeCell(''), makeCell(''),
+                makeCell(''), makeCell(''), makeCell(''), makeCell(''), makeCell(''), makeCell(''), makeCell(''),
                 makeCell(loss, { bold: true }),
                 makeCell(recovery, { bold: true }),
               ]}),
