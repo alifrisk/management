@@ -182,9 +182,14 @@ export default function LiquidityPage() {
       <div className="space-y-1.5 text-xs">
         <div className="flex justify-between"><span className="text-gray-500">Отток обязательств:</span><span className="font-medium">{fmt(data.liab)} TJS</span></div>
         <div className="flex justify-between"><span className="text-gray-500">Использование линий:</span><span className="font-medium">{fmt(data.draw)} TJS</span></div>
-        <div className="flex justify-between border-t border-gray-200 pt-1.5 mt-1.5"><span className="font-semibold text-gray-700">Потребность в ликв.:</span><span className="font-bold text-gray-900">{fmt(data.need)} TJS</span></div>
-        <div className="flex justify-between"><span className="text-gray-500">Покрытие (cash+eq):</span><span className={`font-bold ${covColor(data.cov_cash)}`}>{(data.cov_cash * 100).toFixed(0)}%</span></div>
-        <div className="flex justify-between"><span className="text-gray-500">Покрытие (cash only):</span><span className={`font-bold ${covColor(data.cov_only)}`}>{(data.cov_only * 100).toFixed(0)}%</span></div>
+        <div className="flex justify-between border-t border-gray-200 pt-1.5 mt-1.5"><span className="font-semibold text-gray-700">Стресс-потребность:</span><span className="font-bold text-gray-900">{fmt(data.need)} TJS</span></div>
+        <div className="flex justify-between"><span className="text-gray-500">Покрытие (Cash & Eq):</span><span className={`font-bold ${covColor(data.cov_cash)}`}>{(data.cov_cash * 100).toFixed(0)}%</span></div>
+        <div className="flex justify-between border-t border-gray-200 pt-1 mt-1">
+          {data.cov_cash >= 1
+            ? <><span className="text-green-700 font-semibold">Профицит:</span><span className="font-bold text-green-700">+{fmt(Math.round((data.cov_cash - 1) * data.need))} TJS</span></>
+            : <><span className="text-red-700 font-semibold">Дефицит:</span><span className="font-bold text-red-700">-{fmt(Math.round((1 - data.cov_cash) * data.need))} TJS</span></>
+          }
+        </div>
       </div>
     </div>
   )
