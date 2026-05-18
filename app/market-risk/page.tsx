@@ -4,226 +4,256 @@ import { useState, useEffect, useCallback } from 'react'
 import { supabase } from '@/supabase/client'
 import { Plus, Download, Eye, Trash2, X, Loader2, CheckCircle2, AlertCircle, Filter } from 'lucide-react'
 
-interface CounterpartyAssessment {
+interface Assessment {
   id: string
-  bank_name: string
-  country: string
-  analyst_name: string
-  assessment_date: string
-  // Показатели (1-4)
-  intl_rating: number
-  national_rating: number
-  bank_history: number
-  ownership: number
-  license_revocation: number
-  rating_revocation: number
-  sanctions: number
-  negative_media: number
-  asset_volume: number
-  capital_adequacy: number
-  profitability: number
-  liquidity: number
-  // Результаты
-  total_score: number
-  reliability_category: string
-  limit_recommendation: string
-  ai_conclusion: string
-  recommendation: string
-  created_at: string
+  bank_name: string; country: string; analyst_name: string; assessment_date: string
+  intl_rating_value: string; national_rating_value: string
+  bank_history_years: number; ownership_type: string
+  license_revocation_status: string; rating_revocation_status: string
+  sanctions_status: string; negative_media_status: string
+  total_assets: number; liquid_assets: number; total_capital: number
+  risk_weighted_assets: number; short_term_liabilities: number
+  total_liabilities: number; net_outflow_30d: number
+  net_profit: number; equity: number
+  car_ratio: number; roe_ratio: number; lcr_ratio: number
+  score_intl_rating: number; score_national_rating: number; score_bank_history: number
+  score_ownership: number; score_license: number; score_rating_revocation: number
+  score_sanctions: number; score_negative_media: number; score_asset_volume: number
+  score_capital_adequacy: number; score_profitability: number; score_liquidity: number
+  total_score: number; reliability_category: string; limit_recommendation: string
+  ai_conclusion: string; recommendation: string; created_at: string
 }
 
-// Матрица оценок по каждому показателю
-const CRITERIA = [
-  {
-    key: 'intl_rating', label: 'Международный рейтинг', weight: 5,
-    options: [
-      { value: 1, label: 'na (нет рейтинга)' },
-      { value: 2, label: "Moody's B3-Baa1 / Fitch BBB- / S&P BBB-" },
-      { value: 3, label: "Moody's A3-A1 / Fitch A- / S&P A-" },
-      { value: 4, label: "Moody's Aa2-Aaa / Fitch AA / S&P AA+" },
-    ]
-  },
-  {
-    key: 'national_rating', label: 'Национальный рейтинг', weight: 5,
-    options: [
-      { value: 1, label: 'не ниже B3 или B-' },
-      { value: 2, label: 'не ниже Ba3 или BB-' },
-      { value: 3, label: 'не ниже Baa3 или BBB-' },
-      { value: 4, label: 'от Aa2 до A3 и/или A-' },
-    ]
-  },
-  {
-    key: 'bank_history', label: 'История банка', weight: 5,
-    options: [
-      { value: 1, label: 'до 5 лет' },
-      { value: 2, label: 'от 5 до 10 лет' },
-      { value: 3, label: 'от 10 до 50 лет' },
-      { value: 4, label: 'свыше 50 лет' },
-    ]
-  },
-  {
-    key: 'ownership', label: 'Состав собственников', weight: 5,
-    options: [
-      { value: 1, label: 'Компания неизвестна, мажоритарный — физлицо' },
-      { value: 2, label: 'Компания неизвестна, мажоритарный — юрлицо' },
-      { value: 3, label: 'Крупные организации с известной репутацией' },
-      { value: 4, label: 'Государство или международные институты' },
-    ]
-  },
-  {
-    key: 'license_revocation', label: 'Отзыв лицензии', weight: 5,
-    options: [
-      { value: 1, label: 'Был зафиксирован случай за последний год' },
-      { value: 2, label: 'Попытка отзыва, не завершённая' },
-      { value: 3, label: 'Незначительные нарушения без угрозы лицензии' },
-      { value: 4, label: 'Не было зафиксировано ни одного случая' },
-    ]
-  },
-  {
-    key: 'rating_revocation', label: 'Отзыв рейтинга', weight: 5,
-    options: [
-      { value: 1, label: 'Был зарегистрирован отзыв рейтинга' },
-      { value: 2, label: 'Был понижен рейтинг' },
-      { value: 3, label: 'Был подтверждён без изменений' },
-      { value: 4, label: 'Рейтинг был повышен' },
-    ]
-  },
-  {
-    key: 'sanctions', label: 'Санкционные списки', weight: 5,
-    options: [
-      { value: 1, label: 'В списке OFAC' },
-      { value: 2, label: 'В списке ЕС и OFSI' },
-      { value: 3, label: 'В списке отдельных стран' },
-      { value: 4, label: 'Не числится ни в одном санкционном списке' },
-    ]
-  },
-  {
-    key: 'negative_media', label: 'Негативные освещения в СМИ', weight: 5,
-    options: [
-      { value: 1, label: 'Существенная негативная информация (мошенничество)' },
-      { value: 2, label: 'Информация о судебных исках, нарушениях' },
-      { value: 3, label: 'Незначительная негативная информация' },
-      { value: 4, label: 'Негативных освещений не обнаружено' },
-    ]
-  },
-  {
-    key: 'asset_volume', label: 'Объём активов', weight: 5,
-    options: [
-      { value: 1, label: 'до $100 млн' },
-      { value: 2, label: 'от $100 млн до $1 млрд' },
-      { value: 3, label: 'от $1 млрд до $10 млрд' },
-      { value: 4, label: 'свыше $10 млрд' },
-    ]
-  },
-  {
-    key: 'capital_adequacy', label: 'Достаточность капитала', weight: 5,
-    options: [
-      { value: 1, label: '8% - 10%' },
-      { value: 2, label: '10% - 13%' },
-      { value: 3, label: '13% - 15%' },
-      { value: 4, label: '15% - 25%' },
-    ]
-  },
-  {
-    key: 'profitability', label: 'Рентабельность (ROE/ROA)', weight: 5,
-    options: [
-      { value: 1, label: 'менее 0% (убыток)' },
-      { value: 2, label: '0% - 5%' },
-      { value: 3, label: '5% - 10%' },
-      { value: 4, label: 'свыше 10%' },
-    ]
-  },
-  {
-    key: 'liquidity', label: 'Ликвидность (LCR)', weight: 5,
-    options: [
-      { value: 1, label: 'менее 50%' },
-      { value: 2, label: '50% - 80%' },
-      { value: 3, label: '80% - 100%' },
-      { value: 4, label: 'свыше 100%' },
-    ]
-  },
-]
+const MONTHS = ['Январь','Февраль','Март','Апрель','Май','Июнь','Июль','Август','Сентябрь','Октябрь','Ноябрь','Декабрь']
 
-function calcScore(form: Record<string, number>): number {
-  return CRITERIA.reduce((sum, c) => sum + (form[c.key] || 0) * c.weight / 4, 0)
+// ── Матрица оценок ──
+function calcScores(f: Record<string, string | number>) {
+  const n = (k: string) => Number(f[k]) || 0
+
+  // CAR = Капитал / RWA * 100
+  const car = n('risk_weighted_assets') > 0 ? (n('total_capital') / n('risk_weighted_assets') * 100) : 0
+  // ROE = Чистая прибыль / Капитал * 100
+  const roe = n('equity') > 0 ? (n('net_profit') / n('equity') * 100) : 0
+  // LCR = Ликвидные активы / Чистый отток за 30 дней * 100
+  const lcr = n('net_outflow_30d') > 0
+    ? (n('liquid_assets') / n('net_outflow_30d') * 100)
+    : n('short_term_liabilities') > 0
+      ? (n('liquid_assets') / n('short_term_liabilities') * 100)
+      : 0
+
+  // Объём активов в млн $
+  const assetsUsd = n('total_assets') / 13.5 / 1_000_000 // TJS to USD
+
+  const scores = {
+    score_intl_rating: calcIntlRating(String(f.intl_rating_value || '')),
+    score_national_rating: calcNationalRating(String(f.national_rating_value || '')),
+    score_bank_history: calcHistory(n('bank_history_years')),
+    score_ownership: calcOwnership(String(f.ownership_type || '')),
+    score_license: calcLicense(String(f.license_revocation_status || '')),
+    score_rating_revocation: calcRatingRevocation(String(f.rating_revocation_status || '')),
+    score_sanctions: calcSanctions(String(f.sanctions_status || '')),
+    score_negative_media: calcMedia(String(f.negative_media_status || '')),
+    score_asset_volume: calcAssets(assetsUsd),
+    score_capital_adequacy: calcCAR(car),
+    score_profitability: calcROE(roe),
+    score_liquidity: calcLCR(lcr),
+  }
+
+  const total = Math.round(Object.values(scores).reduce((s, v) => s + v * 5 / 4, 0))
+  return { scores, car: Math.round(car * 10) / 10, roe: Math.round(roe * 10) / 10, lcr: Math.round(lcr * 10) / 10, total }
 }
 
-function getCategory(score: number): { category: string; limit: string; color: string } {
-  if (score >= 50) return { category: 'Надёжность вне сомнений', limit: '$3-5 млн', color: 'green' }
-  if (score >= 40) return { category: 'Надёжность выше средней', limit: '$1-3 млн', color: 'blue' }
-  if (score >= 25) return { category: 'Средняя надёжность', limit: '$500K-1 млн', color: 'yellow' }
-  return { category: 'Низкая надёжность', limit: 'до $500K', color: 'red' }
+function calcIntlRating(r: string): number {
+  if (!r || r.toLowerCase().includes('na') || r.toLowerCase().includes('нет')) return 1
+  if (r.match(/B[1-3]|Ba[1-3]|BB|BBB/i)) return 2
+  if (r.match(/A[1-3]|A-|A\+/i)) return 3
+  if (r.match(/Aa|AA|Aaa|AAA/i)) return 4
+  return 1
+}
+function calcNationalRating(r: string): number {
+  if (!r || r.toLowerCase().includes('нет')) return 1
+  if (r.match(/B[1-3]|B-/i)) return 1
+  if (r.match(/Ba[1-3]|BB/i)) return 2
+  if (r.match(/Baa|BBB/i)) return 3
+  if (r.match(/Aa|AA|A[1-3]/i)) return 4
+  return 2
+}
+function calcHistory(years: number): number {
+  if (years < 5) return 1
+  if (years < 10) return 2
+  if (years < 50) return 3
+  return 4
+}
+function calcOwnership(type: string): number {
+  const t = type.toLowerCase()
+  if (t.includes('физ') || t.includes('unknown') || t.includes('неизвест')) return 1
+  if (t.includes('юр') || t.includes('частн')) return 2
+  if (t.includes('крупн') || t.includes('известн')) return 3
+  if (t.includes('государ') || t.includes('международ') || t.includes('цб')) return 4
+  return 2
+}
+function calcLicense(s: string): number {
+  const t = s.toLowerCase()
+  if (t.includes('отозван') || t.includes('был случ')) return 1
+  if (t.includes('попытк') || t.includes('предупр')) return 2
+  if (t.includes('незначит') || t.includes('нарушен')) return 3
+  return 4
+}
+function calcRatingRevocation(s: string): number {
+  const t = s.toLowerCase()
+  if (t.includes('отозван')) return 1
+  if (t.includes('понижен') || t.includes('снижен')) return 2
+  if (t.includes('подтверждён') || t.includes('без изм')) return 3
+  if (t.includes('повышен') || t.includes('улучш')) return 4
+  return 3
+}
+function calcSanctions(s: string): number {
+  const t = s.toLowerCase()
+  if (t.includes('ofac')) return 1
+  if (t.includes('ес') || t.includes('ofsi')) return 2
+  if (t.includes('отдельн')) return 3
+  if (t.includes('нет') || t.includes('не числ')) return 4
+  return 4
+}
+function calcMedia(s: string): number {
+  const t = s.toLowerCase()
+  if (t.includes('мошенн') || t.includes('существен')) return 1
+  if (t.includes('суд') || t.includes('иск') || t.includes('нарушен')) return 2
+  if (t.includes('незначит')) return 3
+  return 4
+}
+function calcAssets(usd: number): number {
+  if (usd < 100) return 1
+  if (usd < 1000) return 2
+  if (usd < 10000) return 3
+  return 4
+}
+function calcCAR(car: number): number {
+  if (car < 10) return 1
+  if (car < 13) return 2
+  if (car < 15) return 3
+  return 4
+}
+function calcROE(roe: number): number {
+  if (roe < 0) return 1
+  if (roe < 5) return 2
+  if (roe < 10) return 3
+  return 4
+}
+function calcLCR(lcr: number): number {
+  if (lcr < 50) return 1
+  if (lcr < 80) return 2
+  if (lcr < 100) return 3
+  return 4
 }
 
-const EMPTY_SCORES: Record<string, number> = Object.fromEntries(CRITERIA.map(c => [c.key, 0]))
+function getCategory(score: number) {
+  if (score >= 50) return { label: 'Надёжность вне сомнений', limit: '$3-5 млн', color: 'green' }
+  if (score >= 40) return { label: 'Надёжность выше средней', limit: '$1-3 млн', color: 'blue' }
+  if (score >= 25) return { label: 'Средняя надёжность', limit: '$500K-1 млн', color: 'yellow' }
+  return { label: 'Низкая надёжность', limit: 'до $500K', color: 'red' }
+}
+
+const SCORE_LABELS: Record<string, string> = {
+  score_intl_rating: 'Международный рейтинг',
+  score_national_rating: 'Национальный рейтинг',
+  score_bank_history: 'История банка',
+  score_ownership: 'Состав собственников',
+  score_license: 'Отзыв лицензии',
+  score_rating_revocation: 'Отзыв рейтинга',
+  score_sanctions: 'Санкционные списки',
+  score_negative_media: 'Негативные СМИ',
+  score_asset_volume: 'Объём активов',
+  score_capital_adequacy: 'Достаточность капитала (CAR)',
+  score_profitability: 'Рентабельность (ROE)',
+  score_liquidity: 'Ликвидность (LCR)',
+}
+
+const EMPTY = {
+  bank_name: '', country: '', analyst_name: '',
+  intl_rating_value: '', national_rating_value: '',
+  bank_history_years: '', ownership_type: '',
+  license_revocation_status: 'Не было зафиксировано',
+  rating_revocation_status: 'Подтверждён без изменений',
+  sanctions_status: 'Не числится ни в одном списке',
+  negative_media_status: 'Негативных освещений не обнаружено',
+  total_assets: '', liquid_assets: '', total_capital: '',
+  risk_weighted_assets: '', short_term_liabilities: '',
+  total_liabilities: '', net_outflow_30d: '',
+  net_profit: '', equity: '',
+}
 
 export default function MarketRiskPage() {
-  const [assessments, setAssessments] = useState<CounterpartyAssessment[]>([])
+  const [assessments, setAssessments] = useState<Assessment[]>([])
   const [loading, setLoading] = useState(true)
   const [showModal, setShowModal] = useState(false)
-  const [bankName, setBankName] = useState('')
-  const [country, setCountry] = useState('')
-  const [analystName, setAnalystName] = useState('')
-  const [scores, setScores] = useState<Record<string, number>>(EMPTY_SCORES)
+  const [form, setForm] = useState<Record<string, string>>(EMPTY)
   const [generating, setGenerating] = useState(false)
   const [error, setError] = useState<string | null>(null)
-  const [viewing, setViewing] = useState<CounterpartyAssessment | null>(null)
+  const [viewing, setViewing] = useState<Assessment | null>(null)
   const [filterYear, setFilterYear] = useState('')
   const [filterMonth, setFilterMonth] = useState('')
+  const [tab, setTab] = useState(1)
 
   const fetch_ = useCallback(async () => {
     setLoading(true)
     let query = supabase.from('counterparty_assessments').select('*').order('created_at', { ascending: false })
-    if (filterYear) {
-      query = query.gte('assessment_date', `${filterYear}-01-01`).lte('assessment_date', `${filterYear}-12-31`)
-    }
+    if (filterYear) query = query.gte('assessment_date', `${filterYear}-01-01`).lte('assessment_date', `${filterYear}-12-31`)
+    if (filterMonth && filterYear) query = query.gte('assessment_date', `${filterYear}-${filterMonth}-01`).lte('assessment_date', `${filterYear}-${filterMonth}-31`)
     const { data } = await query
     setAssessments(data || [])
     setLoading(false)
-  }, [filterYear])
+  }, [filterYear, filterMonth])
 
   useEffect(() => { fetch_() }, [fetch_])
 
-  const totalScore = calcScore(scores)
-  const category = getCategory(totalScore)
-  const filledCount = Object.values(scores).filter(v => v > 0).length
+  const setF = (k: string, v: string) => setForm(p => ({ ...p, [k]: v }))
+  const n = (k: string) => Number(form[k]) || 0
+  const computed = calcScores(form)
+  const category = getCategory(computed.total)
 
   async function handleGenerate() {
-    if (!bankName.trim()) { setError('Введите название банка'); return }
-    if (filledCount < 12) { setError(`Заполните все показатели (заполнено ${filledCount}/12)`); return }
+    if (!form.bank_name.trim()) { setError('Введите название банка'); return }
     setGenerating(true); setError(null)
-
     try {
+      const payload = { ...form, ...computed.scores, car: computed.car, roe: computed.roe, lcr: computed.lcr, total: computed.total, category }
       const res = await fetch('/api/market-risk/generate', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ bankName, country, analystName, scores, totalScore, category }),
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
       })
       const data = await res.json()
       if (data.error) throw new Error(data.error)
 
       const { error: dbErr } = await supabase.from('counterparty_assessments').insert({
-        bank_name: bankName, country, analyst_name: analystName,
+        bank_name: form.bank_name, country: form.country, analyst_name: form.analyst_name,
         assessment_date: new Date().toISOString().split('T')[0],
-        ...scores,
-        total_score: Math.round(totalScore),
-        reliability_category: category.category,
+        intl_rating_value: form.intl_rating_value, national_rating_value: form.national_rating_value,
+        bank_history_years: n('bank_history_years'),
+        ownership_type: form.ownership_type,
+        license_revocation_status: form.license_revocation_status,
+        rating_revocation_status: form.rating_revocation_status,
+        sanctions_status: form.sanctions_status,
+        negative_media_status: form.negative_media_status,
+        total_assets: n('total_assets'), liquid_assets: n('liquid_assets'),
+        total_capital: n('total_capital'), risk_weighted_assets: n('risk_weighted_assets'),
+        short_term_liabilities: n('short_term_liabilities'), total_liabilities: n('total_liabilities'),
+        net_outflow_30d: n('net_outflow_30d'), net_profit: n('net_profit'), equity: n('equity'),
+        car_ratio: computed.car, roe_ratio: computed.roe, lcr_ratio: computed.lcr,
+        ...computed.scores,
+        total_score: computed.total,
+        reliability_category: category.label,
         limit_recommendation: category.limit,
         ai_conclusion: data.conclusion,
         recommendation: data.recommendation,
       })
       if (dbErr) throw new Error(dbErr.message)
-
-      setShowModal(false)
-      setBankName(''); setCountry(''); setAnalystName('')
-      setScores(EMPTY_SCORES)
-      fetch_()
+      setShowModal(false); setForm(EMPTY); setTab(1); fetch_()
     } catch (err: unknown) {
       setError('Ошибка: ' + (err instanceof Error ? err.message : String(err)))
     } finally { setGenerating(false) }
   }
 
-  async function downloadWord(a: CounterpartyAssessment) {
+  async function downloadWord(a: Assessment) {
     try {
       const res = await fetch('/api/market-risk/export-word', {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
@@ -235,40 +265,29 @@ export default function MarketRiskPage() {
       const link = document.createElement('a')
       link.href = url; link.download = `Оценка_${a.bank_name}.docx`; link.click()
       URL.revokeObjectURL(url)
-    } catch (e: unknown) { alert('Ошибка Word: ' + (e instanceof Error ? e.message : String(e))) }
+    } catch (e: unknown) { alert('Ошибка: ' + (e instanceof Error ? e.message : String(e))) }
   }
 
   async function handleDelete(id: string) {
-    if (!confirm('Удалить оценку?')) return
+    if (!confirm('Удалить?')) return
     await supabase.from('counterparty_assessments').delete().eq('id', id)
     fetch_()
   }
 
-  const catColor = (cat: string) => {
-    if (cat?.includes('вне сомнений')) return 'bg-green-100 text-green-800'
-    if (cat?.includes('выше средней')) return 'bg-blue-100 text-blue-800'
-    if (cat?.includes('средн')) return 'bg-yellow-100 text-yellow-800'
-    return 'bg-red-100 text-red-800'
-  }
-
-  const scoreColor = (score: number) => {
-    if (score >= 50) return 'text-green-600'
-    if (score >= 40) return 'text-blue-600'
-    if (score >= 25) return 'text-yellow-600'
-    return 'text-red-600'
-  }
-
-  const MONTHS = ['Январь','Февраль','Март','Апрель','Май','Июнь','Июль','Август','Сентябрь','Октябрь','Ноябрь','Декабрь']
+  const scoreColor = (s: number) => s >= 50 ? 'text-green-600' : s >= 40 ? 'text-blue-600' : s >= 25 ? 'text-yellow-600' : 'text-red-600'
+  const catBg = (s: number) => s >= 50 ? 'bg-green-100 text-green-800' : s >= 40 ? 'bg-blue-100 text-blue-800' : s >= 25 ? 'bg-yellow-100 text-yellow-800' : 'bg-red-100 text-red-800'
+  const inp = "w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#1B8A4C] bg-white"
+  const lbl = "block text-xs font-medium text-gray-600 mb-1"
+  const numInp = "w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#1B8A4C] bg-white text-right"
 
   return (
     <div className="max-w-6xl mx-auto space-y-5">
-      {/* Header */}
       <div className="flex items-center justify-between flex-wrap gap-3">
         <div>
           <h1 className="text-xl font-semibold text-gray-900">Рыночный риск — Оценка контрагентов</h1>
           <p className="text-sm text-gray-500 mt-0.5">Матрица оценки надёжности банков-контрагентов</p>
         </div>
-        <button onClick={() => { setBankName(''); setCountry(''); setAnalystName(''); setScores(EMPTY_SCORES); setError(null); setShowModal(true) }}
+        <button onClick={() => { setForm(EMPTY); setTab(1); setError(null); setShowModal(true) }}
           className="flex items-center gap-2 px-4 py-2 bg-[#1B8A4C] text-white rounded-lg text-sm font-medium hover:bg-[#177040]">
           <Plus className="w-4 h-4" /> Новая оценка
         </button>
@@ -277,13 +296,13 @@ export default function MarketRiskPage() {
       {/* KPI */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
         {[
-          { label: 'Всего оценок', value: assessments.length, color: 'text-gray-900' },
-          { label: 'Надёжные', value: assessments.filter(a => a.total_score >= 50).length, color: 'text-green-600' },
-          { label: 'Средние', value: assessments.filter(a => a.total_score >= 25 && a.total_score < 50).length, color: 'text-yellow-600' },
-          { label: 'Низкая надёжность', value: assessments.filter(a => a.total_score < 25).length, color: 'text-red-600' },
+          { label: 'Всего оценок', value: assessments.length, c: 'text-gray-900' },
+          { label: 'Надёжные (≥50)', value: assessments.filter(a => a.total_score >= 50).length, c: 'text-green-600' },
+          { label: 'Средние (25-49)', value: assessments.filter(a => a.total_score >= 25 && a.total_score < 50).length, c: 'text-yellow-600' },
+          { label: 'Низкие (<25)', value: assessments.filter(a => a.total_score < 25).length, c: 'text-red-600' },
         ].map(s => (
           <div key={s.label} className="bg-white rounded-xl border border-gray-100 p-4 shadow-sm">
-            <p className={`text-2xl font-bold ${s.color}`}>{s.value}</p>
+            <p className={`text-2xl font-bold ${s.c}`}>{s.value}</p>
             <p className="text-xs text-gray-500 mt-0.5">{s.label}</p>
           </div>
         ))}
@@ -292,15 +311,15 @@ export default function MarketRiskPage() {
       {/* Filters */}
       <div className="bg-white rounded-xl border border-gray-100 p-4 shadow-sm flex items-center gap-3 flex-wrap">
         <Filter className="w-4 h-4 text-gray-400" />
-        <select value={filterYear} onChange={e => setFilterYear(e.target.value)}
+        <select value={filterYear} onChange={e => { setFilterYear(e.target.value); setFilterMonth('') }}
           className="px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#1B8A4C] bg-white">
           <option value="">Все годы</option>
-          {[2026, 2025, 2024].map(y => <option key={y} value={y}>{y}</option>)}
+          {[2026,2025,2024].map(y => <option key={y} value={y}>{y}</option>)}
         </select>
         <select value={filterMonth} onChange={e => setFilterMonth(e.target.value)}
           className="px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#1B8A4C] bg-white">
           <option value="">Все месяцы</option>
-          {MONTHS.map((m, i) => <option key={i} value={String(i+1).padStart(2,'0')}>{m}</option>)}
+          {MONTHS.map((m,i) => <option key={i} value={String(i+1).padStart(2,'0')}>{m}</option>)}
         </select>
         {(filterYear || filterMonth) && (
           <button onClick={() => { setFilterYear(''); setFilterMonth('') }} className="text-xs text-gray-500 hover:text-gray-700 flex items-center gap-1">
@@ -315,30 +334,25 @@ export default function MarketRiskPage() {
           <table className="w-full text-sm">
             <thead>
               <tr className="bg-gray-50 border-b border-gray-100">
-                {['Банк','Страна','Дата','Балл','Категория надёжности','Лимит','Аналитик',''].map(h => (
+                {['Банк','Страна','Дата','Балл','CAR','ROE','LCR','Категория','Лимит',''].map(h => (
                   <th key={h} className="text-left px-4 py-3 text-xs font-medium text-gray-500 uppercase whitespace-nowrap">{h}</th>
                 ))}
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-50">
-              {loading ? <tr><td colSpan={8} className="text-center py-12 text-gray-400">Загрузка...</td></tr>
-                : assessments.length === 0 ? <tr><td colSpan={8} className="text-center py-12 text-gray-400">Нет оценок</td></tr>
+              {loading ? <tr><td colSpan={10} className="text-center py-12 text-gray-400">Загрузка...</td></tr>
+                : assessments.length === 0 ? <tr><td colSpan={10} className="text-center py-12 text-gray-400">Нет оценок</td></tr>
                 : assessments.map(a => (
                   <tr key={a.id} className="hover:bg-gray-50">
                     <td className="px-4 py-3 font-semibold text-gray-900">{a.bank_name}</td>
                     <td className="px-4 py-3 text-gray-600">{a.country || '—'}</td>
-                    <td className="px-4 py-3 text-gray-500 text-xs whitespace-nowrap">{new Date(a.created_at).toLocaleDateString('ru-RU')}</td>
-                    <td className="px-4 py-3">
-                      <span className={`text-2xl font-bold ${scoreColor(a.total_score)}`}>{a.total_score}</span>
-                      <span className="text-xs text-gray-400">/60</span>
-                    </td>
-                    <td className="px-4 py-3">
-                      <span className={`inline-flex px-2 py-0.5 rounded-full text-xs font-medium ${catColor(a.reliability_category)}`}>
-                        {a.reliability_category}
-                      </span>
-                    </td>
+                    <td className="px-4 py-3 text-gray-500 text-xs">{new Date(a.created_at).toLocaleDateString('ru-RU')}</td>
+                    <td className="px-4 py-3"><span className={`text-xl font-bold ${scoreColor(a.total_score)}`}>{a.total_score}</span><span className="text-xs text-gray-400">/60</span></td>
+                    <td className="px-4 py-3 text-sm font-medium">{a.car_ratio ? `${a.car_ratio}%` : '—'}</td>
+                    <td className="px-4 py-3 text-sm font-medium">{a.roe_ratio ? `${a.roe_ratio}%` : '—'}</td>
+                    <td className="px-4 py-3 text-sm font-medium">{a.lcr_ratio ? `${a.lcr_ratio}%` : '—'}</td>
+                    <td className="px-4 py-3"><span className={`inline-flex px-2 py-0.5 rounded-full text-xs font-medium ${catBg(a.total_score)}`}>{a.reliability_category}</span></td>
                     <td className="px-4 py-3 text-sm font-medium text-gray-700">{a.limit_recommendation}</td>
-                    <td className="px-4 py-3 text-gray-600 text-xs">{a.analyst_name || '—'}</td>
                     <td className="px-4 py-3">
                       <div className="flex items-center gap-1">
                         <button onClick={() => setViewing(a)} className="p-1.5 text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg"><Eye className="w-3.5 h-3.5" /></button>
@@ -362,34 +376,45 @@ export default function MarketRiskPage() {
               <button onClick={() => setViewing(null)}><X className="w-5 h-5 text-gray-400" /></button>
             </div>
             <div className="flex-1 overflow-y-auto p-6 space-y-4">
-              <div className="grid grid-cols-3 gap-4">
-                <div className={`col-span-1 p-4 rounded-xl text-center ${viewing.total_score >= 50 ? 'bg-green-50' : viewing.total_score >= 40 ? 'bg-blue-50' : viewing.total_score >= 25 ? 'bg-yellow-50' : 'bg-red-50'}`}>
-                  <p className={`text-4xl font-bold ${scoreColor(viewing.total_score)}`}>{viewing.total_score}</p>
+              {/* Score summary */}
+              <div className={`p-4 rounded-xl flex items-center justify-between ${viewing.total_score >= 50 ? 'bg-green-50' : viewing.total_score >= 40 ? 'bg-blue-50' : viewing.total_score >= 25 ? 'bg-yellow-50' : 'bg-red-50'}`}>
+                <div>
+                  <p className={`text-5xl font-bold ${scoreColor(viewing.total_score)}`}>{viewing.total_score}</p>
                   <p className="text-xs text-gray-500 mt-1">из 60 баллов</p>
                 </div>
-                <div className="col-span-2 space-y-2">
-                  {[
-                    ['Банк', viewing.bank_name], ['Страна', viewing.country || '—'],
-                    ['Категория', viewing.reliability_category], ['Лимит', viewing.limit_recommendation],
-                    ['Аналитик', viewing.analyst_name || '—'],
-                  ].map(([l, v]) => <div key={l} className="flex justify-between text-sm"><span className="text-gray-500">{l}:</span><span className="font-medium">{v}</span></div>)}
+                <div className="text-right">
+                  <p className={`text-sm font-bold ${scoreColor(viewing.total_score)}`}>{viewing.reliability_category}</p>
+                  <p className="text-xs text-gray-600 mt-1">Лимит: <span className="font-semibold">{viewing.limit_recommendation}</span></p>
+                  <div className="flex gap-3 mt-2 text-xs text-gray-600">
+                    <span>CAR: <b>{viewing.car_ratio}%</b></span>
+                    <span>ROE: <b>{viewing.roe_ratio}%</b></span>
+                    <span>LCR: <b>{viewing.lcr_ratio}%</b></span>
+                  </div>
                 </div>
               </div>
+
+              {/* Matrix scores */}
               <div>
-                <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-3">Оценка по критериям</p>
+                <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-3">Матрица оценок</p>
                 <div className="grid grid-cols-2 gap-2">
-                  {CRITERIA.map(c => {
-                    const score = viewing[c.key as keyof CounterpartyAssessment] as number
-                    const option = c.options.find(o => o.value === score)
+                  {Object.entries(SCORE_LABELS).map(([key, label]) => {
+                    const score = viewing[key as keyof Assessment] as number
                     return (
-                      <div key={c.key} className="flex items-center justify-between p-2 bg-gray-50 rounded-lg">
-                        <span className="text-xs text-gray-600 truncate flex-1">{c.label}</span>
-                        <span className={`text-xs font-bold ml-2 px-1.5 py-0.5 rounded ${score >= 3 ? 'bg-green-100 text-green-700' : score >= 2 ? 'bg-yellow-100 text-yellow-700' : 'bg-red-100 text-red-700'}`}>{score}/4</span>
+                      <div key={key} className="flex items-center justify-between p-2 bg-gray-50 rounded-lg">
+                        <span className="text-xs text-gray-600">{label}</span>
+                        <div className="flex items-center gap-1">
+                          {[1,2,3,4].map(v => (
+                            <div key={v} className={`w-4 h-4 rounded-sm ${v <= score ? (score >= 3 ? 'bg-green-500' : score === 2 ? 'bg-yellow-500' : 'bg-red-500') : 'bg-gray-200'}`} />
+                          ))}
+                          <span className="text-xs font-bold ml-1 text-gray-700">{score}/4</span>
+                        </div>
                       </div>
                     )
                   })}
                 </div>
               </div>
+
+              {/* AI Conclusion */}
               {viewing.ai_conclusion && (
                 <div>
                   <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">AI Заключение</p>
@@ -407,92 +432,155 @@ export default function MarketRiskPage() {
         </div>
       )}
 
-      {/* New Assessment Modal */}
+      {/* Form Modal */}
       {showModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50">
-          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-3xl max-h-[95vh] flex flex-col">
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-4xl max-h-[95vh] flex flex-col">
             <div className="flex items-center justify-between p-5 border-b border-gray-100">
-              <h2 className="text-base font-semibold">Оценка надёжности контрагента</h2>
+              <h2 className="text-base font-semibold">Оценка надёжности банка-контрагента</h2>
               <button onClick={() => setShowModal(false)} className="text-gray-400 hover:text-gray-600"><X className="w-5 h-5" /></button>
             </div>
-            <div className="flex-1 overflow-y-auto p-5 space-y-5">
-              {error && <div className="flex items-center gap-2 p-3 bg-red-50 border border-red-100 rounded-lg"><AlertCircle className="w-4 h-4 text-red-500" /><p className="text-sm text-red-600">{error}</p></div>}
 
-              {/* Bank info */}
-              <div className="grid grid-cols-1 lg:grid-cols-3 gap-3">
-                <div>
-                  <label className="block text-xs font-medium text-gray-600 mb-1">Название банка *</label>
-                  <input type="text" value={bankName} onChange={e => setBankName(e.target.value)} placeholder="ОАО 'Банк ...'" className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#1B8A4C] bg-white" />
-                </div>
-                <div>
-                  <label className="block text-xs font-medium text-gray-600 mb-1">Страна</label>
-                  <input type="text" value={country} onChange={e => setCountry(e.target.value)} placeholder="Таджикистан" className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#1B8A4C] bg-white" />
-                </div>
-                <div>
-                  <label className="block text-xs font-medium text-gray-600 mb-1">Аналитик</label>
-                  <input type="text" value={analystName} onChange={e => setAnalystName(e.target.value)} placeholder="ФИО" className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#1B8A4C] bg-white" />
-                </div>
-              </div>
+            {/* Tabs */}
+            <div className="flex border-b border-gray-100 px-4">
+              {[{n:1,t:'Общее'},{n:2,t:'Баланс'},{n:3,t:'ОПУ'},{n:4,t:'Качество'}].map(({n:tn,t}) => (
+                <button key={tn} onClick={() => setTab(tn)}
+                  className={`px-4 py-3 text-xs font-semibold border-b-2 whitespace-nowrap transition-colors ${tab===tn ? 'border-[#1B8A4C] text-[#1B8A4C]' : 'border-transparent text-gray-500 hover:text-gray-700'}`}>
+                  {tn}. {t}
+                </button>
+              ))}
+            </div>
 
-              {/* Score preview */}
-              <div className={`p-4 rounded-xl border-2 flex items-center justify-between ${category.color === 'green' ? 'bg-green-50 border-green-200' : category.color === 'blue' ? 'bg-blue-50 border-blue-200' : category.color === 'yellow' ? 'bg-yellow-50 border-yellow-200' : 'bg-red-50 border-red-200'}`}>
+            <div className="flex-1 overflow-y-auto p-5">
+              {error && <div className="flex items-center gap-2 p-3 bg-red-50 border border-red-100 rounded-lg mb-4"><AlertCircle className="w-4 h-4 text-red-500" /><p className="text-sm text-red-600">{error}</p></div>}
+
+              {/* Live score preview */}
+              <div className={`p-4 rounded-xl border-2 flex items-center justify-between mb-4 ${category.color==='green'?'bg-green-50 border-green-200':category.color==='blue'?'bg-blue-50 border-blue-200':category.color==='yellow'?'bg-yellow-50 border-yellow-200':'bg-red-50 border-red-200'}`}>
                 <div>
                   <p className="text-xs text-gray-500">Текущий балл</p>
-                  <p className={`text-3xl font-bold ${scoreColor(totalScore)}`}>{Math.round(totalScore)} <span className="text-base text-gray-400">/ 60</span></p>
+                  <p className={`text-3xl font-bold ${scoreColor(computed.total)}`}>{computed.total}<span className="text-base text-gray-400"> / 60</span></p>
                 </div>
                 <div className="text-right">
-                  <p className="text-xs text-gray-500">Категория</p>
-                  <p className={`text-sm font-semibold ${scoreColor(totalScore)}`}>{category.category}</p>
-                  <p className="text-xs text-gray-500 mt-0.5">Лимит: {category.limit}</p>
+                  <p className={`text-sm font-semibold ${scoreColor(computed.total)}`}>{category.label}</p>
+                  <p className="text-xs text-gray-500">Лимит: {category.limit}</p>
                 </div>
-                <div className="text-right">
-                  <p className="text-xs text-gray-500">Заполнено</p>
-                  <p className="text-sm font-semibold text-gray-700">{filledCount}/12</p>
+                <div className="text-right text-xs text-gray-600 space-y-0.5">
+                  <p>CAR: <b>{computed.car}%</b></p>
+                  <p>ROE: <b>{computed.roe}%</b></p>
+                  <p>LCR: <b>{computed.lcr}%</b></p>
                 </div>
               </div>
 
-              {/* Criteria */}
-              <div className="space-y-3">
-                <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide">Оценка по 12 критериям (выберите для каждого)</p>
-                {CRITERIA.map((c, idx) => (
-                  <div key={c.key} className="border border-gray-200 rounded-xl p-4">
-                    <div className="flex items-center justify-between mb-3">
-                      <p className="text-sm font-medium text-gray-800">{idx + 1}. {c.label}</p>
-                      {scores[c.key] > 0 && (
-                        <span className={`text-xs font-bold px-2 py-0.5 rounded-full ${scores[c.key] >= 3 ? 'bg-green-100 text-green-700' : scores[c.key] >= 2 ? 'bg-yellow-100 text-yellow-700' : 'bg-red-100 text-red-700'}`}>
-                          {scores[c.key]}/4
-                        </span>
-                      )}
+              {/* Tab 1: General */}
+              {tab === 1 && (
+                <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+                  <div><label className={lbl}>Название банка *</label><input type="text" value={form.bank_name} onChange={e => setF('bank_name', e.target.value)} placeholder="ОАО 'Банк ...'" className={inp} /></div>
+                  <div><label className={lbl}>Страна</label><input type="text" value={form.country} onChange={e => setF('country', e.target.value)} placeholder="Таджикистан" className={inp} /></div>
+                  <div><label className={lbl}>Аналитик</label><input type="text" value={form.analyst_name} onChange={e => setF('analyst_name', e.target.value)} placeholder="ФИО" className={inp} /></div>
+                  <div><label className={lbl}>Стаж на рынке (лет)</label><input type="text" inputMode="numeric" value={form.bank_history_years} onChange={e => setF('bank_history_years', e.target.value.replace(/\D/g,''))} placeholder="15" className={inp} /></div>
+                  <div><label className={lbl}>Международный рейтинг</label><input type="text" value={form.intl_rating_value} onChange={e => setF('intl_rating_value', e.target.value)} placeholder="Moody's Ba1 / Fitch BB+ / na" className={inp} /></div>
+                  <div><label className={lbl}>Национальный рейтинг</label><input type="text" value={form.national_rating_value} onChange={e => setF('national_rating_value', e.target.value)} placeholder="BBB- / na" className={inp} /></div>
+                </div>
+              )}
+
+              {/* Tab 2: Balance */}
+              {tab === 2 && (
+                <div className="space-y-4">
+                  <p className="text-xs text-gray-500">Все суммы в TJS (система автоматически переведёт в USD для оценки объёма активов)</p>
+                  <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+                    <div><label className={lbl}>Общие активы (TJS)</label><input type="text" inputMode="numeric" value={form.total_assets} onChange={e => setF('total_assets', e.target.value.replace(/\D/g,''))} placeholder="0" className={numInp} /></div>
+                    <div><label className={lbl}>Высоколиквидные активы (TJS)</label><input type="text" inputMode="numeric" value={form.liquid_assets} onChange={e => setF('liquid_assets', e.target.value.replace(/\D/g,''))} placeholder="0" className={numInp} /></div>
+                    <div><label className={lbl}>Капитал (TJS)</label><input type="text" inputMode="numeric" value={form.total_capital} onChange={e => setF('total_capital', e.target.value.replace(/\D/g,''))} placeholder="0" className={numInp} /></div>
+                    <div><label className={lbl}>Активы взвешенные по риску RWA (TJS)</label><input type="text" inputMode="numeric" value={form.risk_weighted_assets} onChange={e => setF('risk_weighted_assets', e.target.value.replace(/\D/g,''))} placeholder="0" className={numInp} /></div>
+                    <div><label className={lbl}>Краткосрочные обязательства (TJS)</label><input type="text" inputMode="numeric" value={form.short_term_liabilities} onChange={e => setF('short_term_liabilities', e.target.value.replace(/\D/g,''))} placeholder="0" className={numInp} /></div>
+                    <div><label className={lbl}>Чистый отток за 30 дней (для LCR)</label><input type="text" inputMode="numeric" value={form.net_outflow_30d} onChange={e => setF('net_outflow_30d', e.target.value.replace(/\D/g,''))} placeholder="0 (если не известно — оставь пусто)" className={numInp} /></div>
+                  </div>
+                  {(computed.car > 0 || computed.lcr > 0) && (
+                    <div className="grid grid-cols-2 gap-3">
+                      {computed.car > 0 && <div className={`p-3 rounded-lg ${computed.car >= 15 ? 'bg-green-50' : computed.car >= 10 ? 'bg-yellow-50' : 'bg-red-50'}`}><p className="text-xs text-gray-500">CAR (достаточность капитала)</p><p className={`text-xl font-bold ${computed.car >= 15 ? 'text-green-600' : computed.car >= 10 ? 'text-yellow-600' : 'text-red-600'}`}>{computed.car}%</p><p className="text-xs text-gray-400">Норма: ≥13%</p></div>}
+                      {computed.lcr > 0 && <div className={`p-3 rounded-lg ${computed.lcr >= 100 ? 'bg-green-50' : computed.lcr >= 80 ? 'bg-yellow-50' : 'bg-red-50'}`}><p className="text-xs text-gray-500">LCR (ликвидность)</p><p className={`text-xl font-bold ${computed.lcr >= 100 ? 'text-green-600' : computed.lcr >= 80 ? 'text-yellow-600' : 'text-red-600'}`}>{computed.lcr}%</p><p className="text-xs text-gray-400">Норма: ≥100%</p></div>}
                     </div>
+                  )}
+                </div>
+              )}
+
+              {/* Tab 3: OPU */}
+              {tab === 3 && (
+                <div className="space-y-4">
+                  <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+                    <div><label className={lbl}>Чистая прибыль (TJS)</label><input type="text" inputMode="numeric" value={form.net_profit} onChange={e => setF('net_profit', e.target.value.replace(/[^0-9-]/g,''))} placeholder="0" className={numInp} /></div>
+                    <div><label className={lbl}>Собственный капитал (equity, TJS)</label><input type="text" inputMode="numeric" value={form.equity} onChange={e => setF('equity', e.target.value.replace(/\D/g,''))} placeholder="0" className={numInp} /></div>
+                  </div>
+                  {computed.roe !== 0 && (
+                    <div className={`p-3 rounded-lg ${computed.roe >= 10 ? 'bg-green-50' : computed.roe >= 5 ? 'bg-yellow-50' : 'bg-red-50'}`}>
+                      <p className="text-xs text-gray-500">ROE (рентабельность капитала)</p>
+                      <p className={`text-xl font-bold ${computed.roe >= 10 ? 'text-green-600' : computed.roe >= 5 ? 'text-yellow-600' : 'text-red-600'}`}>{computed.roe}%</p>
+                      <p className="text-xs text-gray-400">Норма: ≥10%</p>
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {/* Tab 4: Qualitative */}
+              {tab === 4 && (
+                <div className="space-y-4">
+                  {[
+                    { key: 'ownership_type', label: 'Состав собственников', options: ['Физическое лицо (мажоритар)', 'Юридическое лицо (частное)', 'Крупные известные организации', 'Государство / международные институты'] },
+                    { key: 'license_revocation_status', label: 'Отзыв лицензии', options: ['Был зафиксирован случай за последний год', 'Попытка отзыва, не завершённая', 'Незначительные нарушения без угрозы лицензии', 'Не было зафиксировано ни одного случая'] },
+                    { key: 'rating_revocation_status', label: 'Изменение рейтинга', options: ['Был отозван рейтинг', 'Рейтинг был понижен', 'Подтверждён без изменений', 'Рейтинг был повышен'] },
+                    { key: 'sanctions_status', label: 'Санкционные списки', options: ['В списке OFAC', 'В списке ЕС и OFSI', 'В списке отдельных стран', 'Не числится ни в одном списке'] },
+                    { key: 'negative_media_status', label: 'Негативные СМИ', options: ['Существенная негативная информация (мошенничество)', 'Информация о судебных исках, нарушениях', 'Незначительная негативная информация', 'Негативных освещений не обнаружено'] },
+                  ].map(field => (
+                    <div key={field.key} className="border border-gray-200 rounded-xl p-4">
+                      <p className="text-sm font-medium text-gray-800 mb-3">{field.label}</p>
+                      <div className="grid grid-cols-2 gap-2">
+                        {field.options.map((opt, i) => (
+                          <button key={i} onClick={() => setF(field.key, opt)}
+                            className={`text-left px-3 py-2 rounded-lg text-xs border-2 transition-all ${form[field.key] === opt
+                              ? i === 0 ? 'bg-red-50 border-red-400 text-red-800' : i === 1 ? 'bg-yellow-50 border-yellow-400 text-yellow-800' : i === 2 ? 'bg-blue-50 border-blue-400 text-blue-800' : 'bg-green-50 border-green-400 text-green-800'
+                              : 'bg-gray-50 border-gray-200 text-gray-600 hover:border-gray-300'}`}>
+                            <span className={`font-bold mr-1 ${i===0?'text-red-500':i===1?'text-yellow-500':i===2?'text-blue-500':'text-green-500'}`}>{i+1}.</span>
+                            {opt}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  ))}
+
+                  {/* Matrix preview */}
+                  <div className="border border-gray-200 rounded-xl p-4">
+                    <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-3">Матрица оценок (автоматически)</p>
                     <div className="grid grid-cols-2 gap-2">
-                      {c.options.map(opt => (
-                        <button key={opt.value} onClick={() => setScores(p => ({ ...p, [c.key]: opt.value }))}
-                          className={`text-left px-3 py-2 rounded-lg text-xs border-2 transition-all ${scores[c.key] === opt.value
-                            ? opt.value === 1 ? 'bg-red-50 border-red-400 text-red-800'
-                              : opt.value === 2 ? 'bg-yellow-50 border-yellow-400 text-yellow-800'
-                              : opt.value === 3 ? 'bg-blue-50 border-blue-400 text-blue-800'
-                              : 'bg-green-50 border-green-400 text-green-800'
-                            : 'bg-gray-50 border-gray-200 text-gray-600 hover:border-gray-300'}`}>
-                          <span className={`font-bold mr-1 ${opt.value === 1 ? 'text-red-500' : opt.value === 2 ? 'text-yellow-500' : opt.value === 3 ? 'text-blue-500' : 'text-green-500'}`}>
-                            {opt.value}
-                          </span>
-                          {opt.label}
-                        </button>
-                      ))}
+                      {Object.entries(SCORE_LABELS).map(([key, label]) => {
+                        const score = computed.scores[key as keyof typeof computed.scores] || 0
+                        return (
+                          <div key={key} className="flex items-center justify-between p-2 bg-gray-50 rounded-lg">
+                            <span className="text-xs text-gray-600 truncate flex-1">{label}</span>
+                            <div className="flex items-center gap-0.5 ml-2">
+                              {[1,2,3,4].map(v => (
+                                <div key={v} className={`w-3 h-3 rounded-sm ${v <= score ? (score >= 3 ? 'bg-green-500' : score === 2 ? 'bg-yellow-500' : 'bg-red-500') : 'bg-gray-200'}`} />
+                              ))}
+                              <span className="text-xs font-bold ml-1 text-gray-700">{score}/4</span>
+                            </div>
+                          </div>
+                        )
+                      })}
                     </div>
                   </div>
-                ))}
-              </div>
+                </div>
+              )}
             </div>
 
             <div className="flex items-center justify-between p-5 border-t border-gray-100">
-              <p className="text-xs text-gray-500">Заполнено: {filledCount}/12 критериев</p>
+              <div>{tab > 1 && <button onClick={() => setTab(tab-1)} className="px-4 py-2 border border-gray-200 rounded-lg text-sm text-gray-600 hover:bg-gray-50">← Назад</button>}</div>
               <div className="flex gap-2">
                 <button onClick={() => setShowModal(false)} className="px-4 py-2 border border-gray-200 rounded-lg text-sm text-gray-600 hover:bg-gray-50">Отмена</button>
-                <button onClick={handleGenerate} disabled={generating || filledCount < 12}
-                  className="flex items-center gap-2 px-4 py-2 bg-[#1B8A4C] text-white rounded-lg text-sm font-medium hover:bg-[#177040] disabled:opacity-50">
-                  {generating ? <><Loader2 className="w-4 h-4 animate-spin" /> Генерация...</> : <><CheckCircle2 className="w-4 h-4" /> Сгенерировать заключение</>}
-                </button>
+                {tab < 4
+                  ? <button onClick={() => setTab(tab+1)} className="px-4 py-2 bg-[#1B8A4C] text-white rounded-lg text-sm font-medium hover:bg-[#177040]">Далее →</button>
+                  : <button onClick={handleGenerate} disabled={generating}
+                      className="flex items-center gap-2 px-4 py-2 bg-[#1B8A4C] text-white rounded-lg text-sm font-medium hover:bg-[#177040] disabled:opacity-50">
+                      {generating ? <><Loader2 className="w-4 h-4 animate-spin" /> Генерация...</> : <><CheckCircle2 className="w-4 h-4" /> Сгенерировать</>}
+                    </button>}
               </div>
             </div>
           </div>
