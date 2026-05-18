@@ -38,8 +38,8 @@ export async function POST(request: Request) {
 Остаток конец: ${f(formData.p1_cash_end)} → ${f(formData.p2_cash_end)}
 
 ═══ ЗАЛОГ ═══
-${(formData.collaterals||[]).map((c,i) => `${i+1}. ${c.type}: ${c.description} — ${f(c.value)} TJS`).join('\n') || 'Не указан'}
-Общий залог: ${f((formData.collaterals||[]).reduce((s,c) => s+(c.value||0), 0))} TJS
+${(formData.collaterals||[]).map((c: {type:string;description:string;value:number}, i: number) => `${i+1}. ${c.type}: ${c.description} — ${f(c.value)} TJS`).join('\n') || 'Не указан'}
+Общий залог: ${f((formData.collaterals||[]).reduce((s: number, c: {value:number}) => s+(c.value||0), 0))} TJS
 
 Напиши заключение строго по этой структуре:
 
