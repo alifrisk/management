@@ -54,7 +54,7 @@ const makeSection = (title: string) =>
 export async function POST(request: Request) {
   try {
     const { assessment: a } = await request.json()
-    const today = new Date().toLocaleDateString('ru-RU')
+    const today = a.assessment_date ? new Date(a.assessment_date).toLocaleDateString('ru-RU') : new Date().toLocaleDateString('ru-RU')
 
     const scoreColor = a.total_score >= 50 ? '1B8A4C' : a.total_score >= 40 ? '1F5DA8' : a.total_score >= 25 ? 'BF8F00' : 'C00000'
     const bgColor = a.total_score >= 50 ? 'E8F4E8' : a.total_score >= 40 ? 'EBF3FF' : a.total_score >= 25 ? 'FFF3CD' : 'FFE7E7'
