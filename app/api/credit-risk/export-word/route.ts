@@ -15,7 +15,7 @@ export async function POST(request: Request) {
     const b = { style: BorderStyle.SINGLE, size: 4, color: 'CCCCCC' }
     const borders = { top: b, bottom: b, left: b, right: b }
 
-    function makeCell(text: string, opts: { gray?: boolean; bold?: boolean; center?: boolean; colSpan?: number } = {}) {
+    const makeCell = (text: string, opts: { gray?: boolean; bold?: boolean; center?: boolean; colSpan?: number } = {}) =>
       return new TableCell({
         borders,
         columnSpan: opts.colSpan,
@@ -29,7 +29,7 @@ export async function POST(request: Request) {
       })
     }
 
-    function makePara(text: string, opts: { bold?: boolean; size?: number; center?: boolean; after?: number; indent?: boolean } = {}) {
+    const makePara = (text: string, opts: { bold?: boolean; size?: number; center?: boolean; after?: number; indent?: boolean } = {}) =>
       return new Paragraph({
         alignment: opts.center ? AlignmentType.CENTER : AlignmentType.BOTH,
         spacing: { after: opts.after ?? 120, line: 276 },
@@ -38,14 +38,14 @@ export async function POST(request: Request) {
       })
     }
 
-    function makeSection(title: string) {
+    const makeSection = (title: string) =>
       return new Paragraph({
         spacing: { before: 200, after: 100 },
         children: [new TextRun({ text: title, size: 24, bold: true, font: 'Times New Roman' })]
       })
     }
 
-    function finTable(title: string, rows: [string, number, number][], totals?: [string, number, number][]) {
+    const finTable = (title: string, rows: [string, number, number][], totals?: [string, number, number][]) =>
       const p1 = c.p1_label || 'Период 1'
       const p2 = c.p2_label || 'Период 2'
       return [
