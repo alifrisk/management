@@ -1,182 +1,201 @@
 import { NextResponse } from 'next/server'
 
-interface CellOpts { gray?: boolean; bold?: boolean; left?: boolean; colSpan?: number }
-interface ParaOpts { right?: boolean; center?: boolean; after?: number; bold?: boolean; size?: number; indent?: boolean }
-
 export async function POST(request: Request) {
   try {
-    const { conclusion } = await request.json()
+    const { conclusion: c } = await request.json()
 
     const {
       Document, Packer, Paragraph, TextRun, Table, TableRow, TableCell,
-      AlignmentType, BorderStyle, WidthType, VerticalAlign, ShadingType, HeadingLevel
+      AlignmentType, BorderStyle, WidthType, VerticalAlign, ShadingType, LevelFormat
     } = await import('docx')
 
-    const b = { style: BorderStyle.SINGLE, size: 4, color: '000000' }
-    const borders = { top: b, bottom: b, left: b, right: b }
-    const nob = { style: BorderStyle.NONE, size: 0, color: 'FFFFFF' }
-    const noborders = { top: nob, bottom: nob, left: nob, right: nob }
-
-    const makeCell = (text: string, opts: CellOpts = {}) =>
-      new TableCell({
-        borders: opts.gray ? borders : borders,
-        columnSpan: opts.colSpan,
-        verticalAlign: VerticalAlign.CENTER,
-        shading: opts.gray ? { fill: 'E8E8E8', type: ShadingType.CLEAR } : undefined,
-        margins: { top: 60, bottom: 60, left: 100, right: 100 },
-        children: [new Paragraph({
-          alignment: opts.left ? AlignmentType.LEFT : AlignmentType.CENTER,
-          children: [new TextRun({ text: String(text || '—'), size: 20, bold: !!opts.bold, font: 'Times New Roman' })]
-        })]
-      })
-
-    const makePara = (text: string, opts: ParaOpts = {}) =>
-      new Paragraph({
-        alignment: opts.right ? AlignmentType.RIGHT : opts.center ? AlignmentType.CENTER : AlignmentType.BOTH,
-        spacing: { after: opts.after !== undefined ? opts.after : 120, line: 276 },
-        indent: opts.indent ? { firstLine: 720 } : undefined,
-        children: [new TextRun({ text: String(text || ''), size: opts.size || 24, bold: !!opts.bold, font: 'Times New Roman' })]
-      })
-
-    const fmt = (n: number) => n ? new Intl.NumberFormat('ru-RU').format(Math.round(n)) : '—'
+    const fmt = (v: number) => v ? new Intl.NumberFormat('ru-RU').format(Math.round(v)) : '—'
     const today = new Date().toLocaleDateString('ru-RU')
 
-    const doc = new Document({
-      sections: [{
-        properties: {
-          page: {
-            size: { width: 11906, height: 16838 },
-            margin: { top: 1134, right: 851, bottom: 1134, left: 1701 }
-          }
-        },
-        children: [
-          // Title
-          new Paragraph({
-            alignment: AlignmentType.CENTER,
-            spacing: { after: 60 },
-            children: [new TextRun({ text: 'ҶСК «Алиф Бонк»', size: 28, bold: true, font: 'Times New Roman' })]
-          }),
-          new Paragraph({
-            alignment: AlignmentType.CENTER,
-            spacing: { after: 240 },
-            children: [new TextRun({ text: 'Служба управления рисками', size: 24, font: 'Times New Roman' })]
-          }),
-          new Paragraph({
-            alignment: AlignmentType.CENTER,
-            spacing: { after: 120 },
-            children: [new TextRun({ text: 'ЗАКЛЮЧЕНИЕ', size: 32, bold: true, font: 'Times New Roman' })]
-          }),
-          new Paragraph({
-            alignment: AlignmentType.CENTER,
-            spacing: { after: 60 },
-            children: [new TextRun({ text: 'по кредитной заявке субъекта малого и среднего бизнеса', size: 24, font: 'Times New Roman' })]
-          }),
-          new Paragraph({
-            alignment: AlignmentType.CENTER,
-            spacing: { after: 360 },
-            children: [new TextRun({ text: `Дата: ${today}`, size: 22, font: 'Times New Roman' })]
-          }),
+    const b = { style: BorderStyle.SINGLE, size: 4, color: 'CCCCCC' }
+    const borders = { top: b, bottom: b, left: b, right: b }
 
-          // Borrower info table
+    function makeCell(text: string, opts: { gray?: boolean; bold?: boolean; center?: boolean; colSpan?: number } = {}) {
+      return new TableCell({
+        borders,
+        columnSpan: opts.colSpan,
+        verticalAlign: VerticalAlign.CENTER,
+        shading: opts.gray ? { fill: 'E8F4E8', type: ShadingType.CLEAR } : undefined,
+        margins: { top: 60, bottom: 60, left: 100, right: 100 },
+        children: [new Paragraph({
+          alignment: opts.center ? AlignmentType.CENTER : AlignmentType.LEFT,
+          children: [new TextRun({ text: String(text || '—'), size: 18, bold: !!opts.bold, font: 'Times New Roman' })]
+        })]
+      })
+    }
+
+    function makePara(text: string, opts: { bold?: boolean; size?: number; center?: boolean; after?: number; indent?: boolean } = {}) {
+      return new Paragraph({
+        alignment: opts.center ? AlignmentType.CENTER : AlignmentType.BOTH,
+        spacing: { after: opts.after ?? 120, line: 276 },
+        indent: opts.indent ? { firstLine: 720 } : undefined,
+        children: [new TextRun({ text: String(text || ''), size: opts.size ?? 22, bold: !!opts.bold, font: 'Times New Roman' })]
+      })
+    }
+
+    function makeSection(title: string) {
+      return new Paragraph({
+        spacing: { before: 200, after: 100 },
+        children: [new TextRun({ text: title, size: 24, bold: true, font: 'Times New Roman' })]
+      })
+    }
+
+    function finTable(title: string, rows: [string, number, number][], totals?: [string, number, number][]) {
+      const p1 = c.p1_label || 'Период 1'
+      const p2 = c.p2_label || 'Период 2'
+      return [
+        makeSection(title),
+        new Table({
+          width: { size: 9354, type: WidthType.DXA },
+          columnWidths: [5000, 2177, 2177],
+          rows: [
+            new TableRow({ children: [makeCell('Показатель', { gray: true, bold: true }), makeCell(p1, { gray: true, bold: true, center: true }), makeCell(p2, { gray: true, bold: true, center: true })] }),
+            ...rows.map(([label, v1, v2]) => new TableRow({ children: [makeCell(label), makeCell(fmt(v1), { center: true }), makeCell(fmt(v2), { center: true })] })),
+            ...(totals || []).map(([label, v1, v2]) => new TableRow({ children: [makeCell(label, { bold: true, gray: true }), makeCell(fmt(v1), { bold: true, center: true }), makeCell(fmt(v2), { bold: true, center: true })] })),
+          ]
+        }),
+        makePara('', { after: 60 }),
+      ]
+    }
+
+    const p1total_assets = (c.p1_cash||0) + (c.p1_receivables||0) + (c.p1_inventory||0) + (c.p1_fixed_assets||0) + (c.p1_other_assets||0)
+    const p2total_assets = (c.p2_cash||0) + (c.p2_receivables||0) + (c.p2_inventory||0) + (c.p2_fixed_assets||0) + (c.p2_other_assets||0)
+    const p1total_liab = (c.p1_supplier_debt||0) + (c.p1_bank_debt||0) + (c.p1_other_liabilities||0)
+    const p2total_liab = (c.p2_supplier_debt||0) + (c.p2_bank_debt||0) + (c.p2_other_liabilities||0)
+    const p1equity = (c.p1_equity_capital||0) + (c.p1_reserves||0) + (c.p1_retained_earnings||0)
+    const p2equity = (c.p2_equity_capital||0) + (c.p2_reserves||0) + (c.p2_retained_earnings||0)
+    const collaterals = Array.isArray(c.collaterals) ? c.collaterals : []
+    const totalCollateral = collaterals.reduce((s: number, col: {value: number}) => s + (col.value || 0), 0)
+
+    const conclusionParagraphs = (c.ai_conclusion || '').split('\n').filter((l: string) => l.trim()).map((line: string) => {
+      const isHeader = /^\d+\./.test(line.trim())
+      return new Paragraph({
+        spacing: { after: isHeader ? 60 : 100, before: isHeader ? 160 : 0 },
+        children: [new TextRun({ text: line.trim(), size: 22, bold: isHeader, font: 'Times New Roman' })]
+      })
+    })
+
+    const doc = new Document({
+      numbering: { config: [{ reference: 'bullets', levels: [{ level: 0, format: LevelFormat.BULLET, text: '•', alignment: AlignmentType.LEFT, style: { paragraph: { indent: { left: 720, hanging: 360 } } } }] }] },
+      sections: [{
+        properties: { page: { size: { width: 11906, height: 16838 }, margin: { top: 1134, right: 851, bottom: 1134, left: 1701 } } },
+        children: [
+          // Шапка
+          makePara('ҶСК «Алиф Бонк»', { bold: true, size: 28, center: true, after: 60 }),
+          makePara('Служба управления рисками', { size: 22, center: true, after: 240 }),
+          makePara('ЗАКЛЮЧЕНИЕ О КРЕДИТОСПОСОБНОСТИ', { bold: true, size: 30, center: true, after: 60 }),
+          makePara('Субъект малого и среднего бизнеса (SME)', { size: 22, center: true, after: 60 }),
+          makePara(`Дата: ${today}`, { size: 20, center: true, after: 360 }),
+
+          // Основные параметры
+          makeSection('1. ПАРАМЕТРЫ КРЕДИТНОЙ ЗАЯВКИ'),
           new Table({
             width: { size: 9354, type: WidthType.DXA },
-            columnWidths: [3500, 5854],
+            columnWidths: [4000, 5354],
             rows: [
-              new TableRow({ children: [
-                makeCell('Наименование заёмщика', { gray: true, bold: true }),
-                makeCell(conclusion.borrower_name, { left: true })
-              ]}),
-              new TableRow({ children: [
-                makeCell('ИНН', { gray: true, bold: true }),
-                makeCell(conclusion.borrower_inn || '—', { left: true })
-              ]}),
-              new TableRow({ children: [
-                makeCell('Вид деятельности', { gray: true, bold: true }),
-                makeCell(conclusion.business_type || '—', { left: true })
-              ]}),
-              new TableRow({ children: [
-                makeCell('Лет в бизнесе', { gray: true, bold: true }),
-                makeCell(String(conclusion.years_in_business || '—'), { left: true })
-              ]}),
-              new TableRow({ children: [
-                makeCell('Сумма кредита', { gray: true, bold: true }),
-                makeCell(`${fmt(conclusion.loan_amount)} ${conclusion.loan_currency}`, { left: true })
-              ]}),
-              new TableRow({ children: [
-                makeCell('Срок кредита', { gray: true, bold: true }),
-                makeCell(conclusion.loan_term || '—', { left: true })
-              ]}),
-              new TableRow({ children: [
-                makeCell('Цель кредита', { gray: true, bold: true }),
-                makeCell(conclusion.loan_purpose, { left: true })
-              ]}),
-              new TableRow({ children: [
-                makeCell('Кредитная история', { gray: true, bold: true }),
-                makeCell(conclusion.credit_history || '—', { left: true })
-              ]}),
-              new TableRow({ children: [
-                makeCell('Годовая выручка (TJS)', { gray: true, bold: true }),
-                makeCell(fmt(conclusion.annual_revenue), { left: true })
-              ]}),
-              new TableRow({ children: [
-                makeCell('Чистая прибыль (TJS)', { gray: true, bold: true }),
-                makeCell(fmt(conclusion.net_profit), { left: true })
-              ]}),
-              new TableRow({ children: [
-                makeCell('Залог', { gray: true, bold: true }),
-                makeCell(`${conclusion.collateral_type || '—'} / ${fmt(conclusion.collateral_value)} TJS`, { left: true })
-              ]}),
-              new TableRow({ children: [
-                makeCell('Аналитик', { gray: true, bold: true }),
-                makeCell(conclusion.analyst_name || '—', { left: true })
-              ]}),
+              new TableRow({ children: [makeCell('Наименование заёмщика', { gray: true, bold: true }), makeCell(c.borrower_name)] }),
+              new TableRow({ children: [makeCell('ИНН', { gray: true, bold: true }), makeCell(c.borrower_inn || '—')] }),
+              new TableRow({ children: [makeCell('Вид деятельности', { gray: true, bold: true }), makeCell(c.business_type || '—')] }),
+              new TableRow({ children: [makeCell('Лет в бизнесе', { gray: true, bold: true }), makeCell(String(c.years_in_business || '—'))] }),
+              new TableRow({ children: [makeCell('Сумма кредита', { gray: true, bold: true }), makeCell(`${fmt(c.loan_amount)} ${c.loan_currency}`)] }),
+              new TableRow({ children: [makeCell('Срок кредита', { gray: true, bold: true }), makeCell(c.loan_term || '—')] }),
+              new TableRow({ children: [makeCell('Цель кредита', { gray: true, bold: true }), makeCell(c.loan_purpose || '—')] }),
+              new TableRow({ children: [makeCell('Кредитная история', { gray: true, bold: true }), makeCell(c.credit_history || '—')] }),
             ]
           }),
-
-          makePara('', { after: 240 }),
-
-          // AI Conclusion
-          new Paragraph({
-            spacing: { after: 120 },
-            children: [new TextRun({ text: 'AI ЗАКЛЮЧЕНИЕ:', size: 24, bold: true, font: 'Times New Roman' })]
-          }),
-
-          // Split conclusion into paragraphs
-          ...conclusion.ai_conclusion.split('\n').filter((line: string) => line.trim()).map((line: string) =>
-            makePara(line.trim(), { after: 80, indent: !line.startsWith('1.') && !line.startsWith('2.') && !line.startsWith('3.') && !line.startsWith('4.') && !line.startsWith('5.') })
-          ),
-
           makePara('', { after: 120 }),
 
-          // Recommendation box
+          // Баланс
+          ...finTable('2. ФИНАНСОВОЕ ПОЛОЖЕНИЕ (БАЛАНС)',
+            [
+              ['Денежные средства', c.p1_cash || 0, c.p2_cash || 0],
+              ['Дебиторская задолженность', c.p1_receivables || 0, c.p2_receivables || 0],
+              ['ТМЗ (запасы)', c.p1_inventory || 0, c.p2_inventory || 0],
+              ['Основные средства', c.p1_fixed_assets || 0, c.p2_fixed_assets || 0],
+              ['Прочие активы', c.p1_other_assets || 0, c.p2_other_assets || 0],
+            ],
+            [
+              ['ИТОГО АКТИВ', p1total_assets, p2total_assets],
+              ['Долги поставщикам', c.p1_supplier_debt || 0, c.p2_supplier_debt || 0],
+              ['Долги банкам', c.p1_bank_debt || 0, c.p2_bank_debt || 0],
+              ['Прочие обязательства', c.p1_other_liabilities || 0, c.p2_other_liabilities || 0],
+              ['ИТОГО ОБЯЗАТЕЛЬСТВА', p1total_liab, p2total_liab],
+              ['Капитал', p1equity, p2equity],
+            ]
+          ),
+
+          // ОПУ
+          ...finTable('3. ФИНАНСОВЫЕ РЕЗУЛЬТАТЫ (ОПУ)',
+            [
+              ['Выручка', c.p1_revenue || 0, c.p2_revenue || 0],
+              ['Себестоимость', c.p1_cogs || 0, c.p2_cogs || 0],
+            ],
+            [
+              ['Валовой доход', (c.p1_revenue||0) - (c.p1_cogs||0), (c.p2_revenue||0) - (c.p2_cogs||0)],
+              ['Административные расходы', c.p1_admin_expense || 0, c.p2_admin_expense || 0],
+              ['Торговые расходы', c.p1_sales_expense || 0, c.p2_sales_expense || 0],
+              ['Чистая прибыль', c.p1_net_profit || 0, c.p2_net_profit || 0],
+            ]
+          ),
+
+          // ОДДС
+          ...finTable('4. ДВИЖЕНИЕ ДЕНЕЖНЫХ СРЕДСТВ (ОДДС)',
+            [
+              ['Остаток на начало периода', c.p1_cash_begin || 0, c.p2_cash_begin || 0],
+              ['Операц. деятельность (нетто)', (c.p1_op_inflow||0)-(c.p1_op_outflow||0), (c.p2_op_inflow||0)-(c.p2_op_outflow||0)],
+              ['Финансовая деятельность (нетто)', (c.p1_fin_inflow||0)-(c.p1_fin_outflow||0), (c.p2_fin_inflow||0)-(c.p2_fin_outflow||0)],
+              ['Инвест. деятельность (нетто)', (c.p1_inv_inflow||0)-(c.p1_inv_outflow||0), (c.p2_inv_inflow||0)-(c.p2_inv_outflow||0)],
+            ],
+            [['Остаток на конец периода', c.p1_cash_end || 0, c.p2_cash_end || 0]]
+          ),
+
+          // Залоги
+          makeSection('5. ОБЕСПЕЧЕНИЕ'),
+          new Table({
+            width: { size: 9354, type: WidthType.DXA },
+            columnWidths: [450, 2500, 4000, 2404],
+            rows: [
+              new TableRow({ children: [makeCell('№', { gray: true, bold: true, center: true }), makeCell('Тип залога', { gray: true, bold: true }), makeCell('Описание', { gray: true, bold: true }), makeCell('Стоимость (TJS)', { gray: true, bold: true, center: true })] }),
+              ...collaterals.map((col: {type: string; description: string; value: number}, i: number) =>
+                new TableRow({ children: [makeCell(String(i+1), { center: true }), makeCell(col.type), makeCell(col.description || '—'), makeCell(fmt(col.value), { center: true })] })
+              ),
+              new TableRow({ children: [makeCell('Итого', { bold: true, colSpan: 3 }), makeCell(fmt(totalCollateral), { bold: true, center: true })] }),
+            ]
+          }),
+          makePara('', { after: 120 }),
+
+          // AI Заключение
+          makeSection('6. ЗАКЛЮЧЕНИЕ СЛУЖБЫ УПРАВЛЕНИЯ РИСКАМИ'),
+          ...conclusionParagraphs,
+          makePara('', { after: 120 }),
+
+          // Рекомендация
           new Table({
             width: { size: 9354, type: WidthType.DXA },
             columnWidths: [3500, 5854],
             rows: [
-              new TableRow({ children: [
-                makeCell('РЕКОМЕНДАЦИЯ', { gray: true, bold: true }),
-                makeCell(conclusion.recommendation || '—', { left: true, bold: true })
-              ]}),
-              new TableRow({ children: [
-                makeCell('УРОВЕНЬ РИСКА', { gray: true, bold: true }),
-                makeCell(conclusion.risk_level || '—', { left: true, bold: true })
-              ]}),
+              new TableRow({ children: [makeCell('РЕКОМЕНДАЦИЯ', { gray: true, bold: true }), makeCell(c.recommendation || '—', { bold: true })] }),
+              new TableRow({ children: [makeCell('УРОВЕНЬ РИСКА', { gray: true, bold: true }), makeCell(c.risk_level || '—', { bold: true })] }),
             ]
           }),
-
           makePara('', { after: 360 }),
 
-          // Signatures
+          // Подписи
           new Table({
             width: { size: 9354, type: WidthType.DXA },
             columnWidths: [4677, 4677],
             rows: [new TableRow({ children: [
-              new TableCell({ borders: noborders, children: [
-                makePara('Риск-аналитик: _________________', { after: 60 }),
-                makePara(conclusion.analyst_name ? `(${conclusion.analyst_name})` : '(подпись)', { after: 0 })
+              new TableCell({ borders: { top: { style: BorderStyle.NONE, size: 0, color: 'FFFFFF' }, bottom: { style: BorderStyle.NONE, size: 0, color: 'FFFFFF' }, left: { style: BorderStyle.NONE, size: 0, color: 'FFFFFF' }, right: { style: BorderStyle.NONE, size: 0, color: 'FFFFFF' } }, children: [
+                makePara('Аналитик: _________________', { after: 60 }),
+                makePara(c.analyst_name ? `(${c.analyst_name})` : '(Ф.И.О.)', { size: 20, after: 0 })
               ]}),
-              new TableCell({ borders: noborders, children: [
-                makePara(`г. Душанбе, ${today}`, { right: true, after: 0 })
+              new TableCell({ borders: { top: { style: BorderStyle.NONE, size: 0, color: 'FFFFFF' }, bottom: { style: BorderStyle.NONE, size: 0, color: 'FFFFFF' }, left: { style: BorderStyle.NONE, size: 0, color: 'FFFFFF' }, right: { style: BorderStyle.NONE, size: 0, color: 'FFFFFF' } }, children: [
+                makePara(`г. Душанбе, ${today}`, { center: true, after: 0 })
               ]})
             ]})]
           }),
@@ -188,11 +207,11 @@ export async function POST(request: Request) {
     return new NextResponse(new Uint8Array(buffer), {
       headers: {
         'Content-Type': 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
-        'Content-Disposition': `attachment; filename="Zakluchenie_${conclusion.borrower_name}.docx"`,
+        'Content-Disposition': `attachment; filename="Zakluchenie_${c.borrower_name}.docx"`,
       }
     })
   } catch (error) {
-    console.error('Word export error:', error)
+    console.error('Word error:', error)
     return NextResponse.json({ error: 'Ошибка генерации Word' }, { status: 500 })
   }
 }
