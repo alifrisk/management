@@ -38,8 +38,12 @@ const EMPTY_FORM = {
   p2_cash: '', p2_receivables: '', p2_inventory: '', p2_fixed_assets: '', p2_other_assets: '',
   p2_supplier_debt: '', p2_bank_debt: '', p2_other_liabilities: '',
   p2_equity_capital: '', p2_reserves: '', p2_retained_earnings: '',
-  p1_revenue: '', p1_cogs: '', p1_admin_expense: '', p1_sales_expense: '', p1_net_profit: '',
-  p2_revenue: '', p2_cogs: '', p2_admin_expense: '', p2_sales_expense: '', p2_net_profit: '',
+  p1_revenue: '', p1_cogs: '',
+  p1_sales_expense: '', p1_admin_expense: '', p1_other_op_income: '',
+  p1_non_op: '', p1_tax: '',
+  p2_revenue: '', p2_cogs: '',
+  p2_sales_expense: '', p2_admin_expense: '', p2_other_op_income: '',
+  p2_non_op: '', p2_tax: '',
   p1_cash_begin: '', p1_op_inflow: '', p1_op_outflow: '', p1_fin_inflow: '', p1_fin_outflow: '', p1_inv_inflow: '', p1_inv_outflow: '',
   p2_cash_begin: '', p2_op_inflow: '', p2_op_outflow: '', p2_fin_inflow: '', p2_fin_outflow: '', p2_inv_inflow: '', p2_inv_outflow: '',
 }
@@ -148,6 +152,14 @@ export default function CreditRiskPage() {
   // Auto-calculate gross profit
   const p1_gross = n('p1_revenue') - n('p1_cogs')
   const p2_gross = n('p2_revenue') - n('p2_cogs')
+  const p1_op_expenses = n('p1_sales_expense') + n('p1_admin_expense')
+  const p2_op_expenses = n('p2_sales_expense') + n('p2_admin_expense')
+  const p1_op_profit = p1_gross - p1_op_expenses + n('p1_other_op_income')
+  const p2_op_profit = p2_gross - p2_op_expenses + n('p2_other_op_income')
+  const p1_profit_before_tax = p1_op_profit + n('p1_non_op')
+  const p2_profit_before_tax = p2_op_profit + n('p2_non_op')
+  const p1_net_profit = p1_profit_before_tax - n('p1_tax')
+  const p2_net_profit = p2_profit_before_tax - n('p2_tax')
   const p1_total_assets = n('p1_cash') + n('p1_receivables') + n('p1_inventory') + n('p1_fixed_assets') + n('p1_other_assets')
   const p2_total_assets = n('p2_cash') + n('p2_receivables') + n('p2_inventory') + n('p2_fixed_assets') + n('p2_other_assets')
   const p1_total_liab = n('p1_supplier_debt') + n('p1_bank_debt') + n('p1_other_liabilities')
@@ -201,9 +213,9 @@ export default function CreditRiskPage() {
         p2_supplier_debt: n('p2_supplier_debt'), p2_bank_debt: n('p2_bank_debt'), p2_other_liabilities: n('p2_other_liabilities'),
         p2_equity_capital: n('p2_equity_capital'), p2_reserves: n('p2_reserves'), p2_retained_earnings: n('p2_retained_earnings'),
         p1_revenue: n('p1_revenue'), p1_cogs: n('p1_cogs'), p1_gross_profit: p1_gross,
-        p1_admin_expense: n('p1_admin_expense'), p1_sales_expense: n('p1_sales_expense'), p1_net_profit: n('p1_net_profit'),
+        p1_admin_expense: n('p1_admin_expense'), p1_sales_expense: n('p1_sales_expense'), p1_net_profit: p1_net_profit,
         p2_revenue: n('p2_revenue'), p2_cogs: n('p2_cogs'), p2_gross_profit: p2_gross,
-        p2_admin_expense: n('p2_admin_expense'), p2_sales_expense: n('p2_sales_expense'), p2_net_profit: n('p2_net_profit'),
+        p2_admin_expense: n('p2_admin_expense'), p2_sales_expense: n('p2_sales_expense'), p2_net_profit: p2_net_profit,
         p1_cash_begin: n('p1_cash_begin'), p1_op_inflow: n('p1_op_inflow'), p1_op_outflow: n('p1_op_outflow'),
         p1_fin_inflow: n('p1_fin_inflow'), p1_fin_outflow: n('p1_fin_outflow'),
         p1_inv_inflow: n('p1_inv_inflow'), p1_inv_outflow: n('p1_inv_outflow'), p1_cash_end,
