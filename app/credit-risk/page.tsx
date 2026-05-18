@@ -30,6 +30,7 @@ const EMPTY_FORM = {
   borrower_name: '', borrower_inn: '', business_type: '', years_in_business: '',
   loan_amount: '', loan_currency: 'TJS', loan_term: '', loan_purpose: '',
   credit_history: 'Положительная', analyst_name: '',
+  interest_rate: '', loan_term_months: '',
   p1_label: '', p2_label: '',
   p1_cash: '', p1_receivables: '', p1_inventory: '', p1_fixed_assets: '', p1_other_assets: '',
   p1_supplier_debt: '', p1_bank_debt: '', p1_other_liabilities: '',
@@ -118,6 +119,7 @@ export default function CreditRiskPage() {
         loan_amount: Number(formData.loan_amount) || 0, loan_currency: formData.loan_currency,
         loan_term: formData.loan_term, loan_purpose: formData.loan_purpose,
         credit_history: formData.credit_history, analyst_name: formData.analyst_name,
+        interest_rate: Number(formData.interest_rate) || 0, loan_term_months: Number(formData.loan_term_months) || 0,
         p1_label: formData.p1_label || 'Период 1', p2_label: formData.p2_label || 'Период 2',
         p1_cash: n('p1_cash'), p1_receivables: n('p1_receivables'), p1_inventory: n('p1_inventory'),
         p1_fixed_assets: n('p1_fixed_assets'), p1_other_assets: n('p1_other_assets'),
@@ -177,16 +179,31 @@ export default function CreditRiskPage() {
 
   // Two-column financial row
   function FinRow({ label, f1, f2, bold, auto, v1, v2 }: { label: string; f1?: string; f2?: string; bold?: boolean; auto?: boolean; v1?: number; v2?: number }) {
+    const numCls = "w-full px-2 py-2 border border-gray-200 rounded text-sm focus:outline-none focus:ring-2 focus:ring-[#1B8A4C] text-right"
     return (
-      <tr className={bold ? 'bg-gray-50' : ''}>
-        <td className={`px-3 py-1.5 text-xs ${bold ? 'font-semibold' : ''} text-gray-700`}>{label}</td>
-        <td className="px-3 py-1.5">
-          {auto ? <span className={`text-xs font-bold ${(v1 || 0) < 0 ? 'text-red-600' : 'text-gray-900'}`}>{fmt(v1 || 0)}</span>
-            : <input type="number" value={f1 ? formData[f1] : ''} onChange={e => f1 && setF(f1, e.target.value)} className="w-full px-2 py-1 border border-gray-200 rounded text-xs focus:outline-none focus:ring-1 focus:ring-[#1B8A4C]" placeholder="0" />}
+      <tr className={bold ? 'bg-gray-50' : 'hover:bg-blue-50/30'}>
+        <td className={`px-3 py-2 text-xs ${bold ? 'font-semibold text-gray-800' : 'text-gray-600'}`}>{label}</td>
+        <td className="px-2 py-1.5">
+          {auto
+            ? <div className={`text-sm font-bold text-right pr-2 ${(v1 || 0) < 0 ? 'text-red-600' : 'text-gray-900'}`}>{fmt(v1 || 0)}</div>
+            : <input
+                type="number"
+                value={f1 ? formData[f1] : ''}
+                onChange={e => f1 && setF(f1, e.target.value)}
+                className={numCls}
+                placeholder="0"
+              />}
         </td>
-        <td className="px-3 py-1.5">
-          {auto ? <span className={`text-xs font-bold ${(v2 || 0) < 0 ? 'text-red-600' : 'text-gray-900'}`}>{fmt(v2 || 0)}</span>
-            : <input type="number" value={f2 ? formData[f2] : ''} onChange={e => f2 && setF(f2, e.target.value)} className="w-full px-2 py-1 border border-gray-200 rounded text-xs focus:outline-none focus:ring-1 focus:ring-[#1B8A4C]" placeholder="0" />}
+        <td className="px-2 py-1.5">
+          {auto
+            ? <div className={`text-sm font-bold text-right pr-2 ${(v2 || 0) < 0 ? 'text-red-600' : 'text-gray-900'}`}>{fmt(v2 || 0)}</div>
+            : <input
+                type="number"
+                value={f2 ? formData[f2] : ''}
+                onChange={e => f2 && setF(f2, e.target.value)}
+                className={numCls}
+                placeholder="0"
+              />}
         </td>
       </tr>
     )
@@ -353,7 +370,23 @@ export default function CreditRiskPage() {
                   <div><label className={labelCls}>Сумма кредита *</label><input type="number" min="0" value={formData.loan_amount} onChange={e => setF('loan_amount', e.target.value)} className={inputCls} /></div>
                   <div><label className={labelCls}>Валюта</label><select value={formData.loan_currency} onChange={e => setF('loan_currency', e.target.value)} className={inputCls}>{CURRENCIES.map(c => <option key={c}>{c}</option>)}</select></div>
                   <div><label className={labelCls}>Срок кредита</label><input type="text" value={formData.loan_term} onChange={e => setF('loan_term', e.target.value)} placeholder="12 месяцев" className={inputCls} /></div>
+                  <div><label className={labelCls}>Срок (месяцев)</label><input type="number" min="1" max="360" value={formData.loan_term_months} onChange={e => setF('loan_term_months', e.target.value)} placeholder="12" className={inputCls} /></div>
+                  <div><label className={labelCls}>Процентная ставка (% годовых)</label><input type="number" min="0" max="100" step="0.1" value={formData.interest_rate} onChange={e => setF('interest_rate', e.target.value)} placeholder="24" className={inputCls} /></div>
                   <div><label className={labelCls}>Кредитная история</label><select value={formData.credit_history} onChange={e => setF('credit_history', e.target.value)} className={inputCls}>{CREDIT_HISTORY.map(c => <option key={c}>{c}</option>)}</select></div>
+                                  {formData.loan_amount && formData.loan_term_months && formData.interest_rate && (
+                    <div className="lg:col-span-2 bg-blue-50 border border-blue-100 rounded-lg p-3">
+                      <p className="text-xs text-gray-500">Ежемесячное погашение кредита</p>
+                      <p className="text-lg font-bold text-[#1B8A4C] mt-0.5">
+                        {(() => {
+                          const amt = Number(formData.loan_amount)
+                          const rate = Number(formData.interest_rate) / 100 / 12
+                          const m = Number(formData.loan_term_months)
+                          const payment = rate > 0 ? Math.round(amt * rate / (1 - Math.pow(1 + rate, -m))) : Math.round(amt / m)
+                          return new Intl.NumberFormat('ru-RU').format(payment) + ' TJS/мес'
+                        })()}
+                      </p>
+                    </div>
+                  )}
                   <div className="lg:col-span-2"><label className={labelCls}>Цель кредита *</label><textarea value={formData.loan_purpose} onChange={e => setF('loan_purpose', e.target.value)} rows={3} placeholder="Пополнение оборотных средств..." className={inputCls + ' resize-none'} /></div>
                   <div className="lg:col-span-2"><label className={labelCls}>Аналитик</label><input type="text" value={formData.analyst_name} onChange={e => setF('analyst_name', e.target.value)} placeholder="ФИО аналитика" className={inputCls} /></div>
                   <div className="lg:col-span-2 grid grid-cols-2 gap-3">
