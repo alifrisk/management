@@ -149,11 +149,16 @@ export async function POST(request: Request) {
 
           // 3. ОПУ
           ...makeFinTable('3. ФИНАНСОВЫЕ РЕЗУЛЬТАТЫ (ОПУ)', [
-            ['Выручка', c.p1_revenue||0, c.p2_revenue||0],
+            ['Выручка от реализации', c.p1_revenue||0, c.p2_revenue||0],
             ['Себестоимость', c.p1_cogs||0, c.p2_cogs||0],
-            ['Валовой доход', (c.p1_revenue||0)-(c.p1_cogs||0), (c.p2_revenue||0)-(c.p2_cogs||0)],
-            ['Административные расходы', c.p1_admin_expense||0, c.p2_admin_expense||0],
+            ['Валовая прибыль', (c.p1_revenue||0)-(c.p1_cogs||0), (c.p2_revenue||0)-(c.p2_cogs||0)],
             ['Торговые расходы', c.p1_sales_expense||0, c.p2_sales_expense||0],
+            ['Административные расходы', c.p1_admin_expense||0, c.p2_admin_expense||0],
+            ['Прочие операционные доходы', c.p1_other_op_income||0, c.p2_other_op_income||0],
+            ['Операционная прибыль', (c.p1_revenue||0)-(c.p1_cogs||0)-(c.p1_sales_expense||0)-(c.p1_admin_expense||0)+(c.p1_other_op_income||0), (c.p2_revenue||0)-(c.p2_cogs||0)-(c.p2_sales_expense||0)-(c.p2_admin_expense||0)+(c.p2_other_op_income||0)],
+            ['Прочие внеоперац. доходы/(расходы)', c.p1_non_op||0, c.p2_non_op||0],
+            ['Прибыль до налогообложения', (c.p1_revenue||0)-(c.p1_cogs||0)-(c.p1_sales_expense||0)-(c.p1_admin_expense||0)+(c.p1_other_op_income||0)+(c.p1_non_op||0), (c.p2_revenue||0)-(c.p2_cogs||0)-(c.p2_sales_expense||0)-(c.p2_admin_expense||0)+(c.p2_other_op_income||0)+(c.p2_non_op||0)],
+            ['Налог на прибыль', c.p1_tax||0, c.p2_tax||0],
           ], [['Чистая прибыль', c.p1_net_profit||0, c.p2_net_profit||0]], p1, p2, fmt),
 
           // 4. ОДДС
