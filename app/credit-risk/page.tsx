@@ -179,7 +179,7 @@ export default function CreditRiskPage() {
 
   // Two-column financial row
   function FinRow({ label, f1, f2, bold, auto, v1, v2 }: { label: string; f1?: string; f2?: string; bold?: boolean; auto?: boolean; v1?: number; v2?: number }) {
-    const numCls = "w-full px-2 py-2 border border-gray-200 rounded text-sm focus:outline-none focus:ring-2 focus:ring-[#1B8A4C] text-right"
+    const numCls = "w-full px-2 py-2 border border-gray-200 rounded text-sm focus:outline-none focus:ring-2 focus:ring-[#1B8A4C] text-right tabular-nums"
     return (
       <tr className={bold ? 'bg-gray-50' : 'hover:bg-blue-50/30'}>
         <td className={`px-3 py-2 text-xs ${bold ? 'font-semibold text-gray-800' : 'text-gray-600'}`}>{label}</td>
@@ -187,9 +187,10 @@ export default function CreditRiskPage() {
           {auto
             ? <div className={`text-sm font-bold text-right pr-2 ${(v1 || 0) < 0 ? 'text-red-600' : 'text-gray-900'}`}>{fmt(v1 || 0)}</div>
             : <input
-                type="number"
+                type="text"
+                inputMode="numeric"
                 value={f1 ? formData[f1] : ''}
-                onChange={e => f1 && setF(f1, e.target.value)}
+                onChange={e => f1 && setF(f1, e.target.value.replace(/[^0-9.-]/g, ''))}
                 className={numCls}
                 placeholder="0"
               />}
@@ -198,9 +199,10 @@ export default function CreditRiskPage() {
           {auto
             ? <div className={`text-sm font-bold text-right pr-2 ${(v2 || 0) < 0 ? 'text-red-600' : 'text-gray-900'}`}>{fmt(v2 || 0)}</div>
             : <input
-                type="number"
+                type="text"
+                inputMode="numeric"
                 value={f2 ? formData[f2] : ''}
-                onChange={e => f2 && setF(f2, e.target.value)}
+                onChange={e => f2 && setF(f2, e.target.value.replace(/[^0-9.-]/g, ''))}
                 className={numCls}
                 placeholder="0"
               />}
@@ -367,11 +369,10 @@ export default function CreditRiskPage() {
                   <div><label className={labelCls}>ИНН</label><input type="text" value={formData.borrower_inn} onChange={e => setF('borrower_inn', e.target.value)} placeholder="000000000" className={inputCls} /></div>
                   <div><label className={labelCls}>Вид деятельности</label><input type="text" value={formData.business_type} onChange={e => setF('business_type', e.target.value)} placeholder="Торговля, производство..." className={inputCls} /></div>
                   <div><label className={labelCls}>Лет в бизнесе</label><input type="number" min="0" value={formData.years_in_business} onChange={e => setF('years_in_business', e.target.value)} className={inputCls} /></div>
-                  <div><label className={labelCls}>Сумма кредита *</label><input type="number" min="0" value={formData.loan_amount} onChange={e => setF('loan_amount', e.target.value)} className={inputCls} /></div>
+                  <div><label className={labelCls}>Сумма кредита *</label><input type="text" inputMode="numeric" value={formData.loan_amount} onChange={e => setF('loan_amount', e.target.value.replace(/[^0-9]/g, ''))} placeholder="0" className={inputCls} /></div>
                   <div><label className={labelCls}>Валюта</label><select value={formData.loan_currency} onChange={e => setF('loan_currency', e.target.value)} className={inputCls}>{CURRENCIES.map(c => <option key={c}>{c}</option>)}</select></div>
-                  <div><label className={labelCls}>Срок кредита</label><input type="text" value={formData.loan_term} onChange={e => setF('loan_term', e.target.value)} placeholder="12 месяцев" className={inputCls} /></div>
-                  <div><label className={labelCls}>Срок (месяцев)</label><input type="number" min="1" max="360" value={formData.loan_term_months} onChange={e => setF('loan_term_months', e.target.value)} placeholder="12" className={inputCls} /></div>
-                  <div><label className={labelCls}>Процентная ставка (% годовых)</label><input type="number" min="0" max="100" step="0.1" value={formData.interest_rate} onChange={e => setF('interest_rate', e.target.value)} placeholder="24" className={inputCls} /></div>
+                  <div><label className={labelCls}>Срок кредита (месяцев)</label><input type="text" inputMode="numeric" value={formData.loan_term_months} onChange={e => setF('loan_term_months', e.target.value.replace(/[^0-9]/g, ''))} placeholder="12" className={inputCls} /></div>
+                  <div><label className={labelCls}>Процентная ставка (% годовых)</label><input type="text" inputMode="decimal" value={formData.interest_rate} onChange={e => setF('interest_rate', e.target.value.replace(/[^0-9.]/g, ''))} placeholder="24" className={inputCls} /></div>
                   <div><label className={labelCls}>Кредитная история</label><select value={formData.credit_history} onChange={e => setF('credit_history', e.target.value)} className={inputCls}>{CREDIT_HISTORY.map(c => <option key={c}>{c}</option>)}</select></div>
                                   {formData.loan_amount && formData.loan_term_months && formData.interest_rate && (
                     <div className="lg:col-span-2 bg-blue-50 border border-blue-100 rounded-lg p-3">
