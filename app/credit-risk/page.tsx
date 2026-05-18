@@ -371,11 +371,11 @@ export default function CreditRiskPage() {
             </div>
 
             {/* Tabs */}
-            <div className="flex border-b border-gray-100 px-4 overflow-x-auto">
+            <div className="flex border-b border-gray-100 px-2">
               {[{n:1,t:'Заёмщик'},{n:2,t:'Баланс'},{n:3,t:'ОПУ'},{n:4,t:'КешФлоу'},{n:5,t:'Залог'}].map(({n:tn,t}) => (
                 <button key={tn} onClick={() => setTab(tn)}
-                  className={`px-4 py-3 text-sm font-medium border-b-2 whitespace-nowrap transition-colors flex-shrink-0 ${tab === tn ? 'border-[#1B8A4C] text-[#1B8A4C]' : 'border-transparent text-gray-500 hover:text-gray-700'}`}>
-                  {tn}. {t}
+                  className={`px-3 py-3 text-xs font-semibold border-b-2 whitespace-nowrap transition-colors flex-shrink-0 ${tab === tn ? 'border-[#1B8A4C] text-[#1B8A4C]' : 'border-transparent text-gray-500 hover:text-gray-700'}`}>
+                  {t}
                 </button>
               ))}
             </div>
