@@ -69,7 +69,11 @@ ${(formData.collaterals||[]).map((c: {type:string;description:string;value:numbe
 
     const response = await fetch('https://api.anthropic.com/v1/messages', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: {
+        'Content-Type': 'application/json',
+        'x-api-key': process.env.ANTHROPIC_API_KEY || '',
+        'anthropic-version': '2023-06-01',
+      },
       body: JSON.stringify({
         model: 'claude-sonnet-4-20250514',
         max_tokens: 2000,
@@ -78,7 +82,12 @@ ${(formData.collaterals||[]).map((c: {type:string;description:string;value:numbe
     })
 
     const data = await response.json()
+    if (!response.ok) {
+      console.error('Anthropic API error:', data)
+      throw new Error(`Anthropic API: ${data?.error?.message || response.status}`)
+    }
     const text = data.content?.[0]?.text || ''
+    if (!text) throw new Error('AI вернул пустой ответ')
 
     const recommMatch = text.match(/РЕКОМЕНДАЦИЯ:\s*(.+)/i)
     const riskMatch = text.match(/УРОВЕНЬ РИСКА:\s*(.+)/i)
