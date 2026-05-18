@@ -287,7 +287,7 @@ export async function POST(request: Request) {
     return new NextResponse(new Uint8Array(buffer), {
       headers: {
         'Content-Type': 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
-        'Content-Disposition': `attachment; filename="Zakluchenie_${c.borrower_name}.docx"`,
+        'Content-Disposition': `attachment; filename="Zakluchenie.docx"; filename*=UTF-8''${encodeURIComponent('Заключение_' + c.borrower_name + '.docx')}`,
       }
     })
   } catch (error) {
