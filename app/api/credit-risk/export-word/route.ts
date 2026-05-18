@@ -91,10 +91,30 @@ export async function POST(request: Request) {
     const monthlyPayment = rate > 0 ? Math.round(loanAmt * rate / (1 - Math.pow(1 + rate, -months))) : Math.round(loanAmt / months)
 
     const conclusionParagraphs = (c.ai_conclusion || '').split('\n').filter((l: string) => l.trim()).map((line: string) => {
-      const isHeader = /^\d+\./.test(line.trim())
+      const text = line.trim()
+      const isHeader = /^\d+\./.test(text)
+      const isBullet = text.startsWith('-') || text.startsWith('•')
+      
+      if (isHeader) {
+        return new Paragraph({
+          spacing: { before: 200, after: 80 },
+          border: { bottom: { style: BorderStyle.SINGLE, size: 4, color: '1B8A4C' } },
+          children: [new TextRun({ text, size: 22, bold: true, color: '1B8A4C', font: 'Times New Roman' })]
+        })
+      }
+      if (isBullet) {
+        return new Paragraph({
+          spacing: { after: 80 },
+          indent: { left: 360 },
+          alignment: AlignmentType.BOTH,
+          children: [new TextRun({ text, size: 20, font: 'Times New Roman' })]
+        })
+      }
       return new Paragraph({
-        spacing: { after: isHeader ? 60 : 100, before: isHeader ? 160 : 0 },
-        children: [new TextRun({ text: line.trim(), size: 22, bold: isHeader, font: 'Times New Roman' })]
+        spacing: { after: 100 },
+        alignment: AlignmentType.BOTH,
+        indent: { firstLine: 360 },
+        children: [new TextRun({ text, size: 20, font: 'Times New Roman' })]
       })
     })
 
@@ -255,14 +275,44 @@ export async function POST(request: Request) {
           makePara('', { after: 120 }),
 
           // Рекомендация
-          new Table({
-            width: { size: 9354, type: WidthType.DXA },
-            columnWidths: [3500, 5854],
-            rows: [
-              new TableRow({ children: [makeCell('РЕКОМЕНДАЦИЯ', { gray: true, bold: true }), makeCell(c.recommendation || '—', { bold: true })] }),
-              new TableRow({ children: [makeCell('УРОВЕНЬ РИСКА', { gray: true, bold: true }), makeCell(c.risk_level || '—', { bold: true })] }),
-            ]
-          }),
+          (() => {
+            const recColor = c.recommendation?.includes('Отклонить') ? 'C00000' : c.recommendation?.includes('Условно') ? 'BF8F00' : '1B8A4C'
+            const recBg = c.recommendation?.includes('Отклонить') ? 'FFE7E7' : c.recommendation?.includes('Условно') ? 'FFF3CD' : 'E8F4E8'
+            const riskColor = c.risk_level === 'Высокий' ? 'C00000' : c.risk_level === 'Средний' ? 'BF8F00' : '1B8A4C'
+            return new Table({
+              width: { size: 9354, type: WidthType.DXA },
+              columnWidths: [3500, 5854],
+              rows: [
+                new TableRow({ children: [
+                  new TableCell({
+                    borders,
+                    shading: { fill: 'E8F4E8', type: ShadingType.CLEAR },
+                    margins: { top: 100, bottom: 100, left: 150, right: 150 },
+                    children: [new Paragraph({ children: [new TextRun({ text: 'РЕКОМЕНДАЦИЯ', size: 22, bold: true, font: 'Times New Roman', color: '1B8A4C' })] })]
+                  }),
+                  new TableCell({
+                    borders,
+                    shading: { fill: recBg, type: ShadingType.CLEAR },
+                    margins: { top: 100, bottom: 100, left: 150, right: 150 },
+                    children: [new Paragraph({ alignment: AlignmentType.CENTER, children: [new TextRun({ text: c.recommendation || '—', size: 28, bold: true, font: 'Times New Roman', color: recColor })] })]
+                  }),
+                ]}),
+                new TableRow({ children: [
+                  new TableCell({
+                    borders,
+                    shading: { fill: 'E8F4E8', type: ShadingType.CLEAR },
+                    margins: { top: 80, bottom: 80, left: 150, right: 150 },
+                    children: [new Paragraph({ children: [new TextRun({ text: 'УРОВЕНЬ РИСКА', size: 22, bold: true, font: 'Times New Roman', color: '1B8A4C' })] })]
+                  }),
+                  new TableCell({
+                    borders,
+                    margins: { top: 80, bottom: 80, left: 150, right: 150 },
+                    children: [new Paragraph({ alignment: AlignmentType.CENTER, children: [new TextRun({ text: c.risk_level || '—', size: 24, bold: true, font: 'Times New Roman', color: riskColor })] })]
+                  }),
+                ]}),
+              ]
+            })
+          })(),
           makePara('', { after: 300 }),
 
           // Подписи
