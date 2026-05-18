@@ -68,7 +68,6 @@ export default function CreditRiskPage() {
   useEffect(() => { fetchConclusions() }, [fetchConclusions])
 
   const n = (k: string) => Number(formData[k]) || 0
-  const f = (v: string) => (field: string) => setFormData(p => ({ ...p, [field]: v })
 
   function setF(field: string, value: string) {
     setFormData(p => ({ ...p, [field]: value }))
