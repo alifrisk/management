@@ -14,6 +14,16 @@ export default function Layout({ children }: { children: React.ReactNode }) {
 
   useEffect(() => {
     async function checkAuth() {
+      // Try cache first — no flicker on navigation
+      const cached = sessionStorage.getItem('alif_user')
+      if (cached) {
+        try {
+          setUser(JSON.parse(cached))
+          setLoading(false)
+          return
+        } catch { sessionStorage.removeItem('alif_user') }
+      }
+
       const { data: { session } } = await supabase.auth.getSession()
 
       if (!session) {
@@ -39,10 +49,13 @@ export default function Layout({ children }: { children: React.ReactNode }) {
 
       if (profile.is_active === false) {
         await supabase.auth.signOut()
+        sessionStorage.removeItem('alif_user')
         router.replace('/auth/login')
         return
       }
 
+      // Cache user profile
+      sessionStorage.setItem('alif_user', JSON.stringify(profile))
       setUser(profile)
       setLoading(false)
     }
@@ -51,6 +64,7 @@ export default function Layout({ children }: { children: React.ReactNode }) {
 
     const { data: { subscription } } = supabase.auth.onAuthStateChange((event) => {
       if (event === 'SIGNED_OUT') {
+        sessionStorage.removeItem('alif_user')
         router.replace('/auth/login')
       }
     })
