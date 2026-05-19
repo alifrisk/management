@@ -1,12 +1,12 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import { supabase } from '@/supabase/client'
 import { UserProfile } from '@/types'
 import { cn } from '@/lib/utils'
-import { Shield, FileText, TrendingUp, Droplets, LayoutDashboard, ChevronDown, ChevronRight, LogOut, Settings, Users, Menu, X, ClipboardList, BarChart3, Map } from 'lucide-react'
+import { Shield, FileText, TrendingUp, Droplets, LayoutDashboard, ChevronDown, ChevronRight, LogOut, Settings, Users, Menu, X, ClipboardList, BarChart3, Map, FolderOpen, ClipboardCheck } from 'lucide-react'
 
 interface SidebarProps { user: UserProfile }
 
@@ -23,17 +23,32 @@ const NAV_ITEMS = [
   { title: 'Кредитный риск', href: '/credit-risk', icon: <FileText className="w-4 h-4" />, adminOnly: true, children: [{ title: 'Заключения SME', href: '/credit-risk', icon: <FileText className="w-3.5 h-3.5" /> }] },
   { title: 'Рыночный риск', href: '/market-risk', icon: <TrendingUp className="w-4 h-4" />, adminOnly: true, children: [{ title: 'Оценка контрагентов', href: '/market-risk', icon: <TrendingUp className="w-3.5 h-3.5" /> }] },
   { title: 'Ликвидность', href: '/liquidity', icon: <Droplets className="w-4 h-4" />, adminOnly: true, children: [{ title: 'Стресс-тест', href: '/liquidity', icon: <BarChart3 className="w-3.5 h-3.5" /> }] },
+  { title: 'ВНД СУР', href: '/vnd', icon: <FolderOpen className="w-4 h-4" />, adminOnly: false, children: [{ title: 'Документы', href: '/vnd', icon: <FolderOpen className="w-3.5 h-3.5" /> }] },
+  { title: 'Реестр рекомендаций', href: '/recommendations', icon: <ClipboardCheck className="w-4 h-4" />, adminOnly: false, children: [{ title: 'Рекомендации', href: '/recommendations', icon: <ClipboardList className="w-3.5 h-3.5" /> }] },
 ]
 
 export default function Sidebar({ user }: SidebarProps) {
   const pathname = usePathname()
   const isAdmin = user.role === 'admin'
-  const [openMenus, setOpenMenus] = useState<string[]>([])
   const [mobileOpen, setMobileOpen] = useState(false)
   const [showLogoutConfirm, setShowLogoutConfirm] = useState(false)
 
+  // Auto-open active menu, close others — одновременно только один открыт
+  const getActiveMenu = () => {
+    for (const item of NAV_ITEMS) {
+      if (item.children?.some(c => pathname.startsWith(c.href))) return item.href
+    }
+    return null
+  }
+  const [openMenu, setOpenMenu] = useState<string | null>(getActiveMenu)
+
+  // При смене pathname — авто открыть нужный и закрыть остальные
+  useEffect(() => {
+    setOpenMenu(getActiveMenu())
+  }, [pathname])
+
   function toggleMenu(href: string) {
-    setOpenMenus(prev => prev.includes(href) ? prev.filter(h => h !== href) : [...prev, href])
+    setOpenMenu(prev => prev === href ? null : href)
   }
 
   async function confirmLogout() {
@@ -70,9 +85,9 @@ export default function Sidebar({ user }: SidebarProps) {
                 >
                   <span className="flex-shrink-0 text-green-200">{item.icon}</span>
                   <span className="flex-1 text-left font-medium">{item.title}</span>
-                  {openMenus.includes(item.href) ? <ChevronDown className="w-3.5 h-3.5 text-green-200" /> : <ChevronRight className="w-3.5 h-3.5 text-green-200" />}
+                  {openMenu === item.href ? <ChevronDown className="w-3.5 h-3.5 text-green-200" /> : <ChevronRight className="w-3.5 h-3.5 text-green-200" />}
                 </button>
-                {openMenus.includes(item.href) && (
+                {openMenu === item.href && (
                   <div className="ml-4 mt-0.5 space-y-0.5 border-l border-white/10 pl-3">
                     {item.children.map((child) => (
                       <Link key={child.href} href={child.href} onClick={() => setMobileOpen(false)}
@@ -132,22 +147,22 @@ export default function Sidebar({ user }: SidebarProps) {
         </div>
       </div>
 
-      {/* Logout confirmation dialog */}
+      {/* Logout confirmation — по центру экрана через fixed */}
       {showLogoutConfirm && (
-        <div className="absolute inset-0 bg-black/70 flex items-end justify-center p-4 rounded-none z-50">
-          <div className="bg-white rounded-2xl p-6 w-full">
-            <h3 className="font-semibold text-gray-900 mb-1 text-sm">Выйти из системы?</h3>
-            <p className="text-xs text-gray-500 mb-4">Вы уверены что хотите выйти?</p>
+        <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-[100] p-4">
+          <div className="bg-white rounded-2xl p-6 w-72 shadow-2xl">
+            <h3 className="font-semibold text-gray-900 mb-1 text-sm text-center">Выйти из системы?</h3>
+            <p className="text-xs text-gray-500 mb-5 text-center">Вы уверены что хотите выйти?</p>
             <div className="flex gap-2">
               <button
                 onClick={() => setShowLogoutConfirm(false)}
-                className="flex-1 py-2 border border-gray-200 rounded-lg text-xs font-medium text-gray-600 hover:bg-gray-50"
+                className="flex-1 py-2.5 border border-gray-200 rounded-xl text-xs font-medium text-gray-600 hover:bg-gray-50"
               >
                 Отмена
               </button>
               <button
                 onClick={confirmLogout}
-                className="flex-1 py-2 bg-red-500 hover:bg-red-600 rounded-lg text-xs font-medium text-white"
+                className="flex-1 py-2.5 bg-red-500 hover:bg-red-600 rounded-xl text-xs font-medium text-white"
               >
                 Выйти
               </button>
