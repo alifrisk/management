@@ -106,8 +106,9 @@ export default function VNDPage() {
       let fileType = ''
 
       if (file) {
-        const ext = file.name.split('.').pop()
-        const path = `${Date.now()}_${file.name.replace(/\s/g, '_')}`
+        const ext = file.name.split('.').pop() || ''
+        // Use only timestamp + extension to avoid cyrillic issues in storage key
+        const path = `${Date.now()}.${ext}`
         const { error: uploadErr } = await supabase.storage.from('vnd-documents').upload(path, file)
         if (uploadErr) throw new Error('Ошибка загрузки файла: ' + uploadErr.message)
         filePath = path
@@ -171,7 +172,8 @@ export default function VNDPage() {
     if (!newVersionDoc || !newVersionFile) return
     setUploading(true)
     try {
-      const path = `${Date.now()}_${newVersionFile.name.replace(/\s/g, '_')}`
+      const ext = newVersionFile.name.split('.').pop() || ''
+      const path = `${Date.now()}.${ext}`
       const { error: uploadErr } = await supabase.storage.from('vnd-documents').upload(path, newVersionFile)
       if (uploadErr) throw new Error(uploadErr.message)
 
