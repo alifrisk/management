@@ -100,6 +100,12 @@ export default function RecommendationsPage() {
 
   async function handleSave() {
     if (!form.title.trim()) { setError('Введите название'); return }
+    if (form.report_date && form.due_date && form.report_date > form.due_date) {
+      setError('Дата рапорта/заключения не может быть позже срока исполнения'); return
+    }
+    if (form.due_date && form.completion_date && form.completion_date < form.due_date) {
+      // allowed - completed early
+    }
     setSaving(true); setError(null)
     try {
       // Convert empty date strings to null
