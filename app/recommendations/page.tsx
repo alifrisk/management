@@ -38,6 +38,8 @@ const SOURCE_TYPES = [
 const ACCEPTANCE_STATUSES = ['На рассмотрении', 'Принята', 'Не принята']
 const EXEC_STATUSES = ['Открыта', 'В процессе', 'Выполнена', 'Просрочена']
 const PRIORITIES = ['Высокий', 'Средний', 'Низкий']
+const PAGE_SIZE = 20
+
 const MONTHS = ['Январь','Февраль','Март','Апрель','Май','Июнь','Июль','Август','Сентябрь','Октябрь','Ноябрь','Декабрь']
 
 const EMPTY_FORM = {
@@ -85,6 +87,7 @@ export default function RecommendationsPage() {
   const [filterAccept, setFilterAccept] = useState('')
   const [filterYear, setFilterYear] = useState('')
   const [filterMonth, setFilterMonth] = useState('')
+  const [currentPage, setCurrentPage] = useState(1)
 
   const fetch_ = useCallback(async () => {
     setLoading(true)
@@ -112,6 +115,7 @@ export default function RecommendationsPage() {
   }, [])
 
   const setF = (k: string, v: string) => setForm(p => ({ ...p, [k]: v }))
+  const resetPage = () => setCurrentPage(1)
   const [attachment, setAttachment] = useState<File | null>(null)
 
   function exportToExcel() {
@@ -204,6 +208,9 @@ export default function RecommendationsPage() {
     overdue: items.filter(r => r.status === 'Просрочена').length,
   }
   const completionRate = stats.accepted > 0 ? Math.round((stats.done / stats.accepted) * 100) : 0
+
+  const totalPages = Math.ceil(filtered.length / PAGE_SIZE)
+  const paginated = filtered.slice((currentPage - 1) * PAGE_SIZE, currentPage * PAGE_SIZE)
 
   const inp = "w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#1B8A4C] bg-white"
   const lbl = "block text-xs font-medium text-gray-600 mb-1"
@@ -312,12 +319,12 @@ export default function RecommendationsPage() {
             <tbody className="divide-y divide-gray-50">
               {loading ? <tr><td colSpan={9} className="text-center py-12 text-gray-400">Загрузка...</td></tr>
                 : filtered.length === 0 ? <tr><td colSpan={9} className="text-center py-12 text-gray-400">Рекомендаций нет</td></tr>
-                : filtered.map((item, idx) => {
+                : paginated.map((item, idx) => {
                   const days = getDaysLeft(item.due_date)
                   const source = SOURCE_TYPES.find(s => s.value === item.source_type)
                   return (
                     <tr key={item.id} className={`hover:bg-gray-50 cursor-pointer ${item.status === 'Просрочена' ? 'bg-red-50/30' : ''}`}>
-                      <td className="px-4 py-3 text-gray-400 text-xs font-mono">{idx + 1}</td>
+                      <td className="px-4 py-3 text-gray-400 text-xs font-mono">{(currentPage - 1) * PAGE_SIZE + idx + 1}</td>
                       <td className="px-4 py-3 max-w-[200px]">
                         <p className="font-medium text-gray-900 truncate">{item.title}</p>
                         {item.report_name && <p className="text-xs text-gray-400 truncate">{item.report_name}</p>}
@@ -384,6 +391,25 @@ export default function RecommendationsPage() {
             </tbody>
           </table>
         </div>
+        {filtered.length > PAGE_SIZE && (
+          <div className="px-4 py-3 border-t border-gray-100 flex items-center justify-between">
+            <p className="text-xs text-gray-500">
+              Показано {(currentPage - 1) * PAGE_SIZE + 1}–{Math.min(currentPage * PAGE_SIZE, filtered.length)} из {filtered.length}
+            </p>
+            <div className="flex items-center gap-1">
+              <button onClick={() => setCurrentPage(p => Math.max(1, p - 1))} disabled={currentPage === 1}
+                className="px-2.5 py-1 text-xs border border-gray-200 rounded disabled:opacity-40 hover:bg-gray-50">←</button>
+              {Array.from({ length: Math.min(totalPages, 5) }, (_, i) => i + 1).map(p => (
+                <button key={p} onClick={() => setCurrentPage(p)}
+                  className={`px-2.5 py-1 text-xs rounded border ${currentPage === p ? 'bg-[#1B8A4C] text-white border-[#1B8A4C]' : 'border-gray-200 hover:bg-gray-50'}`}>
+                  {p}
+                </button>
+              ))}
+              <button onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))} disabled={currentPage === totalPages}
+                className="px-2.5 py-1 text-xs border border-gray-200 rounded disabled:opacity-40 hover:bg-gray-50">→</button>
+            </div>
+          </div>
+        )}
       </div>
 
       {/* Modal */}
