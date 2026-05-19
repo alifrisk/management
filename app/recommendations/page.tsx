@@ -207,7 +207,9 @@ export default function RecommendationsPage() {
     done: items.filter(r => r.status === 'Выполнена').length,
     overdue: items.filter(r => r.status === 'Просрочена').length,
   }
-  const completionRate = stats.accepted > 0 ? Math.round((stats.done / stats.accepted) * 100) : 0
+  // Только выполненные из принятых
+  const doneAndAccepted = items.filter(r => r.acceptance_status === 'Принята' && r.status === 'Выполнена').length
+  const completionRate = stats.accepted > 0 ? Math.round((doneAndAccepted / stats.accepted) * 100) : 0
 
   const totalPages = Math.ceil(filtered.length / PAGE_SIZE)
   const paginated = filtered.slice((currentPage - 1) * PAGE_SIZE, currentPage * PAGE_SIZE)
@@ -370,8 +372,8 @@ export default function RecommendationsPage() {
                             <button onClick={async () => {
                               const { data } = await supabase.storage.from('vnd-documents').download(item.attachment_url)
                               if (data) { const url = URL.createObjectURL(data); const a = document.createElement('a'); a.href=url; a.download=item.attachment_name; a.click(); URL.revokeObjectURL(url) }
-                            }} title="Скачать документ"
-                              className="p-1.5 text-gray-400 hover:text-purple-600 hover:bg-purple-50 rounded-lg">
+                            }}
+                              className="p-1.5 text-purple-600 hover:bg-purple-50 rounded-lg" title={`Скачать: ${item.attachment_name}`}>
                               <FileText className="w-3.5 h-3.5" />
                             </button>
                           )}
