@@ -102,7 +102,15 @@ export default function RecommendationsPage() {
     if (!form.title.trim()) { setError('Введите название'); return }
     setSaving(true); setError(null)
     try {
-      const payload = { ...form, updated_at: new Date().toISOString() }
+      // Convert empty date strings to null
+      const payload = {
+        ...form,
+        report_date: form.report_date || null,
+        acceptance_date: form.acceptance_date || null,
+        due_date: form.due_date || null,
+        completion_date: form.completion_date || null,
+        updated_at: new Date().toISOString(),
+      }
       if (editingId) {
         const { error: e } = await supabase.from('recommendations').update(payload).eq('id', editingId)
         if (e) throw new Error(e.message)
