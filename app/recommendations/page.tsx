@@ -1,66 +1,75 @@
 'use client'
 
 import { useState, useEffect, useCallback } from 'react'
+import { useRouter } from 'next/navigation'
 import { supabase } from '@/supabase/client'
-import { Plus, Edit2, Trash2, X, CheckCircle2, AlertCircle, Clock, Filter, Search, TrendingUp, FileText, Shield, Droplets, MoreHorizontal } from 'lucide-react'
+import { Plus, Edit2, Trash2, X, CheckCircle2, AlertCircle, Clock, Filter, Search, Eye } from 'lucide-react'
 
 interface Recommendation {
   id: string
+  rec_number: number
   title: string
   description: string
   source_type: string
-  source_reference: string
+  report_name: string
+  report_date: string
+  acceptance_status: string
+  acceptance_notes: string
+  acceptance_date: string
   priority: string
   responsible: string
   department: string
   due_date: string
-  completion_date: string
   status: string
+  completion_date: string
   completion_notes: string
   created_by: string
   created_at: string
-  updated_at: string
 }
 
 const SOURCE_TYPES = [
-  { value: 'operational', label: 'Операционный риск', icon: <Shield className="w-3.5 h-3.5" />, color: 'bg-blue-100 text-blue-700' },
-  { value: 'credit', label: 'Кредитный риск', icon: <FileText className="w-3.5 h-3.5" />, color: 'bg-green-100 text-green-700' },
-  { value: 'market', label: 'Рыночный риск', icon: <TrendingUp className="w-3.5 h-3.5" />, color: 'bg-purple-100 text-purple-700' },
-  { value: 'liquidity', label: 'Ликвидность', icon: <Droplets className="w-3.5 h-3.5" />, color: 'bg-cyan-100 text-cyan-700' },
-  { value: 'other', label: 'Прочее', icon: <MoreHorizontal className="w-3.5 h-3.5" />, color: 'bg-gray-100 text-gray-700' },
+  { value: 'report', label: 'Гузориш (рапорт)' },
+  { value: 'conclusion', label: 'Заключение' },
+  { value: 'initiative', label: 'Собственная инициатива' },
 ]
 
+const ACCEPTANCE_STATUSES = ['На рассмотрении', 'Принята', 'Не принята']
+const EXEC_STATUSES = ['Открыта', 'В процессе', 'Выполнена', 'Просрочена']
 const PRIORITIES = ['Высокий', 'Средний', 'Низкий']
-const STATUSES = ['Открыта', 'В процессе', 'Выполнена', 'Просрочена', 'Отменена']
+const MONTHS = ['Январь','Февраль','Март','Апрель','Май','Июнь','Июль','Август','Сентябрь','Октябрь','Ноябрь','Декабрь']
 
 const EMPTY_FORM = {
-  title: '', description: '', source_type: 'operational', source_reference: '',
-  priority: 'Средний', responsible: '', department: '', due_date: '',
-  completion_date: '', status: 'Открыта', completion_notes: '', created_by: '',
+  title: '', description: '',
+  source_type: 'report', report_name: '', report_date: '',
+  acceptance_status: 'На рассмотрении', acceptance_notes: '', acceptance_date: '',
+  priority: 'Средний', responsible: '', department: '',
+  due_date: '', status: 'Открыта', completion_date: '',
+  completion_notes: '', created_by: '',
 }
 
-function getStatusStyle(status: string) {
-  switch (status) {
-    case 'Выполнена': return { bg: 'bg-green-100 text-green-800', icon: <CheckCircle2 className="w-3.5 h-3.5" /> }
-    case 'В процессе': return { bg: 'bg-blue-100 text-blue-800', icon: <Clock className="w-3.5 h-3.5" /> }
-    case 'Просрочена': return { bg: 'bg-red-100 text-red-800', icon: <AlertCircle className="w-3.5 h-3.5" /> }
-    case 'Отменена': return { bg: 'bg-gray-100 text-gray-600', icon: <X className="w-3.5 h-3.5" /> }
-    default: return { bg: 'bg-yellow-100 text-yellow-800', icon: <Clock className="w-3.5 h-3.5" /> }
-  }
+const getStatusStyle = (s: string) => {
+  if (s === 'Выполнена') return 'bg-green-100 text-green-800'
+  if (s === 'В процессе') return 'bg-blue-100 text-blue-800'
+  if (s === 'Просрочена') return 'bg-red-100 text-red-800'
+  return 'bg-yellow-100 text-yellow-800'
 }
 
-function getPriorityStyle(priority: string) {
-  if (priority === 'Высокий') return 'bg-red-100 text-red-700'
-  if (priority === 'Средний') return 'bg-yellow-100 text-yellow-700'
+const getAcceptStyle = (s: string) => {
+  if (s === 'Принята') return 'bg-green-100 text-green-700'
+  if (s === 'Не принята') return 'bg-red-100 text-red-700'
+  return 'bg-gray-100 text-gray-600'
+}
+
+const getPriorityStyle = (p: string) => {
+  if (p === 'Высокий') return 'bg-red-100 text-red-700'
+  if (p === 'Средний') return 'bg-yellow-100 text-yellow-700'
   return 'bg-green-100 text-green-700'
 }
 
-function getDaysLeft(dueDate: string): number | null {
-  if (!dueDate) return null
-  return Math.ceil((new Date(dueDate).getTime() - new Date().getTime()) / (1000 * 60 * 60 * 24))
-}
+const getDaysLeft = (d: string) => d ? Math.ceil((new Date(d).getTime() - Date.now()) / 86400000) : null
 
 export default function RecommendationsPage() {
+  const router = useRouter()
   const [items, setItems] = useState<Recommendation[]>([])
   const [loading, setLoading] = useState(true)
   const [showModal, setShowModal] = useState(false)
@@ -71,35 +80,26 @@ export default function RecommendationsPage() {
   const [search, setSearch] = useState('')
   const [filterSource, setFilterSource] = useState('')
   const [filterStatus, setFilterStatus] = useState('')
-  const [filterPriority, setFilterPriority] = useState('')
-  const [showComplete, setShowComplete] = useState<Recommendation | null>(null)
-  const [completeNotes, setCompleteNotes] = useState('')
+  const [filterAccept, setFilterAccept] = useState('')
+  const [filterYear, setFilterYear] = useState('')
+  const [filterMonth, setFilterMonth] = useState('')
 
   const fetch_ = useCallback(async () => {
     setLoading(true)
-    const { data } = await supabase.from('recommendations').select('*').order('created_at', { ascending: false })
+    let q = supabase.from('recommendations').select('*').order('created_at', { ascending: false })
+    if (filterYear) q = q.gte('created_at', `${filterYear}-01-01`).lte('created_at', `${filterYear}-12-31`)
+    if (filterYear && filterMonth) q = q.gte('created_at', `${filterYear}-${filterMonth}-01`).lte('created_at', `${filterYear}-${filterMonth}-31`)
+    const { data } = await q
     setItems(data || [])
     setLoading(false)
-  }, [])
+  }, [filterYear, filterMonth])
 
   useEffect(() => { fetch_() }, [fetch_])
-
-  // Auto-update overdue statuses
-  useEffect(() => {
-    items.forEach(async (item) => {
-      if (item.status === 'Открыта' || item.status === 'В процессе') {
-        const days = getDaysLeft(item.due_date)
-        if (days !== null && days < 0) {
-          await supabase.from('recommendations').update({ status: 'Просрочена' }).eq('id', item.id)
-        }
-      }
-    })
-  }, [items])
 
   const setF = (k: string, v: string) => setForm(p => ({ ...p, [k]: v }))
 
   async function handleSave() {
-    if (!form.title.trim()) { setError('Введите название рекомендации'); return }
+    if (!form.title.trim()) { setError('Введите название'); return }
     setSaving(true); setError(null)
     try {
       const payload = { ...form, updated_at: new Date().toISOString() }
@@ -116,19 +116,8 @@ export default function RecommendationsPage() {
     } finally { setSaving(false) }
   }
 
-  async function handleComplete() {
-    if (!showComplete) return
-    await supabase.from('recommendations').update({
-      status: 'Выполнена',
-      completion_date: new Date().toISOString().split('T')[0],
-      completion_notes: completeNotes,
-      updated_at: new Date().toISOString(),
-    }).eq('id', showComplete.id)
-    setShowComplete(null); setCompleteNotes(''); fetch_()
-  }
-
   async function handleDelete(id: string) {
-    if (!confirm('Удалить рекомендацию?')) return
+    if (!confirm('Удалить?')) return
     await supabase.from('recommendations').delete().eq('id', id)
     fetch_()
   }
@@ -136,10 +125,13 @@ export default function RecommendationsPage() {
   function openEdit(item: Recommendation) {
     setForm({
       title: item.title, description: item.description || '',
-      source_type: item.source_type, source_reference: item.source_reference || '',
+      source_type: item.source_type, report_name: item.report_name || '',
+      report_date: item.report_date || '',
+      acceptance_status: item.acceptance_status, acceptance_notes: item.acceptance_notes || '',
+      acceptance_date: item.acceptance_date || '',
       priority: item.priority, responsible: item.responsible || '',
       department: item.department || '', due_date: item.due_date || '',
-      completion_date: item.completion_date || '', status: item.status,
+      status: item.status, completion_date: item.completion_date || '',
       completion_notes: item.completion_notes || '', created_by: item.created_by || '',
     })
     setEditingId(item.id); setError(null); setShowModal(true)
@@ -148,20 +140,21 @@ export default function RecommendationsPage() {
   const filtered = items.filter(r => {
     if (filterSource && r.source_type !== filterSource) return false
     if (filterStatus && r.status !== filterStatus) return false
-    if (filterPriority && r.priority !== filterPriority) return false
-    if (search && !r.title.toLowerCase().includes(search.toLowerCase()) && !r.responsible?.toLowerCase().includes(search.toLowerCase())) return false
+    if (filterAccept && r.acceptance_status !== filterAccept) return false
+    if (search && !r.title.toLowerCase().includes(search.toLowerCase()) &&
+        !r.report_name?.toLowerCase().includes(search.toLowerCase()) &&
+        !r.responsible?.toLowerCase().includes(search.toLowerCase())) return false
     return true
   })
 
   const stats = {
     total: items.length,
-    open: items.filter(r => r.status === 'Открыта').length,
-    inProgress: items.filter(r => r.status === 'В процессе').length,
+    accepted: items.filter(r => r.acceptance_status === 'Принята').length,
+    notAccepted: items.filter(r => r.acceptance_status === 'Не принята').length,
     done: items.filter(r => r.status === 'Выполнена').length,
     overdue: items.filter(r => r.status === 'Просрочена').length,
   }
-
-  const completionRate = stats.total > 0 ? Math.round((stats.done / stats.total) * 100) : 0
+  const completionRate = stats.accepted > 0 ? Math.round((stats.done / stats.accepted) * 100) : 0
 
   const inp = "w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#1B8A4C] bg-white"
   const lbl = "block text-xs font-medium text-gray-600 mb-1"
@@ -171,7 +164,7 @@ export default function RecommendationsPage() {
       <div className="flex items-center justify-between flex-wrap gap-3">
         <div>
           <h1 className="text-xl font-semibold text-gray-900">Реестр рекомендаций СУР</h1>
-          <p className="text-sm text-gray-500 mt-0.5">Контроль исполнения рекомендаций по всем модулям</p>
+          <p className="text-sm text-gray-500 mt-0.5">Мониторинг исполнения рекомендаций по рапортам и заключениям</p>
         </div>
         <button onClick={() => { setForm(EMPTY_FORM); setEditingId(null); setError(null); setShowModal(true) }}
           className="flex items-center gap-2 px-4 py-2 bg-[#1B8A4C] text-white rounded-lg text-sm font-medium hover:bg-[#177040]">
@@ -183,9 +176,9 @@ export default function RecommendationsPage() {
       <div className="grid grid-cols-2 lg:grid-cols-5 gap-3">
         {[
           { label: 'Всего', value: stats.total, c: 'text-gray-900' },
-          { label: 'Открыта', value: stats.open, c: 'text-yellow-600' },
-          { label: 'В процессе', value: stats.inProgress, c: 'text-blue-600' },
-          { label: 'Выполнена', value: stats.done, c: 'text-green-600' },
+          { label: 'Принята', value: stats.accepted, c: 'text-green-600' },
+          { label: 'Не принята', value: stats.notAccepted, c: 'text-red-600' },
+          { label: 'Выполнена', value: stats.done, c: 'text-blue-600' },
           { label: 'Просрочена', value: stats.overdue, c: 'text-red-600' },
         ].map(s => (
           <div key={s.label} className="bg-white rounded-xl border border-gray-100 p-4 shadow-sm">
@@ -195,61 +188,55 @@ export default function RecommendationsPage() {
         ))}
       </div>
 
-      {/* Progress bar */}
-      {stats.total > 0 && (
+      {/* Progress */}
+      {stats.accepted > 0 && (
         <div className="bg-white rounded-xl border border-gray-100 p-4 shadow-sm">
           <div className="flex items-center justify-between mb-2">
-            <p className="text-sm font-medium text-gray-700">Процент исполнения</p>
+            <p className="text-sm font-medium text-gray-700">Исполнение принятых рекомендаций</p>
             <p className="text-sm font-bold text-[#1B8A4C]">{completionRate}%</p>
           </div>
           <div className="h-3 bg-gray-100 rounded-full overflow-hidden">
             <div className="h-full bg-[#1B8A4C] rounded-full transition-all" style={{ width: `${completionRate}%` }} />
           </div>
-          <div className="flex gap-4 mt-2">
-            {[
-              { color: 'bg-yellow-400', label: `Открыта: ${stats.open}` },
-              { color: 'bg-blue-400', label: `В процессе: ${stats.inProgress}` },
-              { color: 'bg-green-500', label: `Выполнена: ${stats.done}` },
-              { color: 'bg-red-400', label: `Просрочена: ${stats.overdue}` },
-            ].map(s => (
-              <div key={s.label} className="flex items-center gap-1.5">
-                <div className={`w-2.5 h-2.5 rounded-full ${s.color}`} />
-                <span className="text-xs text-gray-500">{s.label}</span>
-              </div>
-            ))}
-          </div>
         </div>
       )}
 
-      {/* Overdue alert */}
       {stats.overdue > 0 && (
         <div className="flex items-center gap-3 p-4 bg-red-50 border border-red-200 rounded-xl">
           <AlertCircle className="w-5 h-5 text-red-600 flex-shrink-0" />
-          <p className="text-sm text-red-700 font-medium">{stats.overdue} рекомендаций просрочено — требуется немедленное внимание!</p>
+          <p className="text-sm text-red-700 font-medium">{stats.overdue} рекомендаций просрочено!</p>
         </div>
       )}
 
       {/* Filters */}
       <div className="bg-white rounded-xl border border-gray-100 p-4 shadow-sm flex items-center gap-3 flex-wrap">
-        <div className="flex-1 relative min-w-[200px]">
+        <div className="relative">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
-          <input type="text" placeholder="Поиск по названию или ответственному..." value={search} onChange={e => setSearch(e.target.value)}
-            className="w-full pl-9 pr-4 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#1B8A4C]" />
+          <input type="text" placeholder="Поиск..." value={search} onChange={e => setSearch(e.target.value)}
+            className="pl-9 pr-4 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#1B8A4C] w-48" />
         </div>
-        <select value={filterSource} onChange={e => setFilterSource(e.target.value)} className="px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#1B8A4C] bg-white">
+        <select value={filterYear} onChange={e => { setFilterYear(e.target.value); setFilterMonth('') }} className="px-3 py-2 border border-gray-200 rounded-lg text-sm bg-white focus:outline-none focus:ring-2 focus:ring-[#1B8A4C]">
+          <option value="">Все годы</option>
+          {[2026,2025,2024].map(y => <option key={y} value={y}>{y}</option>)}
+        </select>
+        <select value={filterMonth} onChange={e => setFilterMonth(e.target.value)} className="px-3 py-2 border border-gray-200 rounded-lg text-sm bg-white focus:outline-none focus:ring-2 focus:ring-[#1B8A4C]">
+          <option value="">Все месяцы</option>
+          {MONTHS.map((m,i) => <option key={i} value={String(i+1).padStart(2,'0')}>{m}</option>)}
+        </select>
+        <select value={filterSource} onChange={e => setFilterSource(e.target.value)} className="px-3 py-2 border border-gray-200 rounded-lg text-sm bg-white focus:outline-none focus:ring-2 focus:ring-[#1B8A4C]">
           <option value="">Все источники</option>
           {SOURCE_TYPES.map(s => <option key={s.value} value={s.value}>{s.label}</option>)}
         </select>
-        <select value={filterStatus} onChange={e => setFilterStatus(e.target.value)} className="px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#1B8A4C] bg-white">
-          <option value="">Все статусы</option>
-          {STATUSES.map(s => <option key={s}>{s}</option>)}
+        <select value={filterAccept} onChange={e => setFilterAccept(e.target.value)} className="px-3 py-2 border border-gray-200 rounded-lg text-sm bg-white focus:outline-none focus:ring-2 focus:ring-[#1B8A4C]">
+          <option value="">Все статусы принятия</option>
+          {ACCEPTANCE_STATUSES.map(s => <option key={s}>{s}</option>)}
         </select>
-        <select value={filterPriority} onChange={e => setFilterPriority(e.target.value)} className="px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#1B8A4C] bg-white">
-          <option value="">Все приоритеты</option>
-          {PRIORITIES.map(p => <option key={p}>{p}</option>)}
+        <select value={filterStatus} onChange={e => setFilterStatus(e.target.value)} className="px-3 py-2 border border-gray-200 rounded-lg text-sm bg-white focus:outline-none focus:ring-2 focus:ring-[#1B8A4C]">
+          <option value="">Все статусы исполнения</option>
+          {EXEC_STATUSES.map(s => <option key={s}>{s}</option>)}
         </select>
-        {(filterSource || filterStatus || filterPriority || search) && (
-          <button onClick={() => { setFilterSource(''); setFilterStatus(''); setFilterPriority(''); setSearch('') }}
+        {(filterSource || filterStatus || filterAccept || filterYear || search) && (
+          <button onClick={() => { setFilterSource(''); setFilterStatus(''); setFilterAccept(''); setFilterYear(''); setFilterMonth(''); setSearch('') }}
             className="text-xs text-gray-500 hover:text-gray-700 flex items-center gap-1">
             <X className="w-3.5 h-3.5" /> Сбросить
           </button>
@@ -262,35 +249,33 @@ export default function RecommendationsPage() {
           <table className="w-full text-sm">
             <thead>
               <tr className="bg-gray-50 border-b border-gray-100">
-                {['Рекомендация', 'Источник', 'Приоритет', 'Ответственный', 'Срок', 'Статус', ''].map(h => (
+                {['№','Рекомендация','Источник','Приоритет','Принятие','Ответственный','Срок','Исполнение',''].map(h => (
                   <th key={h} className="text-left px-4 py-3 text-xs font-medium text-gray-500 uppercase whitespace-nowrap">{h}</th>
                 ))}
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-50">
-              {loading ? <tr><td colSpan={7} className="text-center py-12 text-gray-400">Загрузка...</td></tr>
-                : filtered.length === 0 ? <tr><td colSpan={7} className="text-center py-12 text-gray-400">
-                  <CheckCircle2 className="w-8 h-8 mx-auto mb-2 opacity-30" />
-                  <p>Рекомендаций нет</p>
-                </td></tr>
-                : filtered.map(item => {
-                  const statusStyle = getStatusStyle(item.status)
-                  const source = SOURCE_TYPES.find(s => s.value === item.source_type)
+              {loading ? <tr><td colSpan={9} className="text-center py-12 text-gray-400">Загрузка...</td></tr>
+                : filtered.length === 0 ? <tr><td colSpan={9} className="text-center py-12 text-gray-400">Рекомендаций нет</td></tr>
+                : filtered.map((item, idx) => {
                   const days = getDaysLeft(item.due_date)
+                  const source = SOURCE_TYPES.find(s => s.value === item.source_type)
                   return (
-                    <tr key={item.id} className={`hover:bg-gray-50 ${item.status === 'Просрочена' ? 'bg-red-50/30' : ''}`}>
-                      <td className="px-4 py-3 max-w-xs">
+                    <tr key={item.id} className={`hover:bg-gray-50 cursor-pointer ${item.status === 'Просрочена' ? 'bg-red-50/30' : ''}`}>
+                      <td className="px-4 py-3 text-gray-400 text-xs font-mono">{idx + 1}</td>
+                      <td className="px-4 py-3 max-w-[200px]">
                         <p className="font-medium text-gray-900 truncate">{item.title}</p>
-                        {item.source_reference && <p className="text-xs text-gray-400 mt-0.5">{item.source_reference}</p>}
+                        {item.report_name && <p className="text-xs text-gray-400 truncate">{item.report_name}</p>}
                       </td>
-                      <td className="px-4 py-3">
-                        <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium ${source?.color}`}>
-                          {source?.icon} {source?.label}
-                        </span>
-                      </td>
+                      <td className="px-4 py-3 text-xs text-gray-600 whitespace-nowrap">{source?.label}</td>
                       <td className="px-4 py-3">
                         <span className={`inline-flex px-2 py-0.5 rounded-full text-xs font-medium ${getPriorityStyle(item.priority)}`}>
                           {item.priority}
+                        </span>
+                      </td>
+                      <td className="px-4 py-3">
+                        <span className={`inline-flex px-2 py-0.5 rounded-full text-xs font-medium ${getAcceptStyle(item.acceptance_status)}`}>
+                          {item.acceptance_status}
                         </span>
                       </td>
                       <td className="px-4 py-3 text-gray-600 text-sm">{item.responsible || '—'}</td>
@@ -302,27 +287,25 @@ export default function RecommendationsPage() {
                             </p>
                             {days !== null && item.status !== 'Выполнена' && (
                               <p className={`text-xs ${days < 0 ? 'text-red-500' : days <= 7 ? 'text-orange-500' : 'text-gray-400'}`}>
-                                {days < 0 ? `просрочено ${Math.abs(days)} дн.` : `${days} дн. осталось`}
+                                {days < 0 ? `${Math.abs(days)} дн. просрочено` : `${days} дн.`}
                               </p>
                             )}
                           </div>
                         ) : '—'}
                       </td>
                       <td className="px-4 py-3">
-                        <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium ${statusStyle.bg}`}>
-                          {statusStyle.icon} {item.status}
+                        <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium ${getStatusStyle(item.status)}`}>
+                          {item.status}
                         </span>
                       </td>
                       <td className="px-4 py-3">
                         <div className="flex items-center gap-1">
-                          {(item.status === 'Открыта' || item.status === 'В процессе') && (
-                            <button onClick={() => setShowComplete(item)} title="Отметить выполненной"
-                              className="p-1.5 text-gray-400 hover:text-green-600 hover:bg-green-50 rounded-lg">
-                              <CheckCircle2 className="w-3.5 h-3.5" />
-                            </button>
-                          )}
-                          <button onClick={() => openEdit(item)} title="Редактировать"
+                          <button onClick={() => router.push(`/recommendations/${item.id}`)} title="Просмотр"
                             className="p-1.5 text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg">
+                            <Eye className="w-3.5 h-3.5" />
+                          </button>
+                          <button onClick={() => openEdit(item)} title="Редактировать"
+                            className="p-1.5 text-gray-400 hover:text-[#1B8A4C] hover:bg-green-50 rounded-lg">
                             <Edit2 className="w-3.5 h-3.5" />
                           </button>
                           <button onClick={() => handleDelete(item.id)} title="Удалить"
@@ -339,33 +322,7 @@ export default function RecommendationsPage() {
         </div>
       </div>
 
-      {/* Complete Modal */}
-      {showComplete && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50">
-          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md">
-            <div className="flex items-center justify-between p-6 border-b border-gray-100">
-              <h2 className="text-base font-semibold">Отметить как выполненную</h2>
-              <button onClick={() => setShowComplete(null)}><X className="w-5 h-5 text-gray-400" /></button>
-            </div>
-            <div className="p-6 space-y-4">
-              <p className="text-sm text-gray-600">{showComplete.title}</p>
-              <div>
-                <label className={lbl}>Примечание к исполнению</label>
-                <textarea value={completeNotes} onChange={e => setCompleteNotes(e.target.value)} rows={3}
-                  placeholder="Опишите что было сделано..." className={inp + ' resize-none'} />
-              </div>
-            </div>
-            <div className="flex justify-end gap-3 p-6 border-t border-gray-100">
-              <button onClick={() => setShowComplete(null)} className="px-4 py-2 border border-gray-200 rounded-lg text-sm text-gray-600 hover:bg-gray-50">Отмена</button>
-              <button onClick={handleComplete} className="flex items-center gap-2 px-4 py-2 bg-green-600 text-white rounded-lg text-sm font-medium hover:bg-green-700">
-                <CheckCircle2 className="w-4 h-4" /> Выполнено
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Add/Edit Modal */}
+      {/* Modal */}
       {showModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50">
           <div className="bg-white rounded-2xl shadow-2xl w-full max-w-2xl max-h-[95vh] flex flex-col">
@@ -375,43 +332,72 @@ export default function RecommendationsPage() {
             </div>
             <div className="flex-1 overflow-y-auto p-5 space-y-4">
               {error && <div className="p-3 bg-red-50 border border-red-100 rounded-lg text-sm text-red-600">{error}</div>}
-              <div className="lg:col-span-2">
-                <label className={lbl}>Название рекомендации *</label>
-                <input type="text" value={form.title} onChange={e => setF('title', e.target.value)} placeholder="Усилить контроль над..." className={inp} />
-              </div>
+
+              <div><label className={lbl}>Название рекомендации *</label>
+                <input type="text" value={form.title} onChange={e => setF('title', e.target.value)} className={inp} /></div>
               <div><label className={lbl}>Описание</label>
-                <textarea value={form.description} onChange={e => setF('description', e.target.value)} rows={3}
-                  placeholder="Подробное описание рекомендации..." className={inp + ' resize-none'} /></div>
+                <textarea value={form.description} onChange={e => setF('description', e.target.value)} rows={3} className={inp + ' resize-none'} /></div>
+
+              <div className="p-4 bg-gray-50 rounded-xl space-y-3">
+                <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide">Источник рекомендации</p>
+                <div className="grid grid-cols-2 gap-3">
+                  <div><label className={lbl}>Тип источника</label>
+                    <select value={form.source_type} onChange={e => setF('source_type', e.target.value)} className={inp}>
+                      {SOURCE_TYPES.map(s => <option key={s.value} value={s.value}>{s.label}</option>)}
+                    </select></div>
+                  <div><label className={lbl}>Название рапорта/заключения</label>
+                    <input type="text" value={form.report_name} onChange={e => setF('report_name', e.target.value)} placeholder="№ или название" className={inp} /></div>
+                  <div><label className={lbl}>Дата рапорта/заключения</label>
+                    <input type="date" value={form.report_date} onChange={e => setF('report_date', e.target.value)} className={inp} /></div>
+                </div>
+              </div>
+
+              <div className="p-4 bg-gray-50 rounded-xl space-y-3">
+                <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide">Статус принятия</p>
+                <div className="grid grid-cols-3 gap-2">
+                  {ACCEPTANCE_STATUSES.map(s => (
+                    <button key={s} onClick={() => setF('acceptance_status', s)}
+                      className={`py-2 px-3 rounded-lg text-xs font-medium border-2 transition-all ${form.acceptance_status === s
+                        ? s === 'Принята' ? 'bg-green-50 border-green-400 text-green-800'
+                          : s === 'Не принята' ? 'bg-red-50 border-red-400 text-red-800'
+                          : 'bg-gray-100 border-gray-400 text-gray-800'
+                        : 'bg-white border-gray-200 text-gray-600 hover:border-gray-300'}`}>
+                      {s}
+                    </button>
+                  ))}
+                </div>
+                {form.acceptance_status === 'Не принята' && (
+                  <div><label className={lbl}>Причина непринятия</label>
+                    <textarea value={form.acceptance_notes} onChange={e => setF('acceptance_notes', e.target.value)} rows={2} className={inp + ' resize-none'} /></div>
+                )}
+              </div>
+
               <div className="grid grid-cols-2 gap-3">
-                <div><label className={lbl}>Источник</label>
-                  <select value={form.source_type} onChange={e => setF('source_type', e.target.value)} className={inp}>
-                    {SOURCE_TYPES.map(s => <option key={s.value} value={s.value}>{s.label}</option>)}
-                  </select></div>
-                <div><label className={lbl}>Ссылка (№ инцидента / заёмщик)</label>
-                  <input type="text" value={form.source_reference} onChange={e => setF('source_reference', e.target.value)} placeholder="Инцидент №123 / ООО 'Компания'" className={inp} /></div>
                 <div><label className={lbl}>Приоритет</label>
                   <select value={form.priority} onChange={e => setF('priority', e.target.value)} className={inp}>
                     {PRIORITIES.map(p => <option key={p}>{p}</option>)}
                   </select></div>
-                <div><label className={lbl}>Статус</label>
+                <div><label className={lbl}>Статус исполнения</label>
                   <select value={form.status} onChange={e => setF('status', e.target.value)} className={inp}>
-                    {STATUSES.map(s => <option key={s}>{s}</option>)}
+                    {EXEC_STATUSES.map(s => <option key={s}>{s}</option>)}
                   </select></div>
                 <div><label className={lbl}>Ответственный</label>
                   <input type="text" value={form.responsible} onChange={e => setF('responsible', e.target.value)} placeholder="ФИО" className={inp} /></div>
                 <div><label className={lbl}>Подразделение</label>
-                  <input type="text" value={form.department} onChange={e => setF('department', e.target.value)} placeholder="Отдел/Департамент" className={inp} /></div>
+                  <input type="text" value={form.department} onChange={e => setF('department', e.target.value)} className={inp} /></div>
                 <div><label className={lbl}>Срок исполнения</label>
                   <input type="date" value={form.due_date} onChange={e => setF('due_date', e.target.value)} className={inp} /></div>
-                <div><label className={lbl}>Дата исполнения</label>
-                  <input type="date" value={form.completion_date} onChange={e => setF('completion_date', e.target.value)} className={inp} /></div>
                 <div><label className={lbl}>Создал</label>
                   <input type="text" value={form.created_by} onChange={e => setF('created_by', e.target.value)} placeholder="ФИО" className={inp} /></div>
               </div>
-              {(form.status === 'Выполнена' || form.status === 'Отменена') && (
-                <div><label className={lbl}>Примечание к исполнению</label>
-                  <textarea value={form.completion_notes} onChange={e => setF('completion_notes', e.target.value)} rows={2}
-                    placeholder="Что было сделано..." className={inp + ' resize-none'} /></div>
+
+              {(form.status === 'Выполнена') && (
+                <div className="grid grid-cols-2 gap-3">
+                  <div><label className={lbl}>Дата исполнения</label>
+                    <input type="date" value={form.completion_date} onChange={e => setF('completion_date', e.target.value)} className={inp} /></div>
+                  <div className="col-span-2"><label className={lbl}>Примечание к исполнению</label>
+                    <textarea value={form.completion_notes} onChange={e => setF('completion_notes', e.target.value)} rows={2} className={inp + ' resize-none'} /></div>
+                </div>
               )}
             </div>
             <div className="flex justify-end gap-3 p-5 border-t border-gray-100">
