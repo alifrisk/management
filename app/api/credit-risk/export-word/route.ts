@@ -114,6 +114,11 @@ export async function POST(request: Request) {
     else if (typeof c.collaterals === 'string') { try { collaterals = JSON.parse(c.collaterals) } catch { collaterals = [] } }
     const totalCollateral = collaterals.reduce((s, col) => s + (col.value || 0), 0)
 
+    // Parse guarantors
+    let guarantors: {name: string; inn: string; relation: string}[] = []
+    if (Array.isArray(c.guarantors)) guarantors = c.guarantors
+    else if (typeof c.guarantors === 'string') { try { guarantors = JSON.parse(c.guarantors) } catch { guarantors = [] } }
+
     const loanAmt = c.loan_amount || 0
     const rate = (c.interest_rate || 0) / 100 / 12
     const months = parseInt(c.loan_term_months || c.loan_term) || 12
@@ -301,7 +306,29 @@ export async function POST(request: Request) {
               ]}),
             ]
           }),
-          para('', { after: 60 }),
+          // Поручители (если есть)
+          ...(guarantors.length > 0 ? [
+            para('Поручители', { bold: true, size: 20, after: 60, color: '1B8A4C' }),
+            new Table({
+              width: { size: 9354, type: WidthType.DXA },
+              columnWidths: [500, 3000, 2200, 3654],
+              rows: [
+                new TableRow({ children: [
+                  cell('№', { green: true, bold: true, center: true }),
+                  cell('ФИО / Название', { green: true, bold: true }),
+                  cell('ИНН', { green: true, bold: true }),
+                  cell('Связь с заёмщиком', { green: true, bold: true }),
+                ]}),
+                ...guarantors.map((g, i) => new TableRow({ children: [
+                  cell(String(i+1), { center: true }),
+                  cell(g.name || '—'),
+                  cell(g.inn || '—'),
+                  cell(g.relation || '—'),
+                ]})),
+              ]
+            }),
+            para('', { after: 60 }),
+          ] : []),
 
           // ── 7. ЗАКЛЮЧЕНИЕ ──
           sectionHead('7', 'ЗАКЛЮЧЕНИЕ СЛУЖБЫ УПРАВЛЕНИЯ РИСКАМИ'),
