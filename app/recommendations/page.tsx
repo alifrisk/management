@@ -147,6 +147,19 @@ export default function RecommendationsPage() {
     }
     setSaving(true); setError(null)
     try {
+      // Upload attachment if selected
+      let attachment_url = (form as Record<string,string>).attachment_url || null
+      let attachment_name = (form as Record<string,string>).attachment_name || null
+      if (attachment) {
+        const ext = attachment.name.split('.').pop() || 'pdf'
+        const path = `rec_${Date.now()}.${ext}`
+        const { error: uploadErr } = await supabase.storage.from('vnd-documents').upload(path, attachment)
+        if (!uploadErr) {
+          attachment_url = path
+          attachment_name = attachment.name
+        }
+      }
+
       // Convert empty date strings to null
       const payload = {
         ...form,
@@ -154,6 +167,8 @@ export default function RecommendationsPage() {
         acceptance_date: form.acceptance_date || null,
         due_date: form.due_date || null,
         completion_date: form.completion_date || null,
+        attachment_url,
+        attachment_name,
         updated_at: new Date().toISOString(),
       }
       if (editingId) {
@@ -163,7 +178,7 @@ export default function RecommendationsPage() {
         const { error: e } = await supabase.from('recommendations').insert(payload)
         if (e) throw new Error(e.message)
       }
-      setShowModal(false); setForm(EMPTY_FORM); setEditingId(null); fetch_()
+      setShowModal(false); setForm(EMPTY_FORM); setAttachment(null); setEditingId(null); fetch_()
     } catch (err: unknown) {
       setError('Ошибка: ' + (err instanceof Error ? err.message : String(err)))
     } finally { setSaving(false) }
