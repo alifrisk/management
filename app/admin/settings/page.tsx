@@ -24,14 +24,7 @@ const SETTING_GROUPS = [
       { key: 'nbt_executor_phone', label: 'Контактный телефон', placeholder: '+992 XX XXX-XX-XX', type: 'text' },
     ]
   },
-  {
-    title: 'Word документы',
-    icon: <FileText className="w-5 h-5 text-purple-600" />,
-    desc: 'Данные для подписи в генерируемых документах',
-    fields: [
-      { key: 'word_signature', label: 'Подпись в документах', placeholder: 'Служба управления рисками', type: 'text' },
-    ]
-  },
+
   {
     title: 'Пороги уведомлений',
     icon: <Phone className="w-5 h-5 text-orange-600" />,
