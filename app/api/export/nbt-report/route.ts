@@ -131,7 +131,7 @@ export async function POST(request: Request) {
           makeNB([makePara('')]),
           makeNB([
             makePara('Ба Бонки миллии Тоҷикистон', { right: true, bold: true, size: 24, after: 40 }),
-            makePara('(Бахши назорати хавфҳо)', { right: true, size: 22, after: 0 }),
+            makePara('(Хадамоти идоракунии хавфҳо)', { right: true, size: 22, after: 0 }),
           ])
         ]})]
       }),
