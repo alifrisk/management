@@ -103,6 +103,8 @@ const EMPTY_FORM = {
   plans: '', actual_execution: '', control_status: '', responsible: '',
 }
 
+const MONTHS = ['Январь','Февраль','Март','Апрель','Май','Июнь','Июль','Август','Сентябрь','Октябрь','Ноябрь','Декабрь']
+
 const PAGE_SIZE = 20
 
 export default function RegistryPage() {
@@ -117,7 +119,8 @@ export default function RegistryPage() {
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [search, setSearch] = useState('')
-  const [filters, setFilters] = useState({ status: '', factor: '', system: '', department: '', risk_level: '', year: '' })
+  // ✅ Добавлен month фильтр
+  const [filters, setFilters] = useState({ status: '', factor: '', system: '', department: '', risk_level: '', year: '', month: '' })
   const [showFilters, setShowFilters] = useState(false)
   const [viewingIncident, setViewingIncident] = useState<Incident | null>(null)
   const [currentPage, setCurrentPage] = useState(1)
@@ -131,6 +134,8 @@ export default function RegistryPage() {
     if (filters.department) query = query.eq('department', filters.department)
     if (filters.risk_level) query = query.eq('risk_level', filters.risk_level)
     if (filters.year) query = query.gte('incident_date', `${filters.year}-01-01`).lte('incident_date', `${filters.year}-12-31`)
+    // ✅ Фильтр по месяцу
+    if (filters.month && filters.year) query = query.gte('incident_date', `${filters.year}-${filters.month}-01`).lte('incident_date', `${filters.year}-${filters.month}-31`)
     const { data } = await query
     setIncidents(data || [])
     setLoading(false)
@@ -252,9 +257,21 @@ export default function RegistryPage() {
   const totalPages = Math.ceil(filtered.length / PAGE_SIZE)
   const paginated = filtered.slice((currentPage - 1) * PAGE_SIZE, currentPage * PAGE_SIZE)
 
+  // ✅ Исправлена нумерация в Excel — по порядку отображения (1,2,3...)
   function exportToExcel() {
-    const headers = ['№ инцидента','Категория Ур.1','Категория Ур.2','Пример действий Ур.3','Бизнес-процесс','Фактор риска','Система','Причина','Частота','Кол-во повторений','Место происшествия','Сотрудник (чел. фактор)','Описание кейса','Обнаружил (ФИО)','Дата обнаружения','Дата инцидента','Раскрытие','Ссылка/ID транзакции','Кол-во транзакций','Сумма ущерба','Валюта','Сумма ущерба (TJS)','Сумма возврата (TJS)','Остаток (TJS)','Уровень возврата (%)','Статус инцидента','Статус работы с клиентом','Планы мероприятий','Фактическое исполнение','Ответственный','Статус контроля','Вероятность','Влияние','Контроль и регулирование','Уровень риска']
-    const rows = filtered.map(i => [i.incident_number,i.event_category_l1?.replace(/_/g,' ')||'',i.event_category_l2||'',i.event_category_l3||'',i.business_process||'',i.factor||'',i.system||'',i.cause||'',i.frequency||'',i.repeat_count||1,i.department||'',i.employee_involved||'',i.case_description||'',i.discovered_by||'',i.discovery_date||'',i.incident_date||'',i.disclosure||'',i.system_link||'',i.transaction_count||'',i.loss_amount||'',i.currency||'TJS',i.loss_amount_tjs||'',i.recovery_amount||'',i.remainder||'',i.recovery_rate?`${i.recovery_rate}%`:'',i.incident_status||'',i.client_work_status||'',i.plans||'',i.actual_execution||'',i.responsible||'',i.control_status||'',i.probability||'',i.impact||'',i.control_quality||'',i.risk_level||''])
+    const headers = ['№','№ инцидента','Категория Ур.1','Категория Ур.2','Пример действий Ур.3','Бизнес-процесс','Фактор риска','Система','Причина','Частота','Кол-во повторений','Место происшествия','Сотрудник (чел. фактор)','Описание кейса','Обнаружил (ФИО)','Дата обнаружения','Дата инцидента','Раскрытие','Ссылка/ID транзакции','Кол-во транзакций','Сумма ущерба','Валюта','Сумма ущерба (TJS)','Сумма возврата (TJS)','Остаток (TJS)','Уровень возврата (%)','Статус инцидента','Статус работы с клиентом','Планы мероприятий','Фактическое исполнение','Ответственный','Статус контроля','Вероятность','Влияние','Контроль и регулирование','Уровень риска']
+    const rows = filtered.map((i, idx) => [
+      idx + 1, // ✅ Порядковый номер по порядку отображения
+      i.incident_number,
+      i.event_category_l1?.replace(/_/g,' ')||'',i.event_category_l2||'',i.event_category_l3||'',
+      i.business_process||'',i.factor||'',i.system||'',i.cause||'',i.frequency||'',i.repeat_count||1,
+      i.department||'',i.employee_involved||'',i.case_description||'',i.discovered_by||'',
+      i.discovery_date||'',i.incident_date||'',i.disclosure||'',i.system_link||'',i.transaction_count||'',
+      i.loss_amount||'',i.currency||'TJS',i.loss_amount_tjs||'',i.recovery_amount||'',i.remainder||'',
+      i.recovery_rate?`${i.recovery_rate}%`:'',i.incident_status||'',i.client_work_status||'',
+      i.plans||'',i.actual_execution||'',i.responsible||'',i.control_status||'',
+      i.probability||'',i.impact||'',i.control_quality||'',i.risk_level||''
+    ])
     const csv = [headers,...rows].map(r=>r.map(c=>`"${String(c).replace(/"/g,'""')}"`).join(',')).join('\n')
     const blob = new Blob(['\uFEFF'+csv],{type:'text/csv;charset=utf-8;'})
     const url = URL.createObjectURL(blob)
@@ -344,7 +361,7 @@ export default function RegistryPage() {
           </button>
         </div>
         {showFilters && (
-          <div className="grid grid-cols-2 lg:grid-cols-6 gap-3 mt-3 pt-3 border-t border-gray-100">
+          <div className="grid grid-cols-2 lg:grid-cols-7 gap-3 mt-3 pt-3 border-t border-gray-100">
             <select value={filters.status} onChange={e => { setFilters(p => ({...p, status: e.target.value})); setCurrentPage(1) }} className={inputCls}>
               <option value="">Все статусы</option>
               {INCIDENT_STATUSES.map(s => <option key={s} value={s}>{s}</option>)}
@@ -361,11 +378,18 @@ export default function RegistryPage() {
               <option value="">Все риски</option>
               {['Низкий','Средний','Высокий','Экстремальные'].map(r => <option key={r} value={r}>{r}</option>)}
             </select>
-            <select value={filters.year} onChange={e => { setFilters(p => ({...p, year: e.target.value})); setCurrentPage(1) }} className={inputCls}>
+            <select value={filters.year} onChange={e => { setFilters(p => ({...p, year: e.target.value, month: ''})); setCurrentPage(1) }} className={inputCls}>
               <option value="">Все годы</option>
               {[2026,2025,2024].map(y => <option key={y} value={y}>{y}</option>)}
             </select>
-            <button onClick={() => { setFilters({status:'',factor:'',system:'',department:'',risk_level:'',year:''}); setCurrentPage(1) }}
+            {/* ✅ Новый фильтр по месяцам */}
+            <select value={filters.month} onChange={e => { setFilters(p => ({...p, month: e.target.value})); setCurrentPage(1) }} className={inputCls}>
+              <option value="">Все месяцы</option>
+              {MONTHS.map((m, i) => (
+                <option key={i} value={String(i+1).padStart(2,'0')}>{m}</option>
+              ))}
+            </select>
+            <button onClick={() => { setFilters({status:'',factor:'',system:'',department:'',risk_level:'',year:'',month:''}); setCurrentPage(1) }}
               className="flex items-center justify-center gap-1 px-3 py-2 border border-gray-200 rounded-lg text-sm text-gray-500 hover:bg-gray-50">
               <X className="w-3.5 h-3.5" /> Сбросить
             </button>
@@ -656,7 +680,7 @@ export default function RegistryPage() {
                   <div><label className={labelCls}>Дата обнаружения *</label>
                     <input type="date" value={String(formData.discovery_date)} max={new Date().toISOString().split('T')[0]} onChange={e => handleChange('discovery_date', e.target.value)} className={inputCls} /></div>
                   <div><label className={labelCls}>Фактическая дата инцидента *</label>
-                    <input type="date" value={String(formData.incident_date)} onChange={e => handleChange('incident_date', e.target.value)} className={inputCls} /></div>
+                    <input type="date" value={String(formData.incident_date)} max={String(formData.discovery_date) || new Date().toISOString().split('T')[0]} onChange={e => handleChange('incident_date', e.target.value)} className={inputCls} /></div>
                   <div className="lg:col-span-2"><label className={labelCls}>Раскрытие *</label>
                     <textarea value={String(formData.disclosure)} onChange={e => handleChange('disclosure', e.target.value)} rows={4} placeholder="Подробное описание инцидента..." className={inputCls+' resize-none'} /></div>
                   <div><label className={labelCls}>Ссылка в Mobi или ID транзакции</label>
