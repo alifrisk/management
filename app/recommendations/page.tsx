@@ -25,6 +25,8 @@ interface Recommendation {
   completion_notes: string
   created_by: string
   created_at: string
+  attachment_url: string
+  attachment_name: string
 }
 
 const SOURCE_TYPES = [
@@ -461,6 +463,20 @@ export default function RecommendationsPage() {
                     <textarea value={form.completion_notes} onChange={e => setF('completion_notes', e.target.value)} rows={2} className={inp + ' resize-none'} /></div>
                 </div>
               )}
+
+              {/* Прикрепить документ */}
+              <div className="p-4 bg-gray-50 rounded-xl space-y-2">
+                <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide">Прикрепить документ (Гузориш, Заключение, PDF)</p>
+                <input type="file" accept=".pdf,.doc,.docx"
+                  onChange={e => setAttachment(e.target.files?.[0] || null)}
+                  className="w-full text-sm text-gray-600 file:mr-3 file:py-1.5 file:px-3 file:rounded-lg file:border-0 file:bg-[#1B8A4C] file:text-white file:text-xs file:cursor-pointer" />
+                {attachment && <p className="text-xs text-green-600">✅ {attachment.name}</p>}
+                {form.attachment_name && !attachment && (
+                  <div className="flex items-center gap-2 text-xs text-gray-500">
+                    <FileText className="w-3.5 h-3.5" /> {form.attachment_name}
+                  </div>
+                )}
+              </div>
             </div>
             <div className="flex justify-end gap-3 p-5 border-t border-gray-100">
               <button onClick={() => { setShowModal(false); setForm(EMPTY_FORM); setEditingId(null) }} className="px-4 py-2 border border-gray-200 rounded-lg text-sm text-gray-600 hover:bg-gray-50">Отмена</button>
