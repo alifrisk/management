@@ -78,11 +78,21 @@ export async function POST(request: Request) {
     const makeNB = (children: InstanceType<typeof Paragraph>[]) =>
       new TableCell({ borders: noborders, children })
 
-    // Read logo
+    // Read logo - works on both local and Vercel
     let logoData: Buffer | null = null
     try {
       logoData = readFileSync(join(process.cwd(), 'public', 'nbt-header.png'))
-    } catch { /* no logo */ }
+    } catch {
+      try {
+        // Vercel fallback - fetch from public URL
+        const baseUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://alif-risk-platform.vercel.app'
+        const res = await fetch(`${baseUrl}/nbt-header.png`)
+        if (res.ok) {
+          const arrayBuffer = await res.arrayBuffer()
+          logoData = Buffer.from(arrayBuffer)
+        }
+      } catch { /* no logo */ }
+    }
 
     // ==================
     // SECTION 1: Portrait - Letter (улучшенный дизайн)
@@ -94,7 +104,7 @@ export async function POST(request: Request) {
         spacing: { after: 400, before: 0 },
         children: [new ImageRun({
           data: logoData,
-          transformation: { width: 900, height: 140 }
+          transformation: { width: 600, height: 93 }
         })]
       })] : []),
 
