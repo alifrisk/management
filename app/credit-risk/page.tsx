@@ -113,6 +113,7 @@ export default function CreditRiskPage() {
   const [showModal, setShowModal] = useState(false)
   const [form, setForm] = useState<Record<string, string>>(EMPTY)
   const [collaterals, setCollaterals] = useState<Collateral[]>([{ type: 'Недвижимость', description: '', value: 0 }])
+  const [guarantors, setGuarantors] = useState<{name: string; inn: string; relation: string}[]>([])
   const [generating, setGenerating] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [viewing, setViewing] = useState<CreditConclusion | null>(null)
@@ -232,11 +233,11 @@ export default function CreditRiskPage() {
         p2_cash_begin: n('p2_cash_begin'), p2_op_inflow: n('p2_op_inflow'), p2_op_outflow: n('p2_op_outflow'),
         p2_fin_inflow: n('p2_fin_inflow'), p2_fin_outflow: n('p2_fin_outflow'),
         p2_inv_inflow: n('p2_inv_inflow'), p2_inv_outflow: n('p2_inv_outflow'), p2_cash_end,
-        collaterals, ai_conclusion: data.conclusion,
+        collaterals, guarantors, ai_conclusion: data.conclusion,
         recommendation: data.recommendation, risk_level: data.risk_level,
       })
       if (dbErr) throw new Error(dbErr.message)
-      setShowModal(false); setForm(EMPTY); setCollaterals([{ type: 'Недвижимость', description: '', value: 0 }]); setTab(1)
+      setShowModal(false); setForm(EMPTY); setCollaterals([{ type: 'Недвижимость', description: '', value: 0 }]); setGuarantors([]); setTab(1)
       fetch_()
     } catch (err: unknown) {
       setError('Ошибка: ' + (err instanceof Error ? err.message : String(err)))
@@ -535,6 +536,36 @@ export default function CreditRiskPage() {
                   <div className="bg-gray-50 rounded-lg p-3 flex items-center justify-between">
                     <p className="text-xs text-gray-500">Общая стоимость залога</p>
                     <p className="text-base font-bold text-gray-900">{fmt(collaterals.reduce((s,c) => s+(c.value||0), 0))} TJS</p>
+                  </div>
+
+                  {/* Поручители */}
+                  <div className="pt-2 border-t border-gray-200">
+                    <div className="flex items-center justify-between mb-2">
+                      <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide">Поручители</p>
+                      <button onClick={() => setGuarantors(p => [...p, {name: '', inn: '', relation: ''}])}
+                        className="flex items-center gap-1 text-xs text-[#1B8A4C] hover:underline">
+                        <Plus className="w-3.5 h-3.5" /> Добавить поручителя
+                      </button>
+                    </div>
+                    {guarantors.length === 0 && (
+                      <p className="text-xs text-gray-400 text-center py-2">Поручители не добавлены</p>
+                    )}
+                    {guarantors.map((g, idx) => (
+                      <div key={idx} className="p-3 border border-gray-200 rounded-xl mb-2">
+                        <div className="flex items-center justify-between mb-2">
+                          <p className="text-xs font-medium text-gray-700">Поручитель №{idx + 1}</p>
+                          <button onClick={() => setGuarantors(p => p.filter((_,i) => i !== idx))} className="text-xs text-red-500 hover:text-red-700">Удалить</button>
+                        </div>
+                        <div className="grid grid-cols-1 lg:grid-cols-3 gap-3">
+                          <div><label className={lbl}>ФИО / Название</label>
+                            <input type="text" value={g.name} onChange={e => setGuarantors(p => p.map((x,i) => i===idx ? {...x, name: e.target.value} : x))} placeholder="ФИО или наименование" className={inp} /></div>
+                          <div><label className={lbl}>ИНН</label>
+                            <input type="text" value={g.inn} onChange={e => setGuarantors(p => p.map((x,i) => i===idx ? {...x, inn: e.target.value} : x))} placeholder="000000000" className={inp} /></div>
+                          <div><label className={lbl}>Связь с заёмщиком</label>
+                            <input type="text" value={g.relation} onChange={e => setGuarantors(p => p.map((x,i) => i===idx ? {...x, relation: e.target.value} : x))} placeholder="Учредитель, супруг..." className={inp} /></div>
+                        </div>
+                      </div>
+                    ))}
                   </div>
                 </div>
               )}
