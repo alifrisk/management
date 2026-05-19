@@ -2,7 +2,8 @@
 
 import { useState, useEffect, useCallback } from 'react'
 import { supabase } from '@/supabase/client'
-import { Plus, Edit2, Trash2, X, CheckCircle2, AlertCircle, ChevronDown, Eye, Download } from 'lucide-react'
+import { Plus, Edit2, Trash2, X, CheckCircle2, AlertCircle, ChevronDown, Eye, Download, ClipboardList } from 'lucide-react'
+import { useRouter } from 'next/navigation'
 
 interface RiskItem {
   id: string
@@ -116,6 +117,7 @@ export default function MappingPage() {
   const [filterLevel, setFilterLevel] = useState('')
   const [activeProcess, setActiveProcess] = useState<string | null>(null)
   const [viewingRisk, setViewingRisk] = useState<RiskItem | null>(null)
+  const router = useRouter()
 
   const fetchRisks = useCallback(async () => {
     setLoading(true)
@@ -125,6 +127,19 @@ export default function MappingPage() {
   }, [])
 
   useEffect(() => { fetchRisks() }, [fetchRisks])
+
+  function createRecommendation(risk: RiskItem) {
+    // Save risk data to sessionStorage so recommendations page can pre-fill
+    sessionStorage.setItem('new_rec_prefill', JSON.stringify({
+      title: `Снижение риска: ${risk.risk_name}`,
+      source_type: 'initiative',
+      report_name: `Карта рисков — ${risk.business_process}`,
+      priority: risk.risk_level === 'Высокий' ? 'Высокий' : risk.risk_level === 'Средний' ? 'Средний' : 'Низкий',
+      description: risk.mitigation || '',
+      responsible: risk.responsible || '',
+    }))
+    router.push('/recommendations')
+  }
 
   async function handleSave() {
     if (!formData.risk_name.trim()) { setError('Введите название риска'); return }
@@ -446,6 +461,10 @@ export default function MappingPage() {
               </div>
             </div>
             <div className="flex justify-end gap-3 p-6 border-t border-gray-100">
+              <button onClick={() => createRecommendation(viewingRisk)}
+                className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg text-sm font-medium hover:bg-blue-700">
+                <ClipboardList className="w-4 h-4" /> Создать рекомендацию
+              </button>
               <button onClick={() => { setViewingRisk(null); openEdit(viewingRisk) }}
                 className="flex items-center gap-2 px-4 py-2 bg-[#1B8A4C] text-white rounded-lg text-sm font-medium hover:bg-[#177040]">
                 <Edit2 className="w-4 h-4" /> Редактировать
