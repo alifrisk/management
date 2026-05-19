@@ -11,7 +11,7 @@ export default function IncidentFormPage() {
     business_process: '',
     factor: '',
     cause: '',
-    discovery_date: ',
+    discovery_date: '',
     incident_date: '',
     loss_amount: '',
     recovery_amount: '',
