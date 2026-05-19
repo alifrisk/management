@@ -1,12 +1,12 @@
 'use client'
 
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useRef } from 'react'
 import { supabase } from '@/supabase/client'
 import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend,
   PieChart, Pie, Cell, LineChart, Line, ComposedChart, ResponsiveContainer, LabelList
 } from 'recharts'
-import { Shield } from 'lucide-react'
+import { Shield, Download } from 'lucide-react'
 
 const COLORS = ['#1B8A4C', '#2EAD62', '#F59E0B', '#EF4444', '#8B5CF6', '#06B6D4', '#F97316', '#EC4899']
 const RISK_COLORS: Record<string, string> = {
@@ -38,8 +38,8 @@ export default function DashboardPage() {
   const [loading, setLoading] = useState(true)
   const [year, setYear] = useState(new Date().getFullYear())
   const [filterMonth, setFilterMonth] = useState('')
-
   const [prevIncidents, setPrevIncidents] = useState<{loss_amount_tjs: number; recovery_amount: number; risk_level: string; incident_status: string}[]>([])
+  const dashboardRef = useRef<HTMLDivElement>(null)
 
   const fetchData = useCallback(async () => {
     setLoading(true)
@@ -54,7 +54,6 @@ export default function DashboardPage() {
       query = query.gte('discovery_date', `${year}-${monthNum}-01`).lte('discovery_date', `${year}-${monthNum}-31`)
     }
 
-    // Fetch previous year for comparison
     const [{ data }, { data: prevData }] = await Promise.all([
       query,
       supabase.from('operational_incidents')
@@ -76,21 +75,17 @@ export default function DashboardPage() {
   const totalLoss = incidents.reduce((s, i) => s + (i.loss_amount_tjs || 0), 0)
   const totalRecovery = incidents.reduce((s, i) => s + (i.recovery_amount || 0), 0)
   const recoveryRate = totalLoss > 0 ? (totalRecovery / totalLoss * 100).toFixed(1) : '0'
-  const extreme = incidents.filter(i => i.risk_level === 'Экстремальные').length
   const open = incidents.filter(i => i.incident_status === 'Открыт').length
+  const high = incidents.filter(i => i.risk_level === 'Высокий' || i.risk_level === 'Экстремальные').length
 
-  // Previous period comparison
   const prevLoss = prevIncidents.reduce((s, i) => s + (i.loss_amount_tjs || 0), 0)
   const prevCount = prevIncidents.length
   const lossDiff = prevLoss > 0 ? ((totalLoss - prevLoss) / prevLoss * 100).toFixed(1) : null
   const countDiff = prevCount > 0 ? ((total - prevCount) / prevCount * 100).toFixed(1) : null
 
-  // Top 3 most expensive incidents (need full data - use from incidents)
   const top3 = [...incidents]
     .sort((a, b) => (b.loss_amount_tjs || 0) - (a.loss_amount_tjs || 0))
     .slice(0, 3)
-
-  // By month - if specific month selected, highlight it
 
   const monthData = MONTHS.map((month, idx) => {
     const m = incidents.filter(i => i.discovery_date && new Date(i.discovery_date).getMonth() === idx)
@@ -102,7 +97,6 @@ export default function DashboardPage() {
     }
   })
 
-  // By business process - loss + recovery
   const bpData = Object.entries(
     incidents.reduce((acc, i) => {
       if (!i.business_process) return acc
@@ -119,7 +113,6 @@ export default function DashboardPage() {
     count: v.count,
   }))
 
-  // By system - loss + recovery
   const systemData = Object.entries(
     incidents.reduce((acc, i) => {
       if (!i.system) return acc
@@ -136,48 +129,62 @@ export default function DashboardPage() {
     count: v.count,
   }))
 
-  // By factor - loss + recovery
   const factorData = ['Риск систем', 'Риск человеческого фактора', 'Риск внутренний процесс', 'Юридический риск', 'Внешний риск'].map(f => {
     const m = incidents.filter(i => i.factor === f)
     return {
-      name: f.replace('Риск ', '').replace(' фактора', '').replace(' процесс', ''),
+      name: f,
       count: m.length,
       loss: Math.round(m.reduce((s, i) => s + (i.loss_amount_tjs || 0), 0)),
       recovery: Math.round(m.reduce((s, i) => s + (i.recovery_amount || 0), 0)),
     }
   }).filter(d => d.count > 0)
 
-  // By risk level
-  const riskData = ['Низкий', 'Средний', 'Высокий', 'Экстремальные'].map(r => ({
+  const riskData = ['Низкий', 'Средний', 'Высокий'].map(r => ({
     name: r,
     count: incidents.filter(i => i.risk_level === r).length,
     loss: Math.round(incidents.filter(i => i.risk_level === r).reduce((s, i) => s + (i.loss_amount_tjs || 0), 0)),
   })).filter(d => d.count > 0)
 
-  // By status
   const statusData = ['Открыт', 'В процессе', 'Закрыт'].map(s => ({
     name: s,
     value: incidents.filter(i => i.incident_status === s).length,
   })).filter(d => d.value > 0)
 
-  // By frequency
   const frequencyData = ['Часто повторяющиеся', 'Редко повторяющиеся', 'Единичный случай'].map(f => ({
     name: f,
     value: incidents.filter(i => i.frequency === f).length,
   })).filter(d => d.value > 0)
 
-  // Client status
   const clientStatusData = ['В процессе обзвона', 'В ожидании возмещения', 'Возмещенно', 'Невозмещаемый', 'Нефинансовый инцидент', 'Процесс возмещения не начался', 'Процесс возмещения не идет'].map(s => ({
     name: s.length > 22 ? s.slice(0, 22) + '…' : s,
     count: incidents.filter(i => i.client_work_status === s).length,
   })).filter(d => d.count > 0)
 
-  // Department
   const deptData = Object.entries(
     incidents.reduce((acc, i) => { if (i.department) acc[i.department] = (acc[i.department] || 0) + 1; return acc }, {} as Record<string, number>)
   ).sort((a, b) => b[1] - a[1]).slice(0, 10).map(([name, count]) => ({
     name: name.length > 25 ? name.slice(0, 25) + '…' : name, count
   }))
+
+  // Download dashboard as HTML/print
+  async function handleDownload() {
+    try {
+      // Use browser print to PDF
+      const printStyle = document.createElement('style')
+      printStyle.innerHTML = `
+        @media print {
+          body { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+          button, select { display: none !important; }
+          .no-print { display: none !important; }
+        }
+      `
+      document.head.appendChild(printStyle)
+      window.print()
+      setTimeout(() => document.head.removeChild(printStyle), 1000)
+    } catch (e) {
+      alert('Используйте Ctrl+P для печати/сохранения в PDF')
+    }
+  }
 
   const card = "bg-white rounded-xl border border-gray-100 shadow-sm p-5"
   const title = "text-sm font-semibold text-gray-700 mb-4"
@@ -189,7 +196,7 @@ export default function DashboardPage() {
   )
 
   return (
-    <div className="max-w-7xl mx-auto space-y-5">
+    <div className="max-w-7xl mx-auto space-y-5" ref={dashboardRef}>
       {/* Header + Filters */}
       <div className="flex items-center justify-between flex-wrap gap-3">
         <div>
@@ -198,7 +205,7 @@ export default function DashboardPage() {
             Аналитика за {year}{filterMonth ? ` · ${MONTHS[parseInt(filterMonth) - 1]}` : ''}
           </p>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 no-print">
           <select value={year} onChange={e => { setYear(Number(e.target.value)); setFilterMonth('') }}
             className="px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#1B8A4C] bg-white">
             {[2026, 2025, 2024, 2023].map(y => <option key={y} value={y}>{y}</option>)}
@@ -213,10 +220,14 @@ export default function DashboardPage() {
               Сбросить
             </button>
           )}
+          <button onClick={handleDownload}
+            className="flex items-center gap-2 px-4 py-2 bg-[#1B8A4C] text-white rounded-lg text-sm font-medium hover:bg-[#177040]">
+            <Download className="w-4 h-4" /> Скачать PDF
+          </button>
         </div>
       </div>
 
-      {/* KPI Cards with comparison */}
+      {/* KPI Cards — без Экстремальных, добавлен Высокий риск */}
       <div className="grid grid-cols-2 lg:grid-cols-6 gap-3">
         <div className={card}>
           <p className="text-xs text-gray-500 mb-1">Всего инцидентов</p>
@@ -230,8 +241,8 @@ export default function DashboardPage() {
           <p className="text-2xl font-bold text-blue-600">{open}</p>
         </div>
         <div className={card}>
-          <p className="text-xs text-gray-500 mb-1">Экстремальные</p>
-          <p className="text-2xl font-bold text-red-600">{extreme}</p>
+          <p className="text-xs text-gray-500 mb-1">Высокий риск</p>
+          <p className="text-2xl font-bold text-orange-600">{high}</p>
         </div>
         <div className={card}>
           <p className="text-xs text-gray-500 mb-1">Ущерб (TJS)</p>
@@ -250,7 +261,7 @@ export default function DashboardPage() {
         </div>
       </div>
 
-      {/* Top 3 most expensive incidents */}
+      {/* Top 3 */}
       {top3.length > 0 && (
         <div className={card}>
           <p className={title}>🔴 Топ 3 крупнейших инцидента по ущербу</p>
@@ -274,7 +285,7 @@ export default function DashboardPage() {
         </div>
       )}
 
-      {/* PRIORITY 1: Ущерб и возврат по месяцам + количество */}
+      {/* Ущерб по месяцам */}
       <div className={card}>
         <p className={title}>Ущерб, возврат и количество инцидентов по месяцам</p>
         <ResponsiveContainer width="100%" height={250}>
@@ -292,7 +303,7 @@ export default function DashboardPage() {
         </ResponsiveContainer>
       </div>
 
-      {/* PRIORITY 2 & 3: Ущерб по бизнес-процессам и системам */}
+      {/* По бизнес-процессам и системам */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
         <div className={card}>
           <p className={title}>Ущерб и возврат по бизнес-процессам (TJS)</p>
@@ -324,7 +335,7 @@ export default function DashboardPage() {
         </div>
       </div>
 
-      {/* PRIORITY 4: Ущерб по факторам */}
+      {/* По факторам */}
       <div className={card}>
         <p className={title}>Ущерб и возврат по факторам риска (TJS)</p>
         <ResponsiveContainer width="100%" height={220}>
@@ -340,7 +351,7 @@ export default function DashboardPage() {
         </ResponsiveContainer>
       </div>
 
-      {/* Secondary: Risk level + Status */}
+      {/* По степени риска (без Экстремальных) + Статус */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
         <div className={card}>
           <p className={title}>По степени риска</p>
@@ -371,7 +382,7 @@ export default function DashboardPage() {
         </div>
       </div>
 
-      {/* Frequency + Client status */}
+      {/* Частота + Клиент */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
         <div className={card}>
           <p className={title}>По частоте повторений</p>
@@ -401,7 +412,7 @@ export default function DashboardPage() {
         </div>
       </div>
 
-      {/* Department */}
+      {/* Подразделения */}
       <div className={card}>
         <p className={title}>Топ подразделений по количеству инцидентов</p>
         <ResponsiveContainer width="100%" height={280}>
