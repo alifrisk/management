@@ -3,7 +3,7 @@
 import { useState, useEffect, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
 import { supabase } from '@/supabase/client'
-import { Plus, Edit2, Trash2, X, CheckCircle2, AlertCircle, Clock, Filter, Search, Eye } from 'lucide-react'
+import { Plus, Edit2, Trash2, X, CheckCircle2, AlertCircle, Clock, Filter, Search, Eye, Download, Upload, FileText } from 'lucide-react'
 
 interface Recommendation {
   id: string
@@ -96,7 +96,40 @@ export default function RecommendationsPage() {
 
   useEffect(() => { fetch_() }, [fetch_])
 
+  // Pre-fill from risk map if navigated from there
+  useEffect(() => {
+    const prefill = sessionStorage.getItem('new_rec_prefill')
+    if (prefill) {
+      try {
+        const data = JSON.parse(prefill)
+        setForm(p => ({ ...p, ...data }))
+        setShowModal(true)
+        sessionStorage.removeItem('new_rec_prefill')
+      } catch { /* ignore */ }
+    }
+  }, [])
+
   const setF = (k: string, v: string) => setForm(p => ({ ...p, [k]: v }))
+  const [attachment, setAttachment] = useState<File | null>(null)
+
+  function exportToExcel() {
+    const headers = ['№','Название','Источник','Рапорт/Заключение','Дата рапорта','Приоритет','Принятие','Ответственный','Подразделение','Срок исполнения','Статус','Дата исполнения','Примечание','Создал','Дата создания']
+    const sourceLabels: Record<string,string> = { report: 'Гузориш (рапорт)', conclusion: 'Заключение', initiative: 'Собственная инициатива' }
+    const rows = items.map((r, idx) => [
+      idx + 1, r.title, sourceLabels[r.source_type] || r.source_type,
+      r.report_name || '', r.report_date || '', r.priority,
+      r.acceptance_status, r.responsible || '', r.department || '',
+      r.due_date || '', r.status, r.completion_date || '',
+      r.completion_notes || '', r.created_by || '',
+      new Date(r.created_at).toLocaleDateString('ru-RU')
+    ])
+    const csv = [headers, ...rows].map(r => r.map(c => `"${String(c).replace(/"/g,'""')}"`).join(',')).join('\n')
+    const blob = new Blob(['\uFEFF'+csv], { type: 'text/csv;charset=utf-8;' })
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url; a.download = `Реестр_рекомендаций_${new Date().toISOString().split('T')[0]}.csv`; a.click()
+    URL.revokeObjectURL(url)
+  }
 
   async function handleSave() {
     if (!form.title.trim()) { setError('Введите название'); return }
@@ -180,10 +213,16 @@ export default function RecommendationsPage() {
           <h1 className="text-xl font-semibold text-gray-900">Реестр рекомендаций СУР</h1>
           <p className="text-sm text-gray-500 mt-0.5">Мониторинг исполнения рекомендаций по рапортам и заключениям</p>
         </div>
-        <button onClick={() => { setForm(EMPTY_FORM); setEditingId(null); setError(null); setShowModal(true) }}
-          className="flex items-center gap-2 px-4 py-2 bg-[#1B8A4C] text-white rounded-lg text-sm font-medium hover:bg-[#177040]">
-          <Plus className="w-4 h-4" /> Добавить рекомендацию
-        </button>
+        <div className="flex items-center gap-2">
+          <button onClick={exportToExcel}
+            className="flex items-center gap-2 px-3 py-2 border border-gray-200 rounded-lg text-sm text-gray-600 hover:bg-gray-50">
+            <Download className="w-4 h-4" /> Excel
+          </button>
+          <button onClick={() => { setForm(EMPTY_FORM); setEditingId(null); setError(null); setShowModal(true) }}
+            className="flex items-center gap-2 px-4 py-2 bg-[#1B8A4C] text-white rounded-lg text-sm font-medium hover:bg-[#177040]">
+            <Plus className="w-4 h-4" /> Добавить рекомендацию
+          </button>
+        </div>
       </div>
 
       {/* KPI */}
@@ -318,6 +357,15 @@ export default function RecommendationsPage() {
                             className="p-1.5 text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg">
                             <Eye className="w-3.5 h-3.5" />
                           </button>
+                          {item.attachment_name && (
+                            <button onClick={async () => {
+                              const { data } = await supabase.storage.from('vnd-documents').download(item.attachment_url)
+                              if (data) { const url = URL.createObjectURL(data); const a = document.createElement('a'); a.href=url; a.download=item.attachment_name; a.click(); URL.revokeObjectURL(url) }
+                            }} title="Скачать документ"
+                              className="p-1.5 text-gray-400 hover:text-purple-600 hover:bg-purple-50 rounded-lg">
+                              <FileText className="w-3.5 h-3.5" />
+                            </button>
+                          )}
                           <button onClick={() => openEdit(item)} title="Редактировать"
                             className="p-1.5 text-gray-400 hover:text-[#1B8A4C] hover:bg-green-50 rounded-lg">
                             <Edit2 className="w-3.5 h-3.5" />
