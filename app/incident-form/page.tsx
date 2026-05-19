@@ -11,40 +11,39 @@ export default function IncidentFormPage() {
     business_process: '',
     factor: '',
     cause: '',
-    system: '',
-    discovery_date: '',
+    discovery_date: ',
     incident_date: '',
     loss_amount: '',
     recovery_amount: '',
     disclosure: '',
     department: '',
-    submitted_by: '',
   })
   const [loading, setLoading] = useState(false)
   const [success, setSuccess] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
+  const today = new Date().toISOString().split('T')[0]
+
   function handleChange(e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) {
     const { name, value } = e.target
     setFormData(prev => {
       const updated = { ...prev, [name]: value }
-      
+
       // Дата инцидента не может быть позже даты обнаружения
       if (name === 'incident_date' && prev.discovery_date && value > prev.discovery_date) {
-        alert('Фактическая дата инцидента не может быть позже даты обнаружения!')
-        return prev
+        return prev // просто не даём выбрать — max уже стоит в input
       }
       if (name === 'discovery_date' && prev.incident_date && prev.incident_date > value) {
-        alert('Дата обнаружения не может быть раньше фактической даты инцидента!')
-        return prev
+        // Сбрасываем дату инцидента если она стала позже новой даты обнаружения
+        return { ...updated, incident_date: '' }
       }
-      
+
       // Сумма восстановления не может быть больше суммы ущерба
       if (name === 'recovery_amount' && prev.loss_amount && Number(value) > Number(prev.loss_amount)) {
         alert('Сумма восстановления не может быть больше суммы ущерба!')
         return prev
       }
-      
+
       return updated
     })
   }
@@ -61,14 +60,12 @@ export default function IncidentFormPage() {
         business_process: formData.business_process,
         factor: formData.factor,
         cause: formData.cause,
-        system: formData.system,
         discovery_date: formData.discovery_date,
         incident_date: formData.incident_date,
         loss_amount: formData.loss_amount ? parseFloat(formData.loss_amount) : null,
         recovery_amount: formData.recovery_amount ? parseFloat(formData.recovery_amount) : null,
         disclosure: formData.disclosure,
         department: formData.department,
-        submitted_by: formData.submitted_by,
         status: 'pending',
       })
 
@@ -90,14 +87,12 @@ export default function IncidentFormPage() {
             <CheckCircle2 className="w-10 h-10 text-[#1B8A4C]" />
           </div>
           <h2 className="text-2xl font-bold text-gray-900 mb-3">Анкета отправлена!</h2>
-          <p className="text-gray-500 mb-2">
-            Служба управления рисками получила вашу анкету и обработает её в ближайшее время.
-          </p>
+          <p className="text-gray-500 mb-2">Служба управления рисками получила вашу анкету и обработает её в ближайшее время.</p>
           <p className="text-sm text-gray-400 mb-8">Спасибо за своевременное уведомление!</p>
           <button
             onClick={() => {
               setSuccess(false)
-              setFormData({ discovered_by: '', business_process: '', factor: '', cause: '', system: '', discovery_date: '', incident_date: '', loss_amount: '', recovery_amount: '', disclosure: '', department: '', submitted_by: '' })
+              setFormData({ discovered_by: '', business_process: '', factor: '', cause: '', discovery_date: '', incident_date: '', loss_amount: '', recovery_amount: '', disclosure: '', department: '' })
             }}
             className="w-full py-3 bg-[#1B8A4C] text-white rounded-xl font-medium hover:bg-[#177040] transition-colors"
           >
@@ -113,7 +108,6 @@ export default function IncidentFormPage() {
 
   return (
     <div className="min-h-screen" style={{background: 'linear-gradient(135deg, #0f3d24 0%, #1a7a43 60%, #1B8A4C 100%)'}}>
-      {/* Header */}
       <div className="px-4 pt-10 pb-6 text-center">
         <div className="inline-flex items-center gap-2 bg-white/10 backdrop-blur-sm rounded-full px-4 py-1.5 mb-4">
           <FileText className="w-4 h-4 text-green-200" />
@@ -123,10 +117,9 @@ export default function IncidentFormPage() {
         <p className="text-green-200/70 text-sm">ОАО «Алиф Банк» — заполните все обязательные поля</p>
       </div>
 
-      {/* Form Card */}
       <div className="max-w-2xl mx-auto px-4 pb-10">
         <div className="bg-white rounded-3xl shadow-2xl overflow-hidden">
-          
+
           {error && (
             <div className="mx-6 mt-6 flex items-start gap-2 p-4 bg-red-50 border border-red-100 rounded-xl">
               <AlertCircle className="w-5 h-5 text-red-500 mt-0.5 flex-shrink-0" />
@@ -135,8 +128,8 @@ export default function IncidentFormPage() {
           )}
 
           <form onSubmit={handleSubmit}>
-            
-            {/* Section 1: Кто обнаружил */}
+
+            {/* Section 1 */}
             <div className="px-6 pt-6 pb-4">
               <div className="flex items-center gap-3 mb-4">
                 <div className="w-8 h-8 bg-[#1B8A4C]/10 rounded-lg flex items-center justify-center flex-shrink-0">
@@ -167,7 +160,7 @@ export default function IncidentFormPage() {
 
             <div className="h-px bg-gray-100 mx-6" />
 
-            {/* Section 2: Детали инцидента */}
+            {/* Section 2 */}
             <div className="px-6 py-4">
               <div className="flex items-center gap-3 mb-4">
                 <div className="w-8 h-8 bg-[#1B8A4C]/10 rounded-lg flex items-center justify-center flex-shrink-0">
@@ -199,17 +192,7 @@ export default function IncidentFormPage() {
                     </select>
                   </div>
                 </div>
-                <div>
-                  <label className="block text-xs font-medium text-gray-500 mb-1.5 uppercase tracking-wide">Система *</label>
-                  <div className="relative">
-                    <Monitor className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 pointer-events-none" />
-                    <select name="system" value={formData.system} onChange={handleChange} required className={selectCls + ' pl-10'}>
-                      <option value="">Выберите систему</option>
-                      {SYSTEMS.map(s => <option key={s} value={s}>{s}</option>)}
-                    </select>
-                  </div>
-                </div>
-                <div>
+<div>
                   <label className="block text-xs font-medium text-gray-500 mb-1.5 uppercase tracking-wide">Причина инцидента *</label>
                   <input name="cause" type="text" value={formData.cause} onChange={handleChange} placeholder="Кратко опишите причину" required className={inputCls} />
                 </div>
@@ -222,7 +205,7 @@ export default function IncidentFormPage() {
 
             <div className="h-px bg-gray-100 mx-6" />
 
-            {/* Section 3: Даты */}
+            {/* Section 3: Даты — ИСПРАВЛЕНО */}
             <div className="px-6 py-4">
               <div className="flex items-center gap-3 mb-4">
                 <div className="w-8 h-8 bg-[#1B8A4C]/10 rounded-lg flex items-center justify-center flex-shrink-0">
@@ -230,7 +213,7 @@ export default function IncidentFormPage() {
                 </div>
                 <div>
                   <h3 className="font-semibold text-gray-900 text-sm">Временные рамки</h3>
-                  <p className="text-xs text-gray-400">Когда произошёл и обнаружен инцидент</p>
+                  <p className="text-xs text-gray-400">Дата инцидента не может быть позже даты обнаружения</p>
                 </div>
               </div>
               <div className="grid grid-cols-2 gap-3">
@@ -238,22 +221,23 @@ export default function IncidentFormPage() {
                   <label className="block text-xs font-medium text-gray-500 mb-1.5 uppercase tracking-wide">Дата обнаружения *</label>
                   <div className="relative">
                     <Calendar className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 pointer-events-none" />
-                    <input name="discovery_date" type="date" value={formData.discovery_date} max={new Date().toISOString().split('T')[0]} onChange={handleChange} required className={inputCls + ' pl-10'} />
+                    <input name="discovery_date" type="date" value={formData.discovery_date} max={today} onChange={handleChange} required className={inputCls + ' pl-10'} />
                   </div>
                 </div>
                 <div>
                   <label className="block text-xs font-medium text-gray-500 mb-1.5 uppercase tracking-wide">Дата инцидента *</label>
                   <div className="relative">
                     <Calendar className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 pointer-events-none" />
-                    <input name="incident_date" type="date" value={formData.incident_date} onChange={handleChange} required className={inputCls + ' pl-10'} />
+                    <input name="incident_date" type="date" value={formData.incident_date} max={formData.discovery_date || today} onChange={handleChange} required className={inputCls + ' pl-10'} />
                   </div>
+
                 </div>
               </div>
             </div>
 
             <div className="h-px bg-gray-100 mx-6" />
 
-            {/* Section 4: Финансы */}
+            {/* Section 4 */}
             <div className="px-6 py-4">
               <div className="flex items-center gap-3 mb-4">
                 <div className="w-8 h-8 bg-[#1B8A4C]/10 rounded-lg flex items-center justify-center flex-shrink-0">
@@ -281,53 +265,17 @@ export default function IncidentFormPage() {
                 </div>
               </div>
             </div>
-
-            <div className="h-px bg-gray-100 mx-6" />
-
-            {/* Section 5: Контакт */}
-            <div className="px-6 py-4">
-              <div className="flex items-center gap-3 mb-4">
-                <div className="w-8 h-8 bg-[#1B8A4C]/10 rounded-lg flex items-center justify-center flex-shrink-0">
-                  <span className="text-[#1B8A4C] font-bold text-sm">5</span>
-                </div>
-                <div>
-                  <h3 className="font-semibold text-gray-900 text-sm">Ваши контакты</h3>
-                  <p className="text-xs text-gray-400">Для обратной связи</p>
-                </div>
-              </div>
-              <div>
-                <label className="block text-xs font-medium text-gray-500 mb-1.5 uppercase tracking-wide">Корпоративный email</label>
-                <div className="relative">
-                  <Mail className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 pointer-events-none" />
-                  <input name="submitted_by" type="email" value={formData.submitted_by} onChange={handleChange} placeholder="имя@alif.tj" className={inputCls + ' pl-10'} />
-                </div>
-              </div>
-            </div>
-
-            {/* Submit Button */}
             <div className="px-6 pb-6">
-              <button
-                type="submit"
-                disabled={loading}
-                className="w-full py-4 bg-[#1B8A4C] hover:bg-[#177040] disabled:opacity-70 text-white font-semibold rounded-xl transition-all flex items-center justify-center gap-2 text-base shadow-lg shadow-green-900/20"
-              >
-                {loading ? (
-                  <><Loader2 className="w-5 h-5 animate-spin" /> Отправляем анкету...</>
-                ) : (
-                  <>Отправить в СУР <ChevronRight className="w-5 h-5" /></>
-                )}
+              <button type="submit" disabled={loading}
+                className="w-full py-4 bg-[#1B8A4C] hover:bg-[#177040] disabled:opacity-70 text-white font-semibold rounded-xl transition-all flex items-center justify-center gap-2 text-base shadow-lg shadow-green-900/20">
+                {loading ? <><Loader2 className="w-5 h-5 animate-spin" /> Отправляем анкету...</> : <>Отправить в СУР <ChevronRight className="w-5 h-5" /></>}
               </button>
-              <p className="text-center text-xs text-gray-400 mt-3">
-                Поля отмеченные * обязательны для заполнения
-              </p>
+              <p className="text-center text-xs text-gray-400 mt-3">Поля отмеченные * обязательны для заполнения</p>
             </div>
 
           </form>
         </div>
-
-        <p className="text-center text-white/30 text-xs mt-4">
-          © 2026 ОАО «Алиф Банк» · Служба управления рисками · Конфиденциально
-        </p>
+        <p className="text-center text-white/30 text-xs mt-4">© 2026 ОАО «Алиф Банк» · Служба управления рисками · Конфиденциально</p>
       </div>
     </div>
   )
