@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useCallback } from 'react'
 import { supabase } from '@/supabase/client'
-import { Plus, FileText, Download, Eye, Trash2, X, Loader2, CheckCircle2, AlertCircle } from 'lucide-react'
+import { Plus, FileText, Download, Eye, Trash2, X, Loader2, CheckCircle2, AlertCircle, Filter } from 'lucide-react'
 
 interface Collateral { type: string; description: string; value: number }
 
@@ -117,13 +117,18 @@ export default function CreditRiskPage() {
   const [error, setError] = useState<string | null>(null)
   const [viewing, setViewing] = useState<CreditConclusion | null>(null)
   const [tab, setTab] = useState(1)
+  const [filterYear, setFilterYear] = useState('')
+  const [filterMonth, setFilterMonth] = useState('')
 
   const fetch_ = useCallback(async () => {
     setLoading(true)
-    const { data } = await supabase.from('credit_conclusions').select('*').order('created_at', { ascending: false })
+    let query = supabase.from('credit_conclusions').select('*').order('created_at', { ascending: false })
+    if (filterYear) query = query.gte('created_at', `${filterYear}-01-01`).lte('created_at', `${filterYear}-12-31`)
+    if (filterYear && filterMonth) query = query.gte('created_at', `${filterYear}-${filterMonth}-01`).lte('created_at', `${filterYear}-${filterMonth}-31`)
+    const { data } = await query
     setConclusions(data || [])
     setLoading(false)
-  }, [])
+  }, [filterYear, filterMonth])
 
   useEffect(() => { fetch_() }, [fetch_])
 
@@ -289,6 +294,29 @@ export default function CreditRiskPage() {
             <p className="text-xs text-gray-500 mt-0.5">{s.label}</p>
           </div>
         ))}
+      </div>
+
+
+      {/* Filters */}
+      <div className="bg-white rounded-xl border border-gray-100 p-4 shadow-sm flex items-center gap-3 flex-wrap">
+        <Filter className="w-4 h-4 text-gray-400 flex-shrink-0" />
+        <select value={filterYear} onChange={e => { setFilterYear(e.target.value); setFilterMonth('') }}
+          className="px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#1B8A4C] bg-white">
+          <option value="">Все годы</option>
+          {[2026,2025,2024].map(y => <option key={y} value={y}>{y}</option>)}
+        </select>
+        <select value={filterMonth} onChange={e => setFilterMonth(e.target.value)}
+          className="px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#1B8A4C] bg-white">
+          <option value="">Все месяцы</option>
+          {['01','02','03','04','05','06','07','08','09','10','11','12'].map((m,i) => (
+            <option key={m} value={m}>{['Январь','Февраль','Март','Апрель','Май','Июнь','Июль','Август','Сентябрь','Октябрь','Ноябрь','Декабрь'][i]}</option>
+          ))}
+        </select>
+        {(filterYear || filterMonth) && (
+          <button onClick={() => { setFilterYear(''); setFilterMonth('') }} className="text-xs text-gray-500 hover:text-gray-700 flex items-center gap-1">
+            <X className="w-3.5 h-3.5" /> Сбросить
+          </button>
+        )}
       </div>
 
       <div className="bg-white rounded-xl border border-gray-100 shadow-sm overflow-hidden">
