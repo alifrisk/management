@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useCallback } from 'react'
 import { supabase } from '@/supabase/client'
-import { Plus, Edit2, Trash2, X, CheckCircle2, AlertCircle, Filter, ChevronDown } from 'lucide-react'
+import { Plus, Edit2, Trash2, X, CheckCircle2, AlertCircle, ChevronDown, Eye, Download } from 'lucide-react'
 
 interface RiskItem {
   id: string
@@ -49,7 +49,20 @@ function getRiskColor(level: string) {
   return { bg: 'bg-green-50', border: 'border-green-200', text: 'text-green-700', badge: 'bg-green-100 text-green-800' }
 }
 
-function MatrixCell({ p, i, risks }: { p: number; i: number; risks: RiskItem[] }) {
+// ✅ Генерируем буквы для рисков в матрице
+function getRiskLetter(risk: RiskItem, allRisks: RiskItem[]): string {
+  const sorted = [...allRisks].sort((a, b) => a.created_at.localeCompare(b.created_at))
+  const idx = sorted.findIndex(r => r.id === risk.id)
+  if (idx < 0) return '?'
+  const letters = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ'
+  if (idx < 26) return letters[idx]
+  return `${letters[Math.floor(idx/26)-1]}${letters[idx%26]}`
+}
+
+function MatrixCell({ p, i, risks, allRisks, onView }: {
+  p: number; i: number; risks: RiskItem[]; allRisks: RiskItem[]
+  onView: (r: RiskItem) => void
+}) {
   const score = p * i
   const level = calcLevel(score)
   const cellRisks = risks.filter(r => {
@@ -63,11 +76,16 @@ function MatrixCell({ p, i, risks }: { p: number; i: number; risks: RiskItem[] }
     <div className={`border-2 rounded-lg p-2 min-h-[70px] ${colors.bg} ${colors.border}`}>
       <div className={`text-xs font-bold mb-1 ${colors.text}`}>{score}</div>
       {cellRisks.length > 0 ? (
-        <div className="space-y-1">
+        <div className="flex flex-wrap gap-1">
           {cellRisks.map(r => (
-            <div key={r.id} className={`text-xs px-1.5 py-0.5 rounded font-medium truncate ${colors.badge}`} title={r.risk_name}>
-              {r.risk_name.length > 20 ? r.risk_name.slice(0, 20) + '…' : r.risk_name}
-            </div>
+            <button
+              key={r.id}
+              onClick={() => onView(r)}
+              title={r.risk_name}
+              className={`text-xs px-1.5 py-0.5 rounded font-bold hover:opacity-80 transition-opacity cursor-pointer ${colors.badge}`}
+            >
+              {getRiskLetter(r, allRisks)}
+            </button>
           ))}
         </div>
       ) : (
@@ -97,13 +115,11 @@ export default function MappingPage() {
   const [filterProcess, setFilterProcess] = useState('')
   const [filterLevel, setFilterLevel] = useState('')
   const [activeProcess, setActiveProcess] = useState<string | null>(null)
+  const [viewingRisk, setViewingRisk] = useState<RiskItem | null>(null)
 
   const fetchRisks = useCallback(async () => {
     setLoading(true)
-    const { data } = await supabase
-      .from('risk_maps')
-      .select('*')
-      .order('created_at', { ascending: false })
+    const { data } = await supabase.from('risk_maps').select('*').order('created_at', { ascending: false })
     setRisks(data || [])
     setLoading(false)
   }, [])
@@ -112,26 +128,18 @@ export default function MappingPage() {
 
   async function handleSave() {
     if (!formData.risk_name.trim()) { setError('Введите название риска'); return }
-    setSaving(true)
-    setError(null)
+    setSaving(true); setError(null)
     const score = calcScore(formData.probability, formData.impact)
     const risk_level = calcLevel(score)
     const payload = { ...formData, score, risk_level }
-
     let err
     if (editingId) {
-      const { error: e } = await supabase.from('risk_maps').update(payload).eq('id', editingId)
-      err = e
+      const { error: e } = await supabase.from('risk_maps').update(payload).eq('id', editingId); err = e
     } else {
-      const { error: e } = await supabase.from('risk_maps').insert(payload)
-      err = e
+      const { error: e } = await supabase.from('risk_maps').insert(payload); err = e
     }
     if (err) { setError('Ошибка: ' + err.message); setSaving(false); return }
-    setShowModal(false)
-    setFormData(EMPTY_FORM)
-    setEditingId(null)
-    fetchRisks()
-    setSaving(false)
+    setShowModal(false); setFormData(EMPTY_FORM); setEditingId(null); fetchRisks(); setSaving(false)
   }
 
   async function handleDelete(id: string) {
@@ -142,15 +150,29 @@ export default function MappingPage() {
 
   function openEdit(risk: RiskItem) {
     setFormData({
-      business_process: risk.business_process,
-      risk_name: risk.risk_name,
-      probability: risk.probability,
-      impact: risk.impact,
-      responsible: risk.responsible || '',
-      mitigation: risk.mitigation || '',
+      business_process: risk.business_process, risk_name: risk.risk_name,
+      probability: risk.probability, impact: risk.impact,
+      responsible: risk.responsible || '', mitigation: risk.mitigation || '',
     })
-    setEditingId(risk.id)
-    setShowModal(true)
+    setEditingId(risk.id); setShowModal(true)
+  }
+
+  // ✅ Скачать матрицу как CSV
+  function handleDownload() {
+    const headers = ['Буква','Бизнес-процесс','Риск','Вероятность','Влияние','Оценка','Уровень','Ответственный','Меры митигации']
+    const rows = [...risks]
+      .sort((a, b) => a.created_at.localeCompare(b.created_at))
+      .map((r, idx) => {
+        const letters = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ'
+        const letter = idx < 26 ? letters[idx] : `${letters[Math.floor(idx/26)-1]}${letters[idx%26]}`
+        return [letter, r.business_process, r.risk_name, r.probability, r.impact, r.score, r.risk_level, r.responsible || '', r.mitigation || '']
+      })
+    const csv = [headers, ...rows].map(r => r.map(c => `"${String(c).replace(/"/g,'""')}"`).join(',')).join('\n')
+    const blob = new Blob(['\uFEFF'+csv], { type: 'text/csv;charset=utf-8;' })
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url; a.download = `Картирование_рисков_${new Date().toISOString().split('T')[0]}.csv`; a.click()
+    URL.revokeObjectURL(url)
   }
 
   const filtered = risks.filter(r => {
@@ -173,18 +195,21 @@ export default function MappingPage() {
 
   return (
     <div className="max-w-7xl mx-auto space-y-5">
-      {/* Header */}
       <div className="flex items-center justify-between flex-wrap gap-3">
         <div>
           <h1 className="text-xl font-semibold text-gray-900">Картирование операционных рисков</h1>
           <p className="text-sm text-gray-500 mt-0.5">Реестр рисков по бизнес-процессам</p>
         </div>
-        <button
-          onClick={() => { setFormData(EMPTY_FORM); setEditingId(null); setShowModal(true) }}
-          className="flex items-center gap-2 px-4 py-2 bg-[#1B8A4C] text-white rounded-lg text-sm font-medium hover:bg-[#177040]"
-        >
-          <Plus className="w-4 h-4" /> Добавить риск
-        </button>
+        <div className="flex items-center gap-2">
+          <button onClick={handleDownload}
+            className="flex items-center gap-2 px-3 py-2 border border-gray-200 rounded-lg text-sm text-gray-600 hover:bg-gray-50">
+            <Download className="w-4 h-4" /> Скачать Excel
+          </button>
+          <button onClick={() => { setFormData(EMPTY_FORM); setEditingId(null); setShowModal(true) }}
+            className="flex items-center gap-2 px-4 py-2 bg-[#1B8A4C] text-white rounded-lg text-sm font-medium hover:bg-[#177040]">
+            <Plus className="w-4 h-4" /> Добавить риск
+          </button>
+        </div>
       </div>
 
       {/* KPI */}
@@ -209,7 +234,7 @@ export default function MappingPage() {
         <div className="overflow-x-auto">
           <div className="min-w-[500px]">
             <div className="flex">
-              <div className="w-28 flex-shrink-0" />
+              <div className="w-32 flex-shrink-0" />
               <div className="flex-1 grid grid-cols-3 gap-1 mb-1">
                 {IMPACT_OPTIONS.map(i => (
                   <div key={i.value} className="text-center text-xs text-gray-500 font-medium">{i.label}</div>
@@ -218,17 +243,23 @@ export default function MappingPage() {
             </div>
             {[...PROBABILITY_OPTIONS].reverse().map(p => (
               <div key={p.value} className="flex gap-1 mb-1">
-                <div className="w-28 flex-shrink-0 flex items-center">
+                <div className="w-32 flex-shrink-0 flex items-center">
                   <span className="text-xs text-gray-500 font-medium">{p.label}</span>
                 </div>
                 <div className="flex-1 grid grid-cols-3 gap-1">
                   {IMPACT_OPTIONS.map(i => (
-                    <MatrixCell key={i.value} p={p.score} i={i.score} risks={filterProcess ? risks.filter(r => r.business_process === filterProcess) : risks} />
+                    <MatrixCell
+                      key={i.value} p={p.score} i={i.score}
+                      risks={filterProcess ? risks.filter(r => r.business_process === filterProcess) : risks}
+                      allRisks={risks}
+                      onView={setViewingRisk}
+                    />
                   ))}
                 </div>
               </div>
             ))}
-            <div className="flex gap-4 mt-3 pt-3 border-t border-gray-100">
+            {/* Легенда + расшифровка букв */}
+            <div className="flex gap-4 mt-3 pt-3 border-t border-gray-100 flex-wrap">
               <span className="text-xs text-gray-500">Легенда:</span>
               {[{ color: 'bg-green-100 border-green-200', label: 'Низкий (1-2)' }, { color: 'bg-yellow-100 border-yellow-200', label: 'Средний (3-4)' }, { color: 'bg-red-100 border-red-200', label: 'Высокий (6-9)' }].map(l => (
                 <div key={l.label} className="flex items-center gap-1.5">
@@ -236,8 +267,28 @@ export default function MappingPage() {
                   <span className="text-xs text-gray-600">{l.label}</span>
                 </div>
               ))}
-              {filterProcess && <span className="text-xs text-[#1B8A4C] font-medium">Фильтр: {filterProcess}</span>}
+              <span className="text-xs text-gray-400 ml-auto">Нажмите на букву для просмотра риска</span>
             </div>
+            {/* Расшифровка букв */}
+            {risks.length > 0 && (
+              <div className="mt-3 pt-3 border-t border-gray-100">
+                <p className="text-xs font-medium text-gray-500 mb-2">Расшифровка:</p>
+                <div className="flex flex-wrap gap-2">
+                  {[...risks].sort((a, b) => a.created_at.localeCompare(b.created_at)).map((r, idx) => {
+                    const letters = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ'
+                    const letter = idx < 26 ? letters[idx] : `${letters[Math.floor(idx/26)-1]}${letters[idx%26]}`
+                    const colors = getRiskColor(r.risk_level)
+                    return (
+                      <button key={r.id} onClick={() => setViewingRisk(r)}
+                        className={`flex items-center gap-1.5 px-2 py-1 rounded-lg text-xs border ${colors.bg} ${colors.border} hover:opacity-80`}>
+                        <span className={`font-bold ${colors.text}`}>{letter}</span>
+                        <span className="text-gray-600 max-w-[120px] truncate">{r.risk_name}</span>
+                      </button>
+                    )
+                  })}
+                </div>
+              </div>
+            )}
           </div>
         </div>
       </div>
@@ -270,11 +321,10 @@ export default function MappingPage() {
           {BUSINESS_PROCESSES.map(bp => {
             const bpRisks = grouped[bp] || []
             if (bpRisks.length === 0 && (filterProcess || filterLevel)) return null
-            const isOpen = activeProcess === bp || !filterProcess
             return (
               <div key={bp} className="bg-white rounded-xl border border-gray-100 shadow-sm overflow-hidden">
                 <button
-                  onClick={() => setActiveProcess(isOpen && activeProcess === bp ? null : bp)}
+                  onClick={() => setActiveProcess(activeProcess === bp ? null : bp)}
                   className="w-full flex items-center justify-between px-5 py-4 hover:bg-gray-50 transition-colors"
                 >
                   <div className="flex items-center gap-3">
@@ -289,7 +339,7 @@ export default function MappingPage() {
                   <ChevronDown className={`w-4 h-4 text-gray-400 transition-transform ${activeProcess === bp ? 'rotate-180' : ''}`} />
                 </button>
 
-                {(activeProcess === bp || bpRisks.length > 0) && (
+                {activeProcess === bp && (
                   <div className="border-t border-gray-100">
                     {bpRisks.length === 0 ? (
                       <p className="px-5 py-4 text-sm text-gray-400">Рисков нет — нажмите "Добавить риск"</p>
@@ -298,7 +348,7 @@ export default function MappingPage() {
                         <table className="w-full text-sm">
                           <thead>
                             <tr className="bg-gray-50">
-                              <th className="text-left px-5 py-3 text-xs font-medium text-gray-500 uppercase">№</th>
+                              <th className="text-left px-4 py-3 text-xs font-medium text-gray-500 uppercase">Код</th>
                               <th className="text-left px-4 py-3 text-xs font-medium text-gray-500 uppercase">Риск</th>
                               <th className="text-left px-4 py-3 text-xs font-medium text-gray-500 uppercase">Вероятность</th>
                               <th className="text-left px-4 py-3 text-xs font-medium text-gray-500 uppercase">Влияние</th>
@@ -309,11 +359,14 @@ export default function MappingPage() {
                             </tr>
                           </thead>
                           <tbody className="divide-y divide-gray-50">
-                            {bpRisks.map((risk, idx) => {
+                            {bpRisks.map(risk => {
                               const colors = getRiskColor(risk.risk_level)
+                              const letter = getRiskLetter(risk, risks)
                               return (
                                 <tr key={risk.id} className="hover:bg-gray-50">
-                                  <td className="px-5 py-3 text-gray-500 text-xs">{idx + 1}</td>
+                                  <td className="px-4 py-3">
+                                    <span className={`text-xs font-bold px-2 py-0.5 rounded ${colors.badge}`}>{letter}</span>
+                                  </td>
                                   <td className="px-4 py-3 max-w-xs">
                                     <p className="text-sm font-medium text-gray-900">{risk.risk_name}</p>
                                     {risk.mitigation && <p className="text-xs text-gray-500 mt-0.5 truncate">{risk.mitigation}</p>}
@@ -322,19 +375,14 @@ export default function MappingPage() {
                                   <td className="px-4 py-3 text-sm text-gray-600 whitespace-nowrap">{risk.impact}</td>
                                   <td className="px-4 py-3 font-bold text-sm text-gray-900">{risk.score}</td>
                                   <td className="px-4 py-3">
-                                    <span className={`inline-flex px-2 py-0.5 rounded-full text-xs font-medium ${colors.badge}`}>
-                                      {risk.risk_level}
-                                    </span>
+                                    <span className={`inline-flex px-2 py-0.5 rounded-full text-xs font-medium ${colors.badge}`}>{risk.risk_level}</span>
                                   </td>
                                   <td className="px-4 py-3 text-sm text-gray-600">{risk.responsible || '—'}</td>
                                   <td className="px-4 py-3">
                                     <div className="flex items-center gap-1">
-                                      <button onClick={() => openEdit(risk)} className="p-1.5 text-gray-400 hover:text-[#1B8A4C] hover:bg-green-50 rounded-lg">
-                                        <Edit2 className="w-3.5 h-3.5" />
-                                      </button>
-                                      <button onClick={() => handleDelete(risk.id)} className="p-1.5 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg">
-                                        <Trash2 className="w-3.5 h-3.5" />
-                                      </button>
+                                      <button onClick={() => setViewingRisk(risk)} className="p-1.5 text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg"><Eye className="w-3.5 h-3.5" /></button>
+                                      <button onClick={() => openEdit(risk)} className="p-1.5 text-gray-400 hover:text-[#1B8A4C] hover:bg-green-50 rounded-lg"><Edit2 className="w-3.5 h-3.5" /></button>
+                                      <button onClick={() => handleDelete(risk.id)} className="p-1.5 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg"><Trash2 className="w-3.5 h-3.5" /></button>
                                     </div>
                                   </td>
                                 </tr>
@@ -349,6 +397,62 @@ export default function MappingPage() {
               </div>
             )
           })}
+        </div>
+      )}
+
+      {/* View Risk Modal */}
+      {viewingRisk && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50">
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md">
+            <div className="flex items-center justify-between p-6 border-b border-gray-100">
+              <div className="flex items-center gap-3">
+                <span className={`text-lg font-bold px-2.5 py-0.5 rounded-lg ${getRiskColor(viewingRisk.risk_level).badge}`}>
+                  {getRiskLetter(viewingRisk, risks)}
+                </span>
+                <h2 className="text-base font-semibold text-gray-900">Карточка риска</h2>
+              </div>
+              <button onClick={() => setViewingRisk(null)}><X className="w-5 h-5 text-gray-400" /></button>
+            </div>
+            <div className="p-6 space-y-4">
+              <div>
+                <p className="text-xs text-gray-500">Название риска</p>
+                <p className="text-sm font-semibold text-gray-900 mt-0.5">{viewingRisk.risk_name}</p>
+              </div>
+              <div className="grid grid-cols-2 gap-4">
+                {[
+                  ['Бизнес-процесс', viewingRisk.business_process],
+                  ['Уровень риска', viewingRisk.risk_level],
+                  ['Вероятность', viewingRisk.probability],
+                  ['Влияние', viewingRisk.impact],
+                  ['Оценка', String(viewingRisk.score)],
+                  ['Ответственный', viewingRisk.responsible || '—'],
+                ].map(([l, v]) => (
+                  <div key={l}>
+                    <p className="text-xs text-gray-500">{l}</p>
+                    <p className="text-sm font-medium text-gray-900 mt-0.5">{v}</p>
+                  </div>
+                ))}
+              </div>
+              {viewingRisk.mitigation && (
+                <div>
+                  <p className="text-xs text-gray-500">Меры по снижению риска</p>
+                  <p className="text-sm text-gray-700 mt-0.5 bg-gray-50 rounded-lg p-3">{viewingRisk.mitigation}</p>
+                </div>
+              )}
+              <div className={`p-3 rounded-xl border-2 ${getRiskColor(viewingRisk.risk_level).bg} ${getRiskColor(viewingRisk.risk_level).border}`}>
+                <p className={`text-lg font-bold ${getRiskColor(viewingRisk.risk_level).text}`}>
+                  {viewingRisk.risk_level} риск · {viewingRisk.score} баллов
+                </p>
+              </div>
+            </div>
+            <div className="flex justify-end gap-3 p-6 border-t border-gray-100">
+              <button onClick={() => { setViewingRisk(null); openEdit(viewingRisk) }}
+                className="flex items-center gap-2 px-4 py-2 bg-[#1B8A4C] text-white rounded-lg text-sm font-medium hover:bg-[#177040]">
+                <Edit2 className="w-4 h-4" /> Редактировать
+              </button>
+              <button onClick={() => setViewingRisk(null)} className="px-4 py-2 border border-gray-200 rounded-lg text-sm text-gray-600 hover:bg-gray-50">Закрыть</button>
+            </div>
+          </div>
         </div>
       )}
 
@@ -393,7 +497,6 @@ export default function MappingPage() {
                   </select>
                 </div>
               </div>
-              {/* Preview score */}
               {formData.probability && formData.impact && (
                 <div className={`p-3 rounded-lg border-2 ${getRiskColor(calcLevel(calcScore(formData.probability, formData.impact))).bg} ${getRiskColor(calcLevel(calcScore(formData.probability, formData.impact))).border}`}>
                   <p className="text-xs text-gray-500">Оценка риска (автоматически)</p>
