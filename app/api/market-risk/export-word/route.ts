@@ -195,24 +195,10 @@ export async function POST(request: Request) {
                 const score = (a[key] as number) || 0
                 const levelText = score === 4 ? 'Отлично' : score === 3 ? 'Хорошо' : score === 2 ? 'Удовл.' : score === 1 ? 'Риск' : '—'
                 const levelColor = score >= 3 ? '1B8A4C' : score === 2 ? 'BF8F00' : score === 1 ? 'C00000' : '999999'
-                const barCells = [1,2,3,4].map(v =>
-                  new TableCell({
-                    borders,
-                    shading: { fill: v <= score ? (score >= 3 ? '1B8A4C' : score === 2 ? 'F59E0B' : 'EF4444') : 'E5E7EB', type: ShadingType.CLEAR },
-                    width: { size: 350, type: WidthType.DXA },
-                    children: [new Paragraph({ children: [] })]
-                  })
-                )
                 return new TableRow({ children: [
                   cell(label),
-                  new TableCell({
-                    borders, columnSpan: 1,
-                    margins: { top: 40, bottom: 40, left: 60, right: 60 },
-                    children: [new Paragraph({ alignment: AlignmentType.CENTER, children: [
-                      new TextRun({ text: score > 0 ? `${score}/4` : '—', size: 20, bold: true, color: levelColor, font: 'Times New Roman' })
-                    ]})]
-                  }),
-                  cell('', {}),
+                  cell(score > 0 ? `${score}/4` : '—', { center: true, bold: score > 0, color: levelColor }),
+                  cell(score > 0 ? String(score) : '—', { center: true, color: levelColor }),
                   cell(levelText, { center: true, color: levelColor, bold: score > 0 }),
                 ]})
               }),
