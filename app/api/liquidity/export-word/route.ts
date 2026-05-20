@@ -115,6 +115,148 @@ export async function POST(request: Request) {
               new TableRow({ children: [makeCell('Cash Only', { bold: true }), makeCell(fmt(t.cash_only), { center: true, bold: true }), makeCell('Буфер', { center: true })] }),
             ]
           }),
+          makePara('', { after: 80 }),
+
+          makeSection('4. ЗАКЛЮЧЕНИЕ'),
+          (() => {
+            const t1ok = t.coverage_cash_t1 >= 1
+            const t7ok = t.coverage_cash_t7 >= 1
+            const t30ok = t.coverage_cash_t30 >= 1
+
+            const surplus30 = t30ok ? Math.round((t.coverage_cash_t30 - 1) * t.need_t30) : 0
+            const deficit30 = !t30ok ? Math.round((1 - t.coverage_cash_t30) * t.need_t30) : 0
+
+            const lines: string[] = []
+
+            if (t1ok && t7ok && t30ok) {
+              lines.push(`По результатам стресс-теста банк располагает достаточным запасом ликвидности во всех трёх горизонтах планирования.`)
+              lines.push(`На горизонте T+30 профицит ликвидности составляет ${new Intl.NumberFormat('ru-RU').format(surplus30)} TJS (покрытие ${(t.coverage_cash_t30 * 100).toFixed(0)}%), что свидетельствует об устойчивой позиции даже в пессимистическом сценарии.`)
+              lines.push(`Рекомендация: поддерживать текущий уровень ликвидного буфера. Рассмотреть возможность оптимизации избыточной ликвидности путём размещения в доходные инструменты.`)
+            } else if (!t1ok) {
+              lines.push(`Стресс-тест выявил критический дефицит ликвидности уже на горизонте T+1 (1 день). Банк не в состоянии покрыть немедленный отток средств даже при наличии всех ликвидных активов.`)
+              lines.push(`Дефицит на горизонте T+30 составляет ${new Intl.NumberFormat('ru-RU').format(deficit30)} TJS. Требуются немедленные меры по восстановлению ликвидной позиции.`)
+              lines.push(`Рекомендация: незамедлительно привлечь дополнительное финансирование, сократить отток обязательств, активировать резервные кредитные линии.`)
+            } else if (!t30ok) {
+              const horizon = !t7ok ? 'T+7' : 'T+30'
+              lines.push(`На краткосрочном горизонте (T+1) позиция ликвидности удовлетворительная. Однако на горизонте ${horizon} выявлен дефицит ликвидности.`)
+              lines.push(`Дефицит на горизонте T+30 составляет ${new Intl.NumberFormat('ru-RU').format(deficit30)} TJS. Необходимо принять превентивные меры для укрепления средне- и долгосрочной позиции.`)
+              lines.push(`Рекомендация: пересмотреть структуру пассивов, увеличить долю стабильного финансирования, нарастить ликвидный буфер до достаточного уровня.`)
+            }
+
+            return new Paragraph({
+              spacing: { after: 120 },
+              alignment: AlignmentType.BOTH,
+              children: lines.map((line, i) => new TextRun({
+                text: (i > 0 ? ' ' : '') + line,
+                size: 22,
+                font: 'Times New Roman',
+                bold: i === lines.length - 1,
+              }))
+            })
+          })(),
+          makeSection('4. ЗАКЛЮЧЕНИЕ И РЕКОМЕНДАЦИИ'),
+          (() => {
+            const bGreen = { style: BorderStyle.SINGLE, size: 6, color: '1B8A4C' }
+            const overallColor = overallRisk === 'High' ? 'C00000' : overallRisk === 'Elevated' ? 'BF8F00' : '1B8A4C'
+            const overallBg = overallRisk === 'High' ? 'FFE7E7' : overallRisk === 'Elevated' ? 'FFF9E6' : 'E8F4E8'
+
+            // Build conclusion text based on results
+            const conclusions: Paragraph[] = []
+
+            // T+1 analysis
+            const t1ok = t.coverage_cash_t1 >= 1.0
+            const t7ok = t.coverage_cash_t7 >= 1.0
+            const t30ok = t.coverage_cash_t30 >= 1.0
+
+            const t1status = t1ok ? 'профицит' : 'дефицит'
+            const t7status = t7ok ? 'профицит' : 'дефицит'
+            const t30status = t30ok ? 'профицит' : 'дефицит'
+
+            const addPara = (text: string, bold = false, color = '000000') =>
+              new Paragraph({
+                alignment: AlignmentType.BOTH,
+                spacing: { after: 100, line: 276 },
+                indent: { firstLine: 360 },
+                children: [new TextRun({ text, size: 20, bold, color, font: 'Times New Roman' })]
+              })
+
+            conclusions.push(addPara(
+              `По результатам стресс-теста ликвидности в пессимистическом сценарии банк демонстрирует следующие показатели покрытия обязательств:`
+            ))
+
+            conclusions.push(addPara(
+              `T+1 (1 день): покрытие составляет ${(t.coverage_cash_t1 * 100).toFixed(1)}% — ${t1status.toUpperCase()}. ` +
+              (t1ok
+                ? `Банк располагает достаточным буфером ликвидности для покрытия однодневных обязательств.`
+                : `Потребность в ликвидности превышает имеющийся буфер на ${new Intl.NumberFormat('ru-RU').format(Math.round(t.need_t1 - t.cash_equivalents))} TJS.`),
+              false, t1ok ? '1B8A4C' : 'C00000'
+            ))
+
+            conclusions.push(addPara(
+              `T+7 (7 дней): покрытие составляет ${(t.coverage_cash_t7 * 100).toFixed(1)}% — ${t7status.toUpperCase()}. ` +
+              (t7ok
+                ? `Семидневный горизонт покрывается имеющимися ресурсами.`
+                : `Необходимо привлечение дополнительной ликвидности в размере ${new Intl.NumberFormat('ru-RU').format(Math.round(t.need_t7 - t.cash_equivalents))} TJS.`),
+              false, t7ok ? '1B8A4C' : 'C00000'
+            ))
+
+            conclusions.push(addPara(
+              `T+30 (30 дней): покрытие составляет ${(t.coverage_cash_t30 * 100).toFixed(1)}% — ${t30status.toUpperCase()}. ` +
+              (t30ok
+                ? `Банк устойчив в 30-дневном горизонте при реализации стрессового сценария.`
+                : `Существенный дефицит ликвидности в ${new Intl.NumberFormat('ru-RU').format(Math.round(t.need_t30 - t.cash_equivalents))} TJS требует незамедлительных мер.`),
+              false, t30ok ? '1B8A4C' : 'C00000'
+            ))
+
+            // Recommendations
+            conclusions.push(new Paragraph({
+              spacing: { before: 160, after: 80 },
+              border: { bottom: { style: BorderStyle.SINGLE, size: 4, color: '1B8A4C' } },
+              children: [new TextRun({ text: 'Рекомендации:', size: 22, bold: true, color: '1B8A4C', font: 'Times New Roman' })]
+            }))
+
+            if (overallRisk === 'High') {
+              conclusions.push(addPara('1. Незамедлительно активировать план действий в чрезвычайных ситуациях с ликвидностью (Liquidity Contingency Plan).', false, 'C00000'))
+              conclusions.push(addPara('2. Привлечь дополнительное финансирование через межбанковский рынок или активировать кредитные линии.'))
+              conclusions.push(addPara('3. Провести срочное совещание АЛКО для принятия оперативных мер по восстановлению ликвидности.'))
+              conclusions.push(addPara('4. Ограничить новые выдачи кредитов до стабилизации ситуации.'))
+            } else if (overallRisk === 'Elevated') {
+              conclusions.push(addPara('1. Усилить мониторинг ликвидности — перейти на ежедневную отчётность.'))
+              conclusions.push(addPara('2. Подготовить резервные источники фондирования для возможного использования.'))
+              conclusions.push(addPara('3. Провести анализ концентрации обязательств и выявить крупных вкладчиков.'))
+              conclusions.push(addPara('4. Информировать Правление банка о текущем уровне риска ликвидности.'))
+            } else {
+              conclusions.push(addPara('1. Поддерживать текущий уровень ликвидного буфера — показатели в норме.'))
+              conclusions.push(addPara('2. Продолжить плановый мониторинг ликвидности в соответствии с утверждённой политикой.'))
+              conclusions.push(addPara('3. Провести следующий стресс-тест согласно установленному графику.'))
+            }
+
+            return [
+              ...conclusions,
+              makePara('', { after: 120 }),
+              // Decision box
+              new Table({
+                width: { size: 9354, type: WidthType.DXA },
+                columnWidths: [3200, 6154],
+                rows: [
+                  new TableRow({ children: [
+                    new TableCell({
+                      borders: { top: bGreen, bottom: bGreen, left: bGreen, right: { style: BorderStyle.SINGLE, size: 4, color: 'CCCCCC' } },
+                      shading: { fill: 'E8F4E8', type: ShadingType.CLEAR },
+                      margins: { top: 140, bottom: 140, left: 180, right: 180 },
+                      children: [new Paragraph({ children: [new TextRun({ text: 'ОБЩИЙ УРОВЕНЬ РИСКА', size: 18, bold: true, color: '1B8A4C', font: 'Times New Roman' })] })]
+                    }),
+                    new TableCell({
+                      borders: { top: bGreen, bottom: bGreen, right: bGreen, left: { style: BorderStyle.SINGLE, size: 4, color: 'CCCCCC' } },
+                      shading: { fill: overallBg, type: ShadingType.CLEAR },
+                      margins: { top: 140, bottom: 140, left: 180, right: 180 },
+                      children: [new Paragraph({ alignment: AlignmentType.CENTER, children: [new TextRun({ text: riskLabel(overallRisk), size: 32, bold: true, color: overallColor, font: 'Times New Roman' })] })]
+                    }),
+                  ]}),
+                ]
+              }),
+            ]
+          })(),
           makePara('', { after: 300 }),
 
           new Table({
