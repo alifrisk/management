@@ -84,7 +84,6 @@ export async function POST(request: Request) {
     const scoreColor = a.total_score >= 50 ? '1B8A4C' : a.total_score >= 40 ? '1F5DA8' : a.total_score >= 25 ? 'BF8F00' : 'C00000'
     const bgColor = a.total_score >= 50 ? 'E8F4E8' : a.total_score >= 40 ? 'EBF3FF' : a.total_score >= 25 ? 'FFF9E6' : 'FFE7E7'
 
-    // AI conclusion paragraphs
     const conclusionParagraphs = (a.ai_conclusion || '').split('\n').filter((l: string) => l.trim()).map((line: string) => {
       const text = line.trim()
       if (/^\d+\./.test(text)) {
@@ -118,13 +117,24 @@ export async function POST(request: Request) {
       })
     })
 
+    // ✅ Build criteria rows safely
+    const criteriaRows = Object.entries(CRITERIA_LABELS).map(([key, label]) => {
+      const score = Number((a as Record<string, unknown>)[key]) || 0
+      const levelText = score === 4 ? 'Отлично' : score === 3 ? 'Хорошо' : score === 2 ? 'Удовл.' : score === 1 ? 'Риск' : '—'
+      const levelColor = score >= 3 ? '1B8A4C' : score === 2 ? 'BF8F00' : score === 1 ? 'C00000' : '999999'
+      return new TableRow({ children: [
+        cell(label),
+        cell(score > 0 ? `${score}/4` : '—', { center: true, bold: score > 0, color: levelColor }),
+        cell(score > 0 ? String(score) : '—', { center: true, color: levelColor }),
+        cell(levelText, { center: true, color: levelColor, bold: score > 0 }),
+      ]})
+    })
+
     const doc = new Document({
       numbering: { config: [{ reference: 'b', levels: [{ level: 0, format: LevelFormat.BULLET, text: '•', alignment: AlignmentType.LEFT, style: { paragraph: { indent: { left: 720, hanging: 360 } } } }] }] },
       sections: [{
         properties: { page: { size: { width: 11906, height: 16838 }, margin: { top: 1134, right: 851, bottom: 1134, left: 1701 } } },
         children: [
-
-          // ── ШАПКА ──
           para('ҶСК «Алиф Бонк»', { bold: true, size: 30, center: true, after: 40 }),
           para('Служба управления рисками', { size: 20, center: true, after: 40, color: '555555' }),
           new Table({
@@ -138,7 +148,6 @@ export async function POST(request: Request) {
           para('ЗАКЛЮЧЕНИЕ ОБ ОЦЕНКЕ НАДЁЖНОСТИ КОНТРАГЕНТА', { bold: true, size: 28, center: true, after: 40 }),
           para(`Дата составления: ${today}`, { size: 20, center: true, after: 300, color: '555555' }),
 
-          // ── 1. ОБЩИЕ СВЕДЕНИЯ ──
           sectionHead('1', 'ОБЩИЕ СВЕДЕНИЯ'),
           new Table({
             width: { size: 9354, type: WidthType.DXA },
@@ -155,7 +164,6 @@ export async function POST(request: Request) {
           }),
           para('', { after: 60 }),
 
-          // ── 2. ИТОГОВАЯ ОЦЕНКА ──
           sectionHead('2', 'ИТОГОВАЯ ОЦЕНКА'),
           new Table({
             width: { size: 9354, type: WidthType.DXA },
@@ -179,7 +187,6 @@ export async function POST(request: Request) {
           }),
           para('', { after: 60 }),
 
-          // ── 3. МАТРИЦА ОЦЕНОК ──
           sectionHead('3', 'МАТРИЦА ОЦЕНОК ПО КРИТЕРИЯМ'),
           new Table({
             width: { size: 9354, type: WidthType.DXA },
@@ -191,27 +198,15 @@ export async function POST(request: Request) {
                 cell('Из 4', { green: true, bold: true, center: true }),
                 cell('Уровень', { green: true, bold: true, center: true }),
               ]}),
-              ...Object.entries(CRITERIA_LABELS).map(([key, label]) => {
-                const score = (a[key] as number) || 0
-                const levelText = score === 4 ? 'Отлично' : score === 3 ? 'Хорошо' : score === 2 ? 'Удовл.' : score === 1 ? 'Риск' : '—'
-                const levelColor = score >= 3 ? '1B8A4C' : score === 2 ? 'BF8F00' : score === 1 ? 'C00000' : '999999'
-                return new TableRow({ children: [
-                  cell(label),
-                  cell(score > 0 ? `${score}/4` : '—', { center: true, bold: score > 0, color: levelColor }),
-                  cell(score > 0 ? String(score) : '—', { center: true, color: levelColor }),
-                  cell(levelText, { center: true, color: levelColor, bold: score > 0 }),
-                ]})
-              }),
+              ...criteriaRows,
             ]
           }),
           para('', { after: 60 }),
 
-          // ── 4. ЗАКЛЮЧЕНИЕ ──
           sectionHead('4', 'ЗАКЛЮЧЕНИЕ СЛУЖБЫ УПРАВЛЕНИЯ РИСКАМИ'),
           ...conclusionParagraphs,
           para('', { after: 120 }),
 
-          // ── РЕШЕНИЕ (выделенный блок) ──
           new Table({
             width: { size: 9354, type: WidthType.DXA },
             columnWidths: [3200, 6154],
@@ -251,7 +246,6 @@ export async function POST(request: Request) {
           }),
           para('', { after: 300 }),
 
-          // ── ПОДПИСИ ──
           new Table({
             width: { size: 9354, type: WidthType.DXA }, columnWidths: [4677, 4677],
             rows: [new TableRow({ children: [
