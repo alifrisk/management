@@ -266,7 +266,7 @@ export async function POST(request: Request) {
     return new NextResponse(new Uint8Array(buffer), {
       headers: {
         'Content-Type': 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
-        'Content-Disposition': `attachment; filename="Assessment_${(a.bank_name || '').replace(/\s+/g,'_')}.docx"`,
+        'Content-Disposition': 'attachment; filename="Assessment.docx"',
       }
     })
   } catch (error) {
