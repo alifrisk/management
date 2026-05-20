@@ -26,22 +26,12 @@ interface Assessment {
 
 const MONTHS = ['Январь','Февраль','Март','Апрель','Май','Июнь','Июль','Август','Сентябрь','Октябрь','Ноябрь','Декабрь']
 
-// ── Матрица оценок ──
 function calcScores(f: Record<string, string | number>) {
   const n = (k: string) => Number(f[k]) || 0
-
-  // CAR упрощённо = Капитал / Общие активы * 100 (Basel simplified)
   const car = n('total_assets') > 0 ? (n('total_capital') / n('total_assets') * 100) : 0
-  // ROE = Чистая прибыль / Капитал * 100
   const roe = n('equity') > 0 ? (n('net_profit') / n('equity') * 100) : 0
-  // Ликвидность = (Ден.средства + Краткосрочные ЦБ) / Краткосрочные обязательства * 100
-  // liquid_assets = Денежные средства (наличные + средства в ЦБ + краткосрочные ЦБ)
-  const lcr = n('short_term_liabilities') > 0
-    ? (n('liquid_assets') / n('short_term_liabilities') * 100)
-    : 0
-
-  // Объём активов в млн $
-  const assetsUsd = n('total_assets') / 1_000_000 // Already in USD
+  const lcr = n('short_term_liabilities') > 0 ? (n('liquid_assets') / n('short_term_liabilities') * 100) : 0
+  const assetsUsd = n('total_assets') / 1_000_000
 
   const scores = {
     score_intl_rating: calcIntlRating(String(f.intl_rating_value || '')),
@@ -84,14 +74,16 @@ function calcHistory(years: number): number {
   return 4
 }
 function calcOwnership(type: string): number {
+  if (!type) return 0
   const t = type.toLowerCase()
   if (t.includes('физ') || t.includes('unknown') || t.includes('неизвест')) return 1
   if (t.includes('юр') || t.includes('частн')) return 2
   if (t.includes('крупн') || t.includes('известн')) return 3
   if (t.includes('государ') || t.includes('международ') || t.includes('цб')) return 4
-  return 2
+  return 0 // ✅ пустое — не выбрано
 }
 function calcLicense(s: string): number {
+  if (!s) return 0 // ✅ пустое
   const t = s.toLowerCase()
   if (t.includes('отозван') || t.includes('был случ')) return 1
   if (t.includes('попытк') || t.includes('предупр')) return 2
@@ -99,22 +91,25 @@ function calcLicense(s: string): number {
   return 4
 }
 function calcRatingRevocation(s: string): number {
+  if (!s) return 0 // ✅ пустое
   const t = s.toLowerCase()
   if (t.includes('отозван')) return 1
   if (t.includes('понижен') || t.includes('снижен')) return 2
   if (t.includes('подтверждён') || t.includes('без изм')) return 3
   if (t.includes('повышен') || t.includes('улучш')) return 4
-  return 3
+  return 0
 }
 function calcSanctions(s: string): number {
+  if (!s) return 0 // ✅ пустое
   const t = s.toLowerCase()
   if (t.includes('ofac')) return 1
   if (t.includes('ес') || t.includes('ofsi')) return 2
   if (t.includes('отдельн')) return 3
   if (t.includes('нет') || t.includes('не числ')) return 4
-  return 4
+  return 0
 }
 function calcMedia(s: string): number {
+  if (!s) return 0 // ✅ пустое
   const t = s.toLowerCase()
   if (t.includes('мошенн') || t.includes('существен')) return 1
   if (t.includes('суд') || t.includes('иск') || t.includes('нарушен')) return 2
@@ -168,14 +163,15 @@ const SCORE_LABELS: Record<string, string> = {
   score_liquidity: 'Ликвидность (LCR)',
 }
 
+// ✅ Все поля качества пустые по умолчанию
 const EMPTY = {
   bank_name: '', country: '', analyst_name: '',
   intl_rating_value: '', national_rating_value: '',
   bank_history_years: '', ownership_type: '',
-  license_revocation_status: 'Не было зафиксировано',
-  rating_revocation_status: 'Подтверждён без изменений',
-  sanctions_status: 'Не числится ни в одном списке',
-  negative_media_status: 'Негативных освещений не обнаружено',
+  license_revocation_status: '',
+  rating_revocation_status: '',
+  sanctions_status: '',
+  negative_media_status: '',
   total_assets: '', liquid_assets: '', total_capital: '',
   risk_weighted_assets: '', short_term_liabilities: '',
   total_liabilities: '', net_outflow_30d: '',
@@ -198,7 +194,7 @@ export default function MarketRiskPage() {
     setLoading(true)
     let query = supabase.from('counterparty_assessments').select('*').order('created_at', { ascending: false })
     if (filterYear) query = query.gte('assessment_date', `${filterYear}-01-01`).lte('assessment_date', `${filterYear}-12-31`)
-    if (filterMonth && filterYear) query = query.gte('assessment_date', `${filterYear}-${filterMonth}-01`).lte('assessment_date', `${filterYear}-${filterMonth}-31`)
+    if (filterYear && filterMonth) query = query.gte('assessment_date', `${filterYear}-${filterMonth}-01`).lte('assessment_date', `${filterYear}-${filterMonth}-31`)
     const { data } = await query
     setAssessments(data || [])
     setLoading(false)
@@ -375,7 +371,6 @@ export default function MarketRiskPage() {
               <button onClick={() => setViewing(null)}><X className="w-5 h-5 text-gray-400" /></button>
             </div>
             <div className="flex-1 overflow-y-auto p-6 space-y-4">
-              {/* Score summary */}
               <div className={`p-4 rounded-xl flex items-center justify-between ${viewing.total_score >= 50 ? 'bg-green-50' : viewing.total_score >= 40 ? 'bg-blue-50' : viewing.total_score >= 25 ? 'bg-yellow-50' : 'bg-red-50'}`}>
                 <div>
                   <p className={`text-5xl font-bold ${scoreColor(viewing.total_score)}`}>{viewing.total_score}</p>
@@ -391,8 +386,6 @@ export default function MarketRiskPage() {
                   </div>
                 </div>
               </div>
-
-              {/* Matrix scores */}
               <div>
                 <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-3">Матрица оценок</p>
                 <div className="grid grid-cols-2 gap-2">
@@ -412,8 +405,6 @@ export default function MarketRiskPage() {
                   })}
                 </div>
               </div>
-
-              {/* AI Conclusion */}
               {viewing.ai_conclusion && (
                 <div>
                   <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">AI Заключение</p>
@@ -440,7 +431,6 @@ export default function MarketRiskPage() {
               <button onClick={() => setShowModal(false)} className="text-gray-400 hover:text-gray-600"><X className="w-5 h-5" /></button>
             </div>
 
-            {/* Tabs */}
             <div className="flex border-b border-gray-100 px-4">
               {[{n:1,t:'Общее'},{n:2,t:'Баланс'},{n:3,t:'ОПУ'},{n:4,t:'Качество'}].map(({n:tn,t}) => (
                 <button key={tn} onClick={() => setTab(tn)}
@@ -453,7 +443,7 @@ export default function MarketRiskPage() {
             <div className="flex-1 overflow-y-auto p-5">
               {error && <div className="flex items-center gap-2 p-3 bg-red-50 border border-red-100 rounded-lg mb-4"><AlertCircle className="w-4 h-4 text-red-500" /><p className="text-sm text-red-600">{error}</p></div>}
 
-              {/* Live score preview */}
+              {/* Live score */}
               <div className={`p-4 rounded-xl border-2 flex items-center justify-between mb-4 ${category.color==='green'?'bg-green-50 border-green-200':category.color==='blue'?'bg-blue-50 border-blue-200':category.color==='yellow'?'bg-yellow-50 border-yellow-200':'bg-red-50 border-red-200'}`}>
                 <div>
                   <p className="text-xs text-gray-500">Текущий балл</p>
@@ -470,7 +460,6 @@ export default function MarketRiskPage() {
                 </div>
               </div>
 
-              {/* Tab 1: General */}
               {tab === 1 && (
                 <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
                   <div><label className={lbl}>Название банка *</label><input type="text" value={form.bank_name} onChange={e => setF('bank_name', e.target.value)} placeholder="ОАО 'Банк ...'" className={inp} /></div>
@@ -482,7 +471,6 @@ export default function MarketRiskPage() {
                 </div>
               )}
 
-              {/* Tab 2: Balance */}
               {tab === 2 && (
                 <div className="space-y-4">
                   <p className="text-xs text-gray-400 bg-blue-50 border border-blue-100 rounded-lg p-2">💡 Все суммы в USD. Данные из годового/квартального отчёта банка.</p>
@@ -502,14 +490,13 @@ export default function MarketRiskPage() {
                   </div>
                   {(computed.car > 0 || computed.lcr > 0) && (
                     <div className="grid grid-cols-2 gap-3">
-                      {computed.car > 0 && <div className={`p-3 rounded-lg ${computed.car >= 15 ? 'bg-green-50' : computed.car >= 10 ? 'bg-yellow-50' : 'bg-red-50'}`}><p className="text-xs text-gray-500">CAR (достаточность капитала)</p><p className={`text-xl font-bold ${computed.car >= 15 ? 'text-green-600' : computed.car >= 10 ? 'text-yellow-600' : 'text-red-600'}`}>{computed.car}%</p><p className="text-xs text-gray-400">Норма: ≥10% (упрощённый)</p></div>}
-                      {computed.lcr > 0 && <div className={`p-3 rounded-lg ${computed.lcr >= 100 ? 'bg-green-50' : computed.lcr >= 80 ? 'bg-yellow-50' : 'bg-red-50'}`}><p className="text-xs text-gray-500">LCR (ликвидность)</p><p className={`text-xl font-bold ${computed.lcr >= 100 ? 'text-green-600' : computed.lcr >= 80 ? 'text-yellow-600' : 'text-red-600'}`}>{computed.lcr}%</p><p className="text-xs text-gray-400">Норма: ≥100%</p></div>}
+                      {computed.car > 0 && <div className={`p-3 rounded-lg ${computed.car >= 15 ? 'bg-green-50' : computed.car >= 10 ? 'bg-yellow-50' : 'bg-red-50'}`}><p className="text-xs text-gray-500">CAR</p><p className={`text-xl font-bold ${computed.car >= 15 ? 'text-green-600' : computed.car >= 10 ? 'text-yellow-600' : 'text-red-600'}`}>{computed.car}%</p></div>}
+                      {computed.lcr > 0 && <div className={`p-3 rounded-lg ${computed.lcr >= 100 ? 'bg-green-50' : computed.lcr >= 80 ? 'bg-yellow-50' : 'bg-red-50'}`}><p className="text-xs text-gray-500">LCR</p><p className={`text-xl font-bold ${computed.lcr >= 100 ? 'text-green-600' : computed.lcr >= 80 ? 'text-yellow-600' : 'text-red-600'}`}>{computed.lcr}%</p></div>}
                     </div>
                   )}
                 </div>
               )}
 
-              {/* Tab 3: OPU */}
               {tab === 3 && (
                 <div className="space-y-4">
                   <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
@@ -518,15 +505,13 @@ export default function MarketRiskPage() {
                   </div>
                   {computed.roe !== 0 && (
                     <div className={`p-3 rounded-lg ${computed.roe >= 10 ? 'bg-green-50' : computed.roe >= 5 ? 'bg-yellow-50' : 'bg-red-50'}`}>
-                      <p className="text-xs text-gray-500">ROE (рентабельность капитала)</p>
+                      <p className="text-xs text-gray-500">ROE</p>
                       <p className={`text-xl font-bold ${computed.roe >= 10 ? 'text-green-600' : computed.roe >= 5 ? 'text-yellow-600' : 'text-red-600'}`}>{computed.roe}%</p>
-                      <p className="text-xs text-gray-400">Норма: ≥10%</p>
                     </div>
                   )}
                 </div>
               )}
 
-              {/* Tab 4: Qualitative */}
               {tab === 4 && (
                 <div className="space-y-4">
                   {[
@@ -540,7 +525,7 @@ export default function MarketRiskPage() {
                       <p className="text-sm font-medium text-gray-800 mb-3">{field.label}</p>
                       <div className="grid grid-cols-2 gap-2">
                         {field.options.map((opt, i) => (
-                          <button key={i} onClick={() => setF(field.key, opt)}
+                          <button key={i} onClick={() => setF(field.key, form[field.key] === opt ? '' : opt)}
                             className={`text-left px-3 py-2 rounded-lg text-xs border-2 transition-all ${form[field.key] === opt
                               ? i === 0 ? 'bg-red-50 border-red-400 text-red-800' : i === 1 ? 'bg-yellow-50 border-yellow-400 text-yellow-800' : i === 2 ? 'bg-blue-50 border-blue-400 text-blue-800' : 'bg-green-50 border-green-400 text-green-800'
                               : 'bg-gray-50 border-gray-200 text-gray-600 hover:border-gray-300'}`}>
@@ -563,9 +548,9 @@ export default function MarketRiskPage() {
                             <span className="text-xs text-gray-600 truncate flex-1">{label}</span>
                             <div className="flex items-center gap-0.5 ml-2">
                               {[1,2,3,4].map(v => (
-                                <div key={v} className={`w-3 h-3 rounded-sm ${v <= score ? (score >= 3 ? 'bg-green-500' : score === 2 ? 'bg-yellow-500' : 'bg-red-500') : 'bg-gray-200'}`} />
+                                <div key={v} className={`w-3 h-3 rounded-sm ${v <= score ? (score >= 3 ? 'bg-green-500' : score === 2 ? 'bg-yellow-500' : score === 1 ? 'bg-red-500' : 'bg-gray-300') : 'bg-gray-200'}`} />
                               ))}
-                              <span className="text-xs font-bold ml-1 text-gray-700">{score}/4</span>
+                              <span className="text-xs font-bold ml-1 text-gray-700">{score > 0 ? `${score}/4` : '—'}</span>
                             </div>
                           </div>
                         )
