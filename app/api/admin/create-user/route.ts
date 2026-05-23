@@ -5,12 +5,16 @@ export async function POST(request: Request) {
   try {
     const { email, password, full_name, role, department, position } = await request.json()
 
-    // Use service role key - only available server-side
-    const supabaseAdmin = createClient(
-      process.env.NEXT_PUBLIC_SUPABASE_URL!,
-      process.env.SUPABASE_SERVICE_ROLE_KEY!,
-      { auth: { autoRefreshToken: false, persistSession: false } }
-    )
+    const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
+    const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY
+
+    if (!supabaseUrl || !serviceKey) {
+      return NextResponse.json({ error: 'Server configuration error' }, { status: 500 })
+    }
+
+    const supabaseAdmin = createClient(supabaseUrl, serviceKey, {
+      auth: { autoRefreshToken: false, persistSession: false }
+    })
 
     // Create auth user
     const { data: authData, error: authErr } = await supabaseAdmin.auth.admin.createUser({
@@ -20,23 +24,28 @@ export async function POST(request: Request) {
       user_metadata: { full_name },
     })
 
-    if (authErr) throw new Error(authErr.message)
+    if (authErr) {
+      return NextResponse.json({ error: authErr.message }, { status: 400 })
+    }
 
     // Create profile
     const { error: profileErr } = await supabaseAdmin.from('user_profiles').upsert({
       id: authData.user.id,
       email,
       full_name,
-      role,
+      role: role || 'observer',
       department: department || null,
       position: position || null,
       is_active: true,
     })
 
-    if (profileErr) throw new Error(profileErr.message)
+    if (profileErr) {
+      return NextResponse.json({ error: profileErr.message }, { status: 400 })
+    }
 
-    return NextResponse.json({ success: true, userId: authData.user.id })
+    return NextResponse.json({ success: true })
   } catch (error) {
-    return NextResponse.json({ error: String(error) }, { status: 400 })
+    console.error('Create user error:', error)
+    return NextResponse.json({ error: String(error) }, { status: 500 })
   }
 }
