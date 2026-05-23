@@ -36,7 +36,7 @@ interface CreditConclusion {
 const EMPTY: Record<string, string> = {
   borrower_name: '', borrower_inn: '', business_type: '', years_in_business: '',
   loan_amount: '', loan_currency: 'TJS', loan_term_months: '', interest_rate: '',
-  loan_purpose: '', credit_history: 'Положительная', analyst_name: '',
+  loan_purpose: '', credit_history: 'Положительная', analyst_name: '', sector: '',
   p1_label: '', p2_label: '',
   // Баланс
   p1_cash: '', p1_receivables: '', p1_inventory: '', p1_fixed_assets: '', p1_other_assets: '',
@@ -56,6 +56,25 @@ const EMPTY: Record<string, string> = {
 const COLLATERAL_TYPES = ['Недвижимость', 'Автотранспорт', 'Оборудование', 'Товары в обороте', 'Депозит', 'Поручительство', 'Другое']
 const CREDIT_HISTORY = ['Положительная', 'Нейтральная', 'Отрицательная', 'Отсутствует']
 const CURRENCIES = ['TJS', 'USD', 'EUR', 'RUB']
+
+const BUSINESS_SECTORS = [
+  'Торговля (розничная)',
+  'Торговля (оптовая)',
+  'Производство продуктов питания',
+  'Производство промышленное',
+  'Строительство',
+  'Сельское хозяйство',
+  'Транспорт и логистика',
+  'Услуги (бытовые)',
+  'Услуги (профессиональные)',
+  'IT и технологии',
+  'Здравоохранение',
+  'Образование',
+  'Гостиницы и рестораны',
+  'Недвижимость',
+  'Другое',
+]
+
 
 // ─── Sub-components OUTSIDE main component (prevent focus loss on re-render) ───
 
@@ -204,7 +223,7 @@ export default function CreditRiskPage() {
 
       const { error: dbErr } = await supabase.from('credit_conclusions').insert({
         borrower_name: form.borrower_name, borrower_inn: form.borrower_inn,
-        business_type: form.business_type, years_in_business: n('years_in_business'),
+        business_type: form.business_type, sector: form.sector || null, years_in_business: n('years_in_business'),
         loan_amount: n('loan_amount'), loan_currency: form.loan_currency,
         loan_term: `${form.loan_term_months} мес.`, loan_term_months: n('loan_term_months'),
         interest_rate: n('interest_rate'), loan_purpose: form.loan_purpose,
@@ -417,7 +436,13 @@ export default function CreditRiskPage() {
                 <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
                   <div><label className={lbl}>Наименование заёмщика *</label><input type="text" value={form.borrower_name} onChange={e => setF('borrower_name', e.target.value)} placeholder="ООО 'Компания'" className={inp} /></div>
                   <div><label className={lbl}>ИНН</label><input type="text" value={form.borrower_inn} onChange={e => setF('borrower_inn', e.target.value)} placeholder="000000000" className={inp} /></div>
-                  <div><label className={lbl}>Вид деятельности</label><input type="text" value={form.business_type} onChange={e => setF('business_type', e.target.value)} placeholder="Торговля, производство..." className={inp} /></div>
+                  <div><label className={lbl}>Сектор бизнеса</label>
+                    <select value={form.sector} onChange={e => setF('sector', e.target.value)} className={inp}>
+                      <option value="">Выберите сектор</option>
+                      {BUSINESS_SECTORS.map(s => <option key={s} value={s}>{s}</option>)}
+                    </select>
+                  </div>
+                  <div><label className={lbl}>Вид деятельности (детально)</label><input type="text" value={form.business_type} onChange={e => setF('business_type', e.target.value)} placeholder="Торговля стройматериалами..." className={inp} /></div>
                   <div><label className={lbl}>Лет в бизнесе</label><input type="text" inputMode="numeric" value={form.years_in_business} onChange={e => setF('years_in_business', e.target.value.replace(/\D/g,''))} className={inp} /></div>
                   <div><label className={lbl}>Сумма кредита *</label><input type="text" inputMode="numeric" value={form.loan_amount} onChange={e => setF('loan_amount', e.target.value.replace(/\D/g,''))} placeholder="0" className={inp} /></div>
                   <div><label className={lbl}>Валюта</label><select value={form.loan_currency} onChange={e => setF('loan_currency', e.target.value)} className={inp}>{CURRENCIES.map(c => <option key={c}>{c}</option>)}</select></div>
