@@ -87,18 +87,35 @@ interface FRProps {
 function FR({ label, f1, f2, bold, auto, v1, v2, formData, setF }: FRProps) {
   const fmt = (n: number) => new Intl.NumberFormat('ru-RU').format(Math.round(n || 0))
   const cls = "w-full px-2 py-2 border border-gray-200 rounded text-sm focus:outline-none focus:ring-2 focus:ring-[#1B8A4C] text-right bg-white"
+
+  // Format display: show spaces while editing
+  const fmtInput = (raw: string) => {
+    if (!raw) return ''
+    const isNeg = raw.startsWith('-')
+    const digits = raw.replace(/[^0-9]/g, '')
+    if (!digits) return isNeg ? '-' : ''
+    return (isNeg ? '-' : '') + new Intl.NumberFormat('ru-RU').format(Number(digits))
+  }
+  const parseInput = (val: string) => val.replace(/[^0-9-]/g, '')
+
   return (
     <tr className={bold ? 'bg-gray-50' : 'hover:bg-blue-50/20'}>
       <td className={`px-3 py-2 text-xs ${bold ? 'font-semibold text-gray-800' : 'text-gray-600'}`}>{label}</td>
       <td className="px-2 py-1">
         {auto
           ? <div className={`text-sm font-bold text-right pr-2 ${(v1||0) < 0 ? 'text-red-600' : bold ? 'text-[#1B8A4C]' : 'text-gray-900'}`}>{fmt(v1||0)}</div>
-          : <input type="text" inputMode="numeric" value={f1 ? formData[f1] || '' : ''} onChange={e => f1 && setF(f1, e.target.value.replace(/[^0-9.-]/g, ''))} className={cls} placeholder="0" />}
+          : <input type="text" inputMode="numeric"
+              value={f1 ? fmtInput(formData[f1] || '') : ''}
+              onChange={e => f1 && setF(f1, parseInput(e.target.value))}
+              className={cls} placeholder="0" />}
       </td>
       <td className="px-2 py-1">
         {auto
           ? <div className={`text-sm font-bold text-right pr-2 ${(v2||0) < 0 ? 'text-red-600' : bold ? 'text-[#1B8A4C]' : 'text-gray-900'}`}>{fmt(v2||0)}</div>
-          : <input type="text" inputMode="numeric" value={f2 ? formData[f2] || '' : ''} onChange={e => f2 && setF(f2, e.target.value.replace(/[^0-9.-]/g, ''))} className={cls} placeholder="0" />}
+          : <input type="text" inputMode="numeric"
+              value={f2 ? fmtInput(formData[f2] || '') : ''}
+              onChange={e => f2 && setF(f2, parseInput(e.target.value))}
+              className={cls} placeholder="0" />}
       </td>
     </tr>
   )
@@ -453,7 +470,12 @@ export default function CreditRiskPage() {
                   </div>
                   <div><label className={lbl}>Вид деятельности (детально)</label><input type="text" value={form.business_type} onChange={e => setF('business_type', e.target.value)} placeholder="Торговля стройматериалами..." className={inp} /></div>
                   <div><label className={lbl}>Лет в бизнесе</label><input type="text" inputMode="numeric" value={form.years_in_business} onChange={e => setF('years_in_business', e.target.value.replace(/\D/g,''))} className={inp} /></div>
-                  <div><label className={lbl}>Сумма кредита *</label><input type="text" inputMode="numeric" value={form.loan_amount} onChange={e => setF('loan_amount', e.target.value.replace(/\D/g,''))} placeholder="0" className={inp} /></div>
+                  <div><label className={lbl}>Сумма кредита *</label>
+                    <input type="text" inputMode="numeric"
+                      value={form.loan_amount ? new Intl.NumberFormat('ru-RU').format(Number(form.loan_amount)) : ''}
+                      onChange={e => setF('loan_amount', e.target.value.replace(/[^0-9]/g,''))}
+                      placeholder="0" className={inp} />
+                  </div>
                   <div><label className={lbl}>Валюта</label><select value={form.loan_currency} onChange={e => setF('loan_currency', e.target.value)} className={inp}>{CURRENCIES.map(c => <option key={c}>{c}</option>)}</select></div>
                   <div><label className={lbl}>Срок кредита (месяцев)</label><input type="text" inputMode="numeric" value={form.loan_term_months} onChange={e => setF('loan_term_months', e.target.value.replace(/\D/g,''))} placeholder="12" className={inp} /></div>
                   <div><label className={lbl}>Процентная ставка (% годовых)</label><input type="text" inputMode="decimal" value={form.interest_rate} onChange={e => setF('interest_rate', e.target.value.replace(/[^0-9.]/g,''))} placeholder="24" className={inp} /></div>
@@ -558,7 +580,10 @@ export default function CreditRiskPage() {
                         <div><label className={lbl}>Описание</label>
                           <input type="text" value={col.description} onChange={e => setCollaterals(p => p.map((c,i) => i===idx ? {...c,description:e.target.value} : c))} placeholder="Адрес, марка..." className={inp} /></div>
                         <div><label className={lbl}>Стоимость (TJS)</label>
-                          <input type="text" inputMode="numeric" value={col.value || ''} onChange={e => setCollaterals(p => p.map((c,i) => i===idx ? {...c,value:Number(e.target.value.replace(/\D/g,''))} : c))} placeholder="0" className={inp} /></div>
+                          <input type="text" inputMode="numeric"
+                          value={col.value ? new Intl.NumberFormat('ru-RU').format(col.value) : ''}
+                          onChange={e => setCollaterals(p => p.map((c,i) => i===idx ? {...c,value:Number(e.target.value.replace(/[^0-9]/g,''))} : c))}
+                          placeholder="0" className={inp} /></div>
                       </div>
                     </div>
                   ))}
