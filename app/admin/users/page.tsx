@@ -231,11 +231,11 @@ export default function AdminUsersPage() {
             <div className="p-5 space-y-4">
               {error && <div className="flex items-center gap-2 p-3 bg-red-50 border border-red-100 rounded-lg"><AlertCircle className="w-4 h-4 text-red-500" /><p className="text-sm text-red-600">{error}</p></div>}
               <div><label className={lbl}>Email (корп. почта) *</label>
-                <input type="email" value={form.email} onChange={e => setF('email', e.target.value)} placeholder="name@alif.tj" className={inp} /></div>
+                <input type="email" value={form.email} onChange={e => setF('email', e.target.value)} placeholder="name@alif.tj" autoComplete="off" className={inp} /></div>
               <div><label className={lbl}>ФИО *</label>
-                <input type="text" value={form.full_name} onChange={e => setF('full_name', e.target.value)} placeholder="Иванов Иван Иванович" className={inp} /></div>
+                <input type="text" value={form.full_name} onChange={e => setF('full_name', e.target.value)} placeholder="Иванов Иван Иванович" autoComplete="off" className={inp} /></div>
               <div><label className={lbl}>Временный пароль *</label>
-                <input type="password" value={form.password} onChange={e => setF('password', e.target.value)} placeholder="Минимум 6 символов" className={inp} /></div>
+                <input type="password" value={form.password} onChange={e => setF('password', e.target.value)} placeholder="Минимум 6 символов" autoComplete="new-password" className={inp} /></div>
               <div><label className={lbl}>Роль</label>
                 <div className="grid grid-cols-3 gap-2">
                   {ROLES.map(r => (
