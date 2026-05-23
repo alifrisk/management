@@ -53,7 +53,7 @@ const EMPTY: Record<string, string> = {
   p2_cash_begin: '', p2_op_inflow: '', p2_op_outflow: '', p2_fin_inflow: '', p2_fin_outflow: '', p2_inv_inflow: '', p2_inv_outflow: '',
 }
 
-const COLLATERAL_TYPES = ['Недвижимость', 'Автотранспорт', 'Оборудование', 'Товары в обороте', 'Депозит', 'Поручительство', 'Другое']
+const COLLATERAL_TYPES = ['Недвижимость', 'Автотранспорт', 'Оборудование', 'Товары в обороте', 'Депозит', 'Другое']
 const CREDIT_HISTORY = ['Положительная', 'Нейтральная', 'Отрицательная', 'Отсутствует']
 const CURRENCIES = ['TJS', 'USD', 'EUR', 'RUB']
 
@@ -274,10 +274,10 @@ export default function CreditRiskPage() {
       })
       if (dbErr) throw new Error(dbErr.message)
       // ✅ Автоматически создать запись в реестре заёмщиков
-      await supabase.from('borrowers').upsert({
-        code: form.borrower_name,
-        updated_at: new Date().toISOString(),
-      }, { onConflict: 'code', ignoreDuplicates: true })
+      const { data: existingBorrower } = await supabase.from('borrowers').select('id').eq('code', form.borrower_name).single()
+      if (!existingBorrower) {
+        await supabase.from('borrowers').insert({ code: form.borrower_name })
+      }
 
       setShowModal(false); setForm(EMPTY); setCollaterals([{ type: 'Недвижимость', description: '', value: 0 }]); setGuarantors([]); setTab(1)
       fetch_()
@@ -617,8 +617,11 @@ export default function CreditRiskPage() {
                         <div className="grid grid-cols-1 lg:grid-cols-3 gap-3">
                           <div><label className={lbl}>ФИО / Название</label>
                             <input type="text" value={g.name} onChange={e => setGuarantors(p => p.map((x,i) => i===idx ? {...x, name: e.target.value} : x))} placeholder="ФИО или наименование" className={inp} /></div>
-                          <div><label className={lbl}>ИНН</label>
-                            <input type="text" value={g.inn} onChange={e => setGuarantors(p => p.map((x,i) => i===idx ? {...x, inn: e.target.value} : x))} placeholder="000000000" className={inp} /></div>
+                          <div><label className={lbl}>Доход поручителя (TJS)</label>
+                            <input type="text" inputMode="numeric"
+                              value={g.inn ? new Intl.NumberFormat('ru-RU').format(Number(g.inn)) : ''}
+                              onChange={e => setGuarantors(p => p.map((x,i) => i===idx ? {...x, inn: e.target.value.replace(/[^0-9]/g,'')} : x))}
+                              placeholder="0" className={inp} /></div>
                           <div><label className={lbl}>Связь с заёмщиком</label>
                             <input type="text" value={g.relation} onChange={e => setGuarantors(p => p.map((x,i) => i===idx ? {...x, relation: e.target.value} : x))} placeholder="Учредитель, супруг..." className={inp} /></div>
                         </div>
