@@ -55,28 +55,20 @@ export default function AdminUsersPage() {
 
     setSaving(true); setError(null)
     try {
-      // Create user in Supabase Auth
-      const { data: authData, error: authErr } = await supabase.auth.admin.createUser({
-        email: form.email,
-        password: form.password,
-        email_confirm: true,
-        user_metadata: { full_name: form.full_name },
+      const res = await fetch('/api/admin/create-user', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          email: form.email,
+          password: form.password,
+          full_name: form.full_name,
+          role: form.role,
+          department: form.department || null,
+          position: form.position || null,
+        }),
       })
-
-      if (authErr) throw new Error(authErr.message)
-
-      // Create profile
-      const { error: profileErr } = await supabase.from('user_profiles').upsert({
-        id: authData.user.id,
-        email: form.email,
-        full_name: form.full_name,
-        role: form.role,
-        department: form.department || null,
-        position: form.position || null,
-        is_active: true,
-      })
-
-      if (profileErr) throw new Error(profileErr.message)
+      const data = await res.json()
+      if (data.error) throw new Error(data.error)
 
       setSuccess(`Пользователь ${form.full_name} успешно добавлен!`)
       setShowModal(false); setForm(EMPTY_FORM); fetch_()
