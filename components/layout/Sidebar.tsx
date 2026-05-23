@@ -6,7 +6,7 @@ import { usePathname } from 'next/navigation'
 import { supabase } from '@/supabase/client'
 import { UserProfile } from '@/types'
 import { cn } from '@/lib/utils'
-import { Shield, FileText, TrendingUp, Droplets, LayoutDashboard, ChevronDown, ChevronRight, LogOut, Settings, Users, Menu, X, ClipboardList, BarChart3, Map, FolderOpen, ClipboardCheck, BookUser } from 'lucide-react'
+import { Shield, FileText, TrendingUp, Droplets, LayoutDashboard, ChevronDown, ChevronRight, LogOut, Settings, Users, Menu, X, ClipboardList, BarChart3, Map, FolderOpen, ClipboardCheck, BookUser, Activity } from 'lucide-react'
 
 interface SidebarProps { user: UserProfile }
 
@@ -18,6 +18,7 @@ const NAV_ITEMS = [
       { title: 'Реестр инцидентов', href: '/operational-risk/registry', icon: <ClipboardList className="w-3.5 h-3.5" /> },
       { title: 'Дашборд аналитика', href: '/operational-risk/dashboard', icon: <BarChart3 className="w-3.5 h-3.5" /> },
       { title: 'Картирование рисков', href: '/operational-risk/mapping', icon: <Map className="w-3.5 h-3.5" /> },
+      { title: 'Стресс-тест', href: '/operational-risk/stress-test', icon: <Activity className="w-3.5 h-3.5" /> },
     ],
   },
   {
@@ -25,9 +26,16 @@ const NAV_ITEMS = [
     children: [
       { title: 'Заключения SME', href: '/credit-risk', icon: <FileText className="w-3.5 h-3.5" /> },
       { title: 'Реестр заёмщиков', href: '/borrowers', icon: <BookUser className="w-3.5 h-3.5" /> },
+      { title: 'Стресс-тест', href: '/credit-risk/stress-test', icon: <Activity className="w-3.5 h-3.5" /> },
     ],
   },
-  { title: 'Рыночный риск', href: '/market-risk', icon: <TrendingUp className="w-4 h-4" />, adminOnly: true, children: [{ title: 'Оценка контрагентов', href: '/market-risk', icon: <TrendingUp className="w-3.5 h-3.5" /> }] },
+  {
+    title: 'Рыночный риск', href: '/market-risk', icon: <TrendingUp className="w-4 h-4" />, adminOnly: true,
+    children: [
+      { title: 'Оценка контрагентов', href: '/market-risk', icon: <TrendingUp className="w-3.5 h-3.5" /> },
+      { title: 'Стресс-тест', href: '/market-risk/stress-test', icon: <Activity className="w-3.5 h-3.5" /> },
+    ],
+  },
   { title: 'Ликвидность', href: '/liquidity', icon: <Droplets className="w-4 h-4" />, adminOnly: true, children: [{ title: 'Стресс-тест', href: '/liquidity', icon: <BarChart3 className="w-3.5 h-3.5" /> }] },
   { title: 'ВНД СУР', href: '/vnd', icon: <FolderOpen className="w-4 h-4" />, adminOnly: false, children: [{ title: 'Документы', href: '/vnd', icon: <FolderOpen className="w-3.5 h-3.5" /> }] },
   { title: 'Реестр рекомендаций', href: '/recommendations', icon: <ClipboardCheck className="w-4 h-4" />, adminOnly: false, children: [{ title: 'Рекомендации', href: '/recommendations', icon: <ClipboardList className="w-3.5 h-3.5" /> }] },
@@ -65,8 +73,8 @@ export default function Sidebar({ user }: SidebarProps) {
     ? user.full_name.split(' ').map((n: string) => n[0]).slice(0, 2).join('')
     : user.email[0].toUpperCase()
 
-  // ✅ Исправлен roleLabel — observer показывает правильно
-  const roleLabel = user.role === 'admin' ? 'Администратор' : (user.role as string) === 'observer' ? 'Наблюдатель' : 'Риск-координатор'
+  const roleMap: Record<string, string> = { admin: 'Администратор', observer: 'Наблюдатель', coordinator: 'Риск-координатор', user: 'Пользователь' }
+  const roleLabel = roleMap[user.role] || user.role
 
   const sidebarContent = (
     <div className="flex flex-col h-full">
@@ -159,7 +167,7 @@ export default function Sidebar({ user }: SidebarProps) {
 
   return (
     <>
-      {/* ✅ Logout диалог вынесен из sidebar на уровень root — всегда по центру */}
+      {/* ✅ Logout диалог вынесен из sidebar — всегда по центру */}
       {showLogoutConfirm && (
         <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-[200] p-4">
           <div className="bg-white rounded-2xl p-6 w-72 shadow-2xl">
