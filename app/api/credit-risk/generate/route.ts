@@ -5,14 +5,14 @@ export async function POST(request: Request) {
     const { formData } = await request.json()
     const f = (v: unknown) => v ? new Intl.NumberFormat('ru-RU').format(Math.round(Number(v))) : '0'
 
+    // ✅ Безопасность: AI не видит имя и ИНН заёмщика
     const prompt = `Ты старший кредитный риск-аналитик банка Алиф Банк (Таджикистон) с 15-летним опытом.
 
 Твоя задача: дать КОНКРЕТНОЕ заключение с рекомендацией — одобрить или отклонить кредит. Ты ОБЯЗАН дать рекомендацию даже если данных мало — на основе того что есть.
 
 ═══ ДАННЫЕ ЗАЯВКИ ═══
-Заёмщик: ${formData.borrower_name}
-ИНН: ${formData.borrower_inn || 'не указан'}
-Вид бизнеса: ${formData.business_type || 'не указан'}
+Сектор бизнеса: ${formData.sector || 'не указан'}
+Вид деятельности: ${formData.business_type || 'не указан'}
 Лет в бизнесе: ${formData.years_in_business || 'не указано'}
 Кредитная история: ${formData.credit_history}
 Сумма кредита: ${f(formData.loan_amount)} ${formData.loan_currency}
@@ -22,13 +22,13 @@ export async function POST(request: Request) {
 Цель: ${formData.loan_purpose}
 
 ═══ БАЛАНС (${formData.p1_label || 'П1'} → ${formData.p2_label || 'П2'}) ═══
-Активы:      ${f(formData.p1_total_assets)} → ${f(formData.p2_total_assets)}
+Активы:        ${f(formData.p1_total_assets)} → ${f(formData.p2_total_assets)}
 Обязательства: ${f(formData.p1_total_liabilities)} → ${f(formData.p2_total_liabilities)}
-Капитал:     ${f(Number(formData.p1_equity_capital||0)+Number(formData.p1_reserves||0)+Number(formData.p1_retained_earnings||0))} → ${f(Number(formData.p2_equity_capital||0)+Number(formData.p2_reserves||0)+Number(formData.p2_retained_earnings||0))}
+Капитал:       ${f(Number(formData.p1_equity_capital||0)+Number(formData.p1_reserves||0)+Number(formData.p1_retained_earnings||0))} → ${f(Number(formData.p2_equity_capital||0)+Number(formData.p2_reserves||0)+Number(formData.p2_retained_earnings||0))}
 
 ═══ ОПУ ═══
-Выручка:       ${f(formData.p1_revenue)} → ${f(formData.p2_revenue)}
-Себестоимость: ${f(formData.p1_cogs)} → ${f(formData.p2_cogs)}
+Выручка:         ${f(formData.p1_revenue)} → ${f(formData.p2_revenue)}
+Себестоимость:   ${f(formData.p1_cogs)} → ${f(formData.p2_cogs)}
 Валовая прибыль: ${f(formData.p1_gross_profit)} → ${f(formData.p2_gross_profit)}
 Операц. прибыль: ${f(formData.p1_op_profit)} → ${f(formData.p2_op_profit)}
 Чистая прибыль:  ${f(formData.p1_net)} → ${f(formData.p2_net)}
@@ -44,14 +44,12 @@ ${(formData.collaterals||[]).map((c: {type:string;description:string;value:numbe
 Напиши краткое профессиональное заключение строго по этой структуре (не более 600 слов):
 
 1. ХАРАКТЕРИСТИКА ЗАЁМЩИКА
-2-3 предложения: бизнес, опыт, кредитная история. Общая оценка.
+2-3 предложения: сектор, опыт, кредитная история. Общая оценка.
 
 2. ФИНАНСОВЫЙ АНАЛИЗ
-Таблица коэффициентов уже будет в документе. Здесь напиши ТОЛЬКО:
 - Ключевые тренды (рост/снижение в % с оценкой)
 - Главные сильные стороны (1-2 пункта)
 - Главные слабые стороны (1-2 пункта)
-- Если данных нет — одно предложение об этом
 
 3. ОЦЕНКА РИСКОВ
 Ровно 3 риска. Каждый: название + 1 предложение обоснования + оценка (высокий/средний/низкий).
