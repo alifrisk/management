@@ -66,7 +66,7 @@ export default function Sidebar({ user }: SidebarProps) {
     : user.email[0].toUpperCase()
 
   // ✅ Исправлен roleLabel — observer показывает правильно
-  const roleLabel = user.role === 'admin' ? 'Администратор' : user.role === 'observer' ? 'Наблюдатель' : 'Риск-координатор'
+  const roleLabel = user.role === 'admin' ? 'Администратор' : (user.role as string) === 'observer' ? 'Наблюдатель' : 'Риск-координатор'
 
   const sidebarContent = (
     <div className="flex flex-col h-full">
