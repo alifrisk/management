@@ -55,7 +55,7 @@ export default function AdminUsersPage() {
 
     setSaving(true); setError(null)
     try {
-      const res = await fetch('/api/admin/create-user', {
+      const res = await fetch('/api/create-user', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
