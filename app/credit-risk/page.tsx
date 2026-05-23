@@ -256,6 +256,12 @@ export default function CreditRiskPage() {
         recommendation: data.recommendation, risk_level: data.risk_level,
       })
       if (dbErr) throw new Error(dbErr.message)
+      // ✅ Автоматически создать запись в реестре заёмщиков
+      await supabase.from('borrowers').upsert({
+        code: form.borrower_name,
+        updated_at: new Date().toISOString(),
+      }, { onConflict: 'code', ignoreDuplicates: true })
+
       setShowModal(false); setForm(EMPTY); setCollaterals([{ type: 'Недвижимость', description: '', value: 0 }]); setGuarantors([]); setTab(1)
       fetch_()
     } catch (err: unknown) {
@@ -434,8 +440,11 @@ export default function CreditRiskPage() {
               {/* Tab 1: Заёмщик */}
               {tab === 1 && (
                 <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-                  <div><label className={lbl}>Наименование заёмщика *</label><input type="text" value={form.borrower_name} onChange={e => setF('borrower_name', e.target.value)} placeholder="ООО 'Компания'" className={inp} /></div>
-                  <div><label className={lbl}>ИНН</label><input type="text" value={form.borrower_inn} onChange={e => setF('borrower_inn', e.target.value)} placeholder="000000000" className={inp} /></div>
+                  <div><label className={lbl}>Код заёмщика *</label>
+                    <input type="text" value={form.borrower_name} onChange={e => setF('borrower_name', e.target.value)} placeholder="Заёмщик-001" className={inp} />
+                    <p className="text-xs text-gray-400 mt-1">Используйте код вместо реального имени (напр. Заёмщик-001)</p>
+                  </div>
+                  <div><label className={lbl}>Кредитная история</label><select value={form.credit_history} onChange={e => setF('credit_history', e.target.value)} className={inp}>{CREDIT_HISTORY.map(c => <option key={c}>{c}</option>)}</select></div>
                   <div><label className={lbl}>Сектор бизнеса</label>
                     <select value={form.sector} onChange={e => setF('sector', e.target.value)} className={inp}>
                       <option value="">Выберите сектор</option>
@@ -454,7 +463,6 @@ export default function CreditRiskPage() {
                       <p className="text-base font-bold text-[#1B8A4C]">{new Intl.NumberFormat('ru-RU').format(monthlyPayment)} {form.loan_currency}/мес</p>
                     </div>
                   )}
-                  <div><label className={lbl}>Кредитная история</label><select value={form.credit_history} onChange={e => setF('credit_history', e.target.value)} className={inp}>{CREDIT_HISTORY.map(c => <option key={c}>{c}</option>)}</select></div>
                   <div><label className={lbl}>Аналитик</label><input type="text" value={form.analyst_name} onChange={e => setF('analyst_name', e.target.value)} placeholder="ФИО" className={inp} /></div>
                   <div><label className={lbl}>Название периода 1 (напр. 31.12.2024)</label><input type="text" value={form.p1_label} onChange={e => setF('p1_label', e.target.value)} placeholder="31.12.2024" className={inp} /></div>
                   <div><label className={lbl}>Название периода 2 (напр. 31.03.2025)</label><input type="text" value={form.p2_label} onChange={e => setF('p2_label', e.target.value)} placeholder="31.03.2025" className={inp} /></div>
