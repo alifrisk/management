@@ -1,5 +1,4 @@
 'use client'
-
 import { useState, useEffect, useCallback } from 'react'
 import { supabase } from '@/supabase/client'
 import { Plus, Download, Eye, Trash2, X, Loader2, CheckCircle2, AlertCircle, Filter } from 'lucide-react'
@@ -26,13 +25,50 @@ interface Assessment {
 
 const MONTHS = ['Январь','Февраль','Март','Апрель','Май','Июнь','Июль','Август','Сентябрь','Октябрь','Ноябрь','Декабрь']
 
+// ✅ Выпадающие списки рейтингов
+const INTL_RATINGS = [
+  '', 'Нет рейтинга',
+  'Moody\'s: Aaa', 'Moody\'s: Aa1', 'Moody\'s: Aa2', 'Moody\'s: Aa3',
+  'Moody\'s: A1', 'Moody\'s: A2', 'Moody\'s: A3',
+  'Moody\'s: Baa1', 'Moody\'s: Baa2', 'Moody\'s: Baa3',
+  'Moody\'s: Ba1', 'Moody\'s: Ba2', 'Moody\'s: Ba3',
+  'Moody\'s: B1', 'Moody\'s: B2', 'Moody\'s: B3',
+  'Fitch: AAA', 'Fitch: AA+', 'Fitch: AA', 'Fitch: AA-',
+  'Fitch: A+', 'Fitch: A', 'Fitch: A-',
+  'Fitch: BBB+', 'Fitch: BBB', 'Fitch: BBB-',
+  'Fitch: BB+', 'Fitch: BB', 'Fitch: BB-',
+  'Fitch: B+', 'Fitch: B', 'Fitch: B-',
+  'S&P: AAA', 'S&P: AA+', 'S&P: AA', 'S&P: AA-',
+  'S&P: A+', 'S&P: A', 'S&P: A-',
+  'S&P: BBB+', 'S&P: BBB', 'S&P: BBB-',
+  'S&P: BB+', 'S&P: BB', 'S&P: BB-',
+  'S&P: B+', 'S&P: B', 'S&P: B-',
+]
+
+const NATL_RATINGS = [
+  '', 'Нет рейтинга',
+  'AAA', 'AA+', 'AA', 'AA-',
+  'A+', 'A', 'A-',
+  'BBB+', 'BBB', 'BBB-',
+  'BB+', 'BB', 'BB-',
+  'B+', 'B', 'B-',
+  'CCC', 'CC', 'C', 'D',
+]
+
+// ✅ Форматирование чисел с пробелами
+const formatNum = (v: string) => {
+  const num = v.replace(/\D/g, '')
+  if (!num) return ''
+  return new Intl.NumberFormat('ru-RU').format(Number(num))
+}
+const parseNum = (v: string) => v.replace(/[^0-9-]/g, '')
+
 function calcScores(f: Record<string, string | number>) {
-  const n = (k: string) => Number(f[k]) || 0
+  const n = (k: string) => Number(String(f[k]).replace(/[^0-9.-]/g, '')) || 0
   const car = n('total_assets') > 0 ? (n('total_capital') / n('total_assets') * 100) : 0
   const roe = n('equity') > 0 ? (n('net_profit') / n('equity') * 100) : 0
   const lcr = n('short_term_liabilities') > 0 ? (n('liquid_assets') / n('short_term_liabilities') * 100) : 0
   const assetsUsd = n('total_assets') / 1_000_000
-
   const scores = {
     score_intl_rating: calcIntlRating(String(f.intl_rating_value || '')),
     score_national_rating: calcNationalRating(String(f.national_rating_value || '')),
@@ -47,7 +83,6 @@ function calcScores(f: Record<string, string | number>) {
     score_profitability: calcROE(roe),
     score_liquidity: calcLCR(lcr),
   }
-
   const total = Math.round(Object.values(scores).reduce((s, v) => s + v * 5 / 4, 0))
   return { scores, car: Math.round(car * 10) / 10, roe: Math.round(roe * 10) / 10, lcr: Math.round(lcr * 10) / 10, total }
 }
@@ -80,10 +115,10 @@ function calcOwnership(type: string): number {
   if (t.includes('юр') || t.includes('частн')) return 2
   if (t.includes('крупн') || t.includes('известн')) return 3
   if (t.includes('государ') || t.includes('международ') || t.includes('цб')) return 4
-  return 0 // ✅ пустое — не выбрано
+  return 0
 }
 function calcLicense(s: string): number {
-  if (!s) return 0 // ✅ пустое
+  if (!s) return 0
   const t = s.toLowerCase()
   if (t.includes('отозван') || t.includes('был случ')) return 1
   if (t.includes('попытк') || t.includes('предупр')) return 2
@@ -91,7 +126,7 @@ function calcLicense(s: string): number {
   return 4
 }
 function calcRatingRevocation(s: string): number {
-  if (!s) return 0 // ✅ пустое
+  if (!s) return 0
   const t = s.toLowerCase()
   if (t.includes('отозван')) return 1
   if (t.includes('понижен') || t.includes('снижен')) return 2
@@ -100,7 +135,7 @@ function calcRatingRevocation(s: string): number {
   return 0
 }
 function calcSanctions(s: string): number {
-  if (!s) return 0 // ✅ пустое
+  if (!s) return 0
   const t = s.toLowerCase()
   if (t.includes('ofac')) return 1
   if (t.includes('ес') || t.includes('ofsi')) return 2
@@ -109,7 +144,7 @@ function calcSanctions(s: string): number {
   return 0
 }
 function calcMedia(s: string): number {
-  if (!s) return 0 // ✅ пустое
+  if (!s) return 0
   const t = s.toLowerCase()
   if (t.includes('мошенн') || t.includes('существен')) return 1
   if (t.includes('суд') || t.includes('иск') || t.includes('нарушен')) return 2
@@ -140,14 +175,12 @@ function calcLCR(lcr: number): number {
   if (lcr < 100) return 3
   return 4
 }
-
 function getCategory(score: number) {
   if (score >= 50) return { label: 'Надёжность вне сомнений', limit: '$3-5 млн', color: 'green' }
   if (score >= 40) return { label: 'Надёжность выше средней', limit: '$1-3 млн', color: 'blue' }
   if (score >= 25) return { label: 'Средняя надёжность', limit: '$500K-1 млн', color: 'yellow' }
   return { label: 'Низкая надёжность', limit: 'до $500K', color: 'red' }
 }
-
 const SCORE_LABELS: Record<string, string> = {
   score_intl_rating: 'Международный рейтинг',
   score_national_rating: 'Национальный рейтинг',
@@ -162,16 +195,12 @@ const SCORE_LABELS: Record<string, string> = {
   score_profitability: 'Рентабельность (ROE)',
   score_liquidity: 'Ликвидность (LCR)',
 }
-
-// ✅ Все поля качества пустые по умолчанию
 const EMPTY = {
   bank_name: '', country: '', analyst_name: '',
   intl_rating_value: '', national_rating_value: '',
   bank_history_years: '', ownership_type: '',
-  license_revocation_status: '',
-  rating_revocation_status: '',
-  sanctions_status: '',
-  negative_media_status: '',
+  license_revocation_status: '', rating_revocation_status: '',
+  sanctions_status: '', negative_media_status: '',
   total_assets: '', liquid_assets: '', total_capital: '',
   risk_weighted_assets: '', short_term_liabilities: '',
   total_liabilities: '', net_outflow_30d: '',
@@ -203,12 +232,13 @@ export default function MarketRiskPage() {
   useEffect(() => { fetch_() }, [fetch_])
 
   const setF = (k: string, v: string) => setForm(p => ({ ...p, [k]: v }))
-  const n = (k: string) => Number(form[k]) || 0
+  const setNum = (k: string, v: string) => setForm(p => ({ ...p, [k]: formatNum(v) }))
+  const n = (k: string) => Number(String(form[k]).replace(/[^0-9.-]/g, '')) || 0
   const computed = calcScores(form)
   const category = getCategory(computed.total)
 
   async function handleGenerate() {
-    if (!form.bank_name.trim()) { setError('Введите название банка'); return }
+    if (!form.bank_name.trim()) { setError('Введите код контрагента'); return }
     setGenerating(true); setError(null)
     try {
       const payload = { ...form, ...computed.scores, car: computed.car, roe: computed.roe, lcr: computed.lcr, total: computed.total, category }
@@ -218,7 +248,6 @@ export default function MarketRiskPage() {
       })
       const data = await res.json()
       if (data.error) throw new Error(data.error)
-
       const { error: dbErr } = await supabase.from('counterparty_assessments').insert({
         bank_name: form.bank_name, country: form.country, analyst_name: form.analyst_name,
         assessment_date: new Date().toISOString().split('T')[0],
@@ -242,6 +271,13 @@ export default function MarketRiskPage() {
         recommendation: data.recommendation,
       })
       if (dbErr) throw new Error(dbErr.message)
+
+      // ✅ Авто-создание в реестре контрагентов
+      await supabase.from('counterparties').upsert({
+        code: form.bank_name,
+        updated_at: new Date().toISOString(),
+      }, { onConflict: 'code', ignoreDuplicates: true })
+
       setShowModal(false); setForm(EMPTY); setTab(1); fetch_()
     } catch (err: unknown) {
       setError('Ошибка: ' + (err instanceof Error ? err.message : String(err)))
@@ -258,7 +294,7 @@ export default function MarketRiskPage() {
       const blob = await res.blob()
       const url = URL.createObjectURL(blob)
       const link = document.createElement('a')
-      link.href = url; link.download = `Оценка_${a.bank_name}.docx`; link.click()
+      link.href = url; link.download = 'Assessment.docx'; link.click()
       URL.revokeObjectURL(url)
     } catch (e: unknown) { alert('Ошибка: ' + (e instanceof Error ? e.message : String(e))) }
   }
@@ -288,7 +324,6 @@ export default function MarketRiskPage() {
         </button>
       </div>
 
-      {/* KPI */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
         {[
           { label: 'Всего оценок', value: assessments.length, c: 'text-gray-900' },
@@ -303,7 +338,6 @@ export default function MarketRiskPage() {
         ))}
       </div>
 
-      {/* Filters */}
       <div className="bg-white rounded-xl border border-gray-100 p-4 shadow-sm flex items-center gap-3 flex-wrap">
         <Filter className="w-4 h-4 text-gray-400" />
         <select value={filterYear} onChange={e => { setFilterYear(e.target.value); setFilterMonth('') }}
@@ -323,13 +357,12 @@ export default function MarketRiskPage() {
         )}
       </div>
 
-      {/* Table */}
       <div className="bg-white rounded-xl border border-gray-100 shadow-sm overflow-hidden">
         <div className="overflow-x-auto">
           <table className="w-full text-sm">
             <thead>
               <tr className="bg-gray-50 border-b border-gray-100">
-                {['Банк','Страна','Дата','Балл','CAR','ROE','LCR','Категория','Лимит',''].map(h => (
+                {['Контрагент','Страна','Дата','Балл','CAR','ROE','LCR','Категория','Лимит',''].map(h => (
                   <th key={h} className="text-left px-4 py-3 text-xs font-medium text-gray-500 uppercase whitespace-nowrap">{h}</th>
                 ))}
               </tr>
@@ -430,7 +463,6 @@ export default function MarketRiskPage() {
               <h2 className="text-base font-semibold">Оценка надёжности банка-контрагента</h2>
               <button onClick={() => setShowModal(false)} className="text-gray-400 hover:text-gray-600"><X className="w-5 h-5" /></button>
             </div>
-
             <div className="flex border-b border-gray-100 px-4">
               {[{n:1,t:'Общее'},{n:2,t:'Баланс'},{n:3,t:'ОПУ'},{n:4,t:'Качество'}].map(({n:tn,t}) => (
                 <button key={tn} onClick={() => setTab(tn)}
@@ -439,11 +471,8 @@ export default function MarketRiskPage() {
                 </button>
               ))}
             </div>
-
             <div className="flex-1 overflow-y-auto p-5">
               {error && <div className="flex items-center gap-2 p-3 bg-red-50 border border-red-100 rounded-lg mb-4"><AlertCircle className="w-4 h-4 text-red-500" /><p className="text-sm text-red-600">{error}</p></div>}
-
-              {/* Live score */}
               <div className={`p-4 rounded-xl border-2 flex items-center justify-between mb-4 ${category.color==='green'?'bg-green-50 border-green-200':category.color==='blue'?'bg-blue-50 border-blue-200':category.color==='yellow'?'bg-yellow-50 border-yellow-200':'bg-red-50 border-red-200'}`}>
                 <div>
                   <p className="text-xs text-gray-500">Текущий балл</p>
@@ -462,12 +491,26 @@ export default function MarketRiskPage() {
 
               {tab === 1 && (
                 <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-                  <div><label className={lbl}>Название банка *</label><input type="text" value={form.bank_name} onChange={e => setF('bank_name', e.target.value)} placeholder="ОАО 'Банк ...'" className={inp} /></div>
+                  <div>
+                    <label className={lbl}>Код контрагента *</label>
+                    <input type="text" value={form.bank_name} onChange={e => setF('bank_name', e.target.value)} placeholder="Контрагент-001" className={inp} />
+                    <p className="text-xs text-gray-400 mt-1">Используйте код вместо реального названия</p>
+                  </div>
                   <div><label className={lbl}>Страна</label><input type="text" value={form.country} onChange={e => setF('country', e.target.value)} placeholder="Таджикистан" className={inp} /></div>
                   <div><label className={lbl}>Аналитик</label><input type="text" value={form.analyst_name} onChange={e => setF('analyst_name', e.target.value)} placeholder="ФИО" className={inp} /></div>
                   <div><label className={lbl}>Стаж на рынке (лет)</label><input type="text" inputMode="numeric" value={form.bank_history_years} onChange={e => setF('bank_history_years', e.target.value.replace(/\D/g,''))} placeholder="15" className={inp} /></div>
-                  <div><label className={lbl}>Международный рейтинг</label><input type="text" value={form.intl_rating_value} onChange={e => setF('intl_rating_value', e.target.value)} placeholder="Moody's Ba1 / Fitch BB+ / na" className={inp} /></div>
-                  <div><label className={lbl}>Национальный рейтинг</label><input type="text" value={form.national_rating_value} onChange={e => setF('national_rating_value', e.target.value)} placeholder="BBB- / na" className={inp} /></div>
+                  <div>
+                    <label className={lbl}>Международный рейтинг</label>
+                    <select value={form.intl_rating_value} onChange={e => setF('intl_rating_value', e.target.value)} className={inp}>
+                      {INTL_RATINGS.map(r => <option key={r} value={r}>{r || '— Выберите рейтинг —'}</option>)}
+                    </select>
+                  </div>
+                  <div>
+                    <label className={lbl}>Национальный рейтинг</label>
+                    <select value={form.national_rating_value} onChange={e => setF('national_rating_value', e.target.value)} className={inp}>
+                      {NATL_RATINGS.map(r => <option key={r} value={r}>{r || '— Выберите рейтинг —'}</option>)}
+                    </select>
+                  </div>
                 </div>
               )}
 
@@ -475,16 +518,18 @@ export default function MarketRiskPage() {
                 <div className="space-y-4">
                   <p className="text-xs text-gray-400 bg-blue-50 border border-blue-100 rounded-lg p-2">💡 Все суммы в USD. Данные из годового/квартального отчёта банка.</p>
                   <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-                    <div><label className={lbl}>Общие активы (USD)</label><input type="text" inputMode="numeric" value={form.total_assets} onChange={e => setF('total_assets', e.target.value.replace(/\D/g,''))} placeholder="0" className={numInp} /></div>
+                    <div><label className={lbl}>Общие активы (USD)</label>
+                      <input type="text" inputMode="numeric" value={form.total_assets} onChange={e => setNum('total_assets', e.target.value)} placeholder="0" className={numInp} /></div>
                     <div>
                       <label className={lbl}>Ликвидные активы (USD)</label>
-                      <input type="text" inputMode="numeric" value={form.liquid_assets} onChange={e => setF('liquid_assets', e.target.value.replace(/\D/g,''))} placeholder="0" className={numInp} />
+                      <input type="text" inputMode="numeric" value={form.liquid_assets} onChange={e => setNum('liquid_assets', e.target.value)} placeholder="0" className={numInp} />
                       <p className="text-xs text-gray-400 mt-1">Наличные + средства в ЦБ + краткосрочные ценные бумаги</p>
                     </div>
-                    <div><label className={lbl}>Собственный капитал (USD)</label><input type="text" inputMode="numeric" value={form.total_capital} onChange={e => setF('total_capital', e.target.value.replace(/\D/g,''))} placeholder="0" className={numInp} /></div>
+                    <div><label className={lbl}>Собственный капитал (USD)</label>
+                      <input type="text" inputMode="numeric" value={form.total_capital} onChange={e => setNum('total_capital', e.target.value)} placeholder="0" className={numInp} /></div>
                     <div>
                       <label className={lbl}>Краткосрочные обязательства (USD)</label>
-                      <input type="text" inputMode="numeric" value={form.short_term_liabilities} onChange={e => setF('short_term_liabilities', e.target.value.replace(/\D/g,''))} placeholder="0" className={numInp} />
+                      <input type="text" inputMode="numeric" value={form.short_term_liabilities} onChange={e => setNum('short_term_liabilities', e.target.value)} placeholder="0" className={numInp} />
                       <p className="text-xs text-gray-400 mt-1">Депозиты до востребования + обязательства до 1 года</p>
                     </div>
                   </div>
@@ -500,8 +545,10 @@ export default function MarketRiskPage() {
               {tab === 3 && (
                 <div className="space-y-4">
                   <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-                    <div><label className={lbl}>Чистая прибыль (USD)</label><input type="text" inputMode="numeric" value={form.net_profit} onChange={e => setF('net_profit', e.target.value.replace(/[^0-9-]/g,''))} placeholder="0" className={numInp} /></div>
-                    <div><label className={lbl}>Собственный капитал (equity, USD)</label><input type="text" inputMode="numeric" value={form.equity} onChange={e => setF('equity', e.target.value.replace(/\D/g,''))} placeholder="0" className={numInp} /></div>
+                    <div><label className={lbl}>Чистая прибыль (USD)</label>
+                      <input type="text" inputMode="numeric" value={form.net_profit} onChange={e => setNum('net_profit', e.target.value)} placeholder="0" className={numInp} /></div>
+                    <div><label className={lbl}>Собственный капитал (equity, USD)</label>
+                      <input type="text" inputMode="numeric" value={form.equity} onChange={e => setNum('equity', e.target.value)} placeholder="0" className={numInp} /></div>
                   </div>
                   {computed.roe !== 0 && (
                     <div className={`p-3 rounded-lg ${computed.roe >= 10 ? 'bg-green-50' : computed.roe >= 5 ? 'bg-yellow-50' : 'bg-red-50'}`}>
@@ -536,8 +583,6 @@ export default function MarketRiskPage() {
                       </div>
                     </div>
                   ))}
-
-                  {/* Matrix preview */}
                   <div className="border border-gray-200 rounded-xl p-4">
                     <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-3">Матрица оценок (автоматически)</p>
                     <div className="grid grid-cols-2 gap-2">
@@ -560,7 +605,6 @@ export default function MarketRiskPage() {
                 </div>
               )}
             </div>
-
             <div className="flex items-center justify-between p-5 border-t border-gray-100">
               <div>{tab > 1 && <button onClick={() => setTab(tab-1)} className="px-4 py-2 border border-gray-200 rounded-lg text-sm text-gray-600 hover:bg-gray-50">← Назад</button>}</div>
               <div className="flex gap-2">
