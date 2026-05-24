@@ -1,7 +1,7 @@
 'use client'
 import { useState, useEffect, useCallback } from 'react'
 import { supabase } from '@/supabase/client'
-import { Plus, Download, Eye, Trash2, X, Loader2, CheckCircle2, AlertCircle, Filter } from 'lucide-react'
+import { Plus, Download, Eye, Trash2, X, Loader2, CheckCircle2, AlertCircle, Filter, Link2 } from 'lucide-react'
 
 interface Assessment {
   id: string
@@ -23,9 +23,17 @@ interface Assessment {
   ai_conclusion: string; recommendation: string; created_at: string
 }
 
+interface FinAnalysis {
+  id: string; code: string
+  p2_cash: number; p2_receivables: number; p2_investments: number
+  p2_loans_issued: number; p2_fixed_assets: number; p2_other_assets: number
+  p2_deposits: number; p2_borrowings: number; p2_other_liab: number
+  p2_equity: number; p2_net_profit: number
+  p2_label: string
+}
+
 const MONTHS = ['Январь','Февраль','Март','Апрель','Май','Июнь','Июль','Август','Сентябрь','Октябрь','Ноябрь','Декабрь']
 
-// ✅ Выпадающие списки рейтингов
 const INTL_RATINGS = [
   '', 'Нет рейтинга',
   'Moody\'s: Aaa', 'Moody\'s: Aa1', 'Moody\'s: Aa2', 'Moody\'s: Aa3',
@@ -55,13 +63,11 @@ const NATL_RATINGS = [
   'CCC', 'CC', 'C', 'D',
 ]
 
-// ✅ Форматирование чисел с пробелами
 const formatNum = (v: string) => {
   const num = v.replace(/\D/g, '')
   if (!num) return ''
   return new Intl.NumberFormat('ru-RU').format(Number(num))
 }
-const parseNum = (v: string) => v.replace(/[^0-9-]/g, '')
 
 function calcScores(f: Record<string, string | number>) {
   const n = (k: string) => Number(String(f[k]).replace(/[^0-9.-]/g, '')) || 0
@@ -103,10 +109,7 @@ function calcNationalRating(r: string): number {
   return 2
 }
 function calcHistory(years: number): number {
-  if (years < 5) return 1
-  if (years < 10) return 2
-  if (years < 50) return 3
-  return 4
+  if (years < 5) return 1; if (years < 10) return 2; if (years < 50) return 3; return 4
 }
 function calcOwnership(type: string): number {
   if (!type) return 0
@@ -152,28 +155,16 @@ function calcMedia(s: string): number {
   return 4
 }
 function calcAssets(usd: number): number {
-  if (usd < 100) return 1
-  if (usd < 1000) return 2
-  if (usd < 10000) return 3
-  return 4
+  if (usd < 100) return 1; if (usd < 1000) return 2; if (usd < 10000) return 3; return 4
 }
 function calcCAR(car: number): number {
-  if (car < 10) return 1
-  if (car < 13) return 2
-  if (car < 15) return 3
-  return 4
+  if (car < 10) return 1; if (car < 13) return 2; if (car < 15) return 3; return 4
 }
 function calcROE(roe: number): number {
-  if (roe < 0) return 1
-  if (roe < 5) return 2
-  if (roe < 10) return 3
-  return 4
+  if (roe < 0) return 1; if (roe < 5) return 2; if (roe < 10) return 3; return 4
 }
 function calcLCR(lcr: number): number {
-  if (lcr < 50) return 1
-  if (lcr < 80) return 2
-  if (lcr < 100) return 3
-  return 4
+  if (lcr < 50) return 1; if (lcr < 80) return 2; if (lcr < 100) return 3; return 4
 }
 function getCategory(score: number) {
   if (score >= 50) return { label: 'Надёжность вне сомнений', limit: '$3-5 млн', color: 'green' }
@@ -181,6 +172,7 @@ function getCategory(score: number) {
   if (score >= 25) return { label: 'Средняя надёжность', limit: '$500K-1 млн', color: 'yellow' }
   return { label: 'Низкая надёжность', limit: 'до $500K', color: 'red' }
 }
+
 const SCORE_LABELS: Record<string, string> = {
   score_intl_rating: 'Международный рейтинг',
   score_national_rating: 'Национальный рейтинг',
@@ -195,6 +187,7 @@ const SCORE_LABELS: Record<string, string> = {
   score_profitability: 'Рентабельность (ROE)',
   score_liquidity: 'Ликвидность (LCR)',
 }
+
 const EMPTY = {
   bank_name: '', country: '', analyst_name: '',
   intl_rating_value: '', national_rating_value: '',
@@ -209,6 +202,7 @@ const EMPTY = {
 
 export default function MarketRiskPage() {
   const [assessments, setAssessments] = useState<Assessment[]>([])
+  const [finAnalyses, setFinAnalyses] = useState<FinAnalysis[]>([])
   const [loading, setLoading] = useState(true)
   const [showModal, setShowModal] = useState(false)
   const [form, setForm] = useState<Record<string, string>>(EMPTY)
@@ -218,14 +212,19 @@ export default function MarketRiskPage() {
   const [filterYear, setFilterYear] = useState('')
   const [filterMonth, setFilterMonth] = useState('')
   const [tab, setTab] = useState(1)
+  const [linkedFinId, setLinkedFinId] = useState('')
 
   const fetch_ = useCallback(async () => {
     setLoading(true)
     let query = supabase.from('counterparty_assessments').select('*').order('created_at', { ascending: false })
     if (filterYear) query = query.gte('assessment_date', `${filterYear}-01-01`).lte('assessment_date', `${filterYear}-12-31`)
     if (filterYear && filterMonth) query = query.gte('assessment_date', `${filterYear}-${filterMonth}-01`).lte('assessment_date', `${filterYear}-${filterMonth}-31`)
-    const { data } = await query
-    setAssessments(data || [])
+    const [{ data: aData }, { data: fData }] = await Promise.all([
+      query,
+      supabase.from('counterparty_financials').select('id, code, p2_label, p2_cash, p2_receivables, p2_investments, p2_loans_issued, p2_fixed_assets, p2_other_assets, p2_deposits, p2_borrowings, p2_other_liab, p2_equity, p2_net_profit').order('created_at', { ascending: false }),
+    ])
+    setAssessments(aData || [])
+    setFinAnalyses(fData || [])
     setLoading(false)
   }, [filterYear, filterMonth])
 
@@ -236,6 +235,28 @@ export default function MarketRiskPage() {
   const n = (k: string) => Number(String(form[k]).replace(/[^0-9.-]/g, '')) || 0
   const computed = calcScores(form)
   const category = getCategory(computed.total)
+
+  // ✅ Auto-populate from financial analysis
+  function handleLinkFinAnalysis(finId: string) {
+    setLinkedFinId(finId)
+    if (!finId) return
+    const fin = finAnalyses.find(f => f.id === finId)
+    if (!fin) return
+    const fmtN = (v: number) => v ? new Intl.NumberFormat('ru-RU').format(Math.round(v)) : ''
+    const totalAssets = fin.p2_cash + fin.p2_receivables + fin.p2_investments + fin.p2_loans_issued + fin.p2_fixed_assets + fin.p2_other_assets
+    const totalLiab = fin.p2_deposits + fin.p2_borrowings + fin.p2_other_liab
+    setForm(p => ({
+      ...p,
+      bank_name: fin.code,
+      total_assets: fmtN(totalAssets),
+      liquid_assets: fmtN(fin.p2_cash + fin.p2_investments),
+      total_capital: fmtN(fin.p2_equity),
+      short_term_liabilities: fmtN(fin.p2_deposits),
+      total_liabilities: fmtN(totalLiab),
+      net_profit: fmtN(fin.p2_net_profit),
+      equity: fmtN(fin.p2_equity),
+    }))
+  }
 
   async function handleGenerate() {
     if (!form.bank_name.trim()) { setError('Введите код контрагента'); return }
@@ -271,14 +292,8 @@ export default function MarketRiskPage() {
         recommendation: data.recommendation,
       })
       if (dbErr) throw new Error(dbErr.message)
-
-      // ✅ Авто-создание в реестре контрагентов
-      await supabase.from('counterparties').upsert({
-        code: form.bank_name,
-        updated_at: new Date().toISOString(),
-      }, { onConflict: 'code', ignoreDuplicates: true })
-
-      setShowModal(false); setForm(EMPTY); setTab(1); fetch_()
+      await supabase.from('counterparties').upsert({ code: form.bank_name, updated_at: new Date().toISOString() }, { onConflict: 'code', ignoreDuplicates: true })
+      setShowModal(false); setForm(EMPTY); setLinkedFinId(''); setTab(1); fetch_()
     } catch (err: unknown) {
       setError('Ошибка: ' + (err instanceof Error ? err.message : String(err)))
     } finally { setGenerating(false) }
@@ -318,7 +333,7 @@ export default function MarketRiskPage() {
           <h1 className="text-xl font-semibold text-gray-900">Рыночный риск — Оценка контрагентов</h1>
           <p className="text-sm text-gray-500 mt-0.5">Матрица оценки надёжности банков-контрагентов</p>
         </div>
-        <button onClick={() => { setForm(EMPTY); setTab(1); setError(null); setShowModal(true) }}
+        <button onClick={() => { setForm(EMPTY); setLinkedFinId(''); setTab(1); setError(null); setShowModal(true) }}
           className="flex items-center gap-2 px-4 py-2 bg-[#1B8A4C] text-white rounded-lg text-sm font-medium hover:bg-[#177040]">
           <Plus className="w-4 h-4" /> Новая оценка
         </button>
@@ -491,6 +506,23 @@ export default function MarketRiskPage() {
 
               {tab === 1 && (
                 <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+                  {/* ✅ Привязка к финансовому анализу */}
+                  {finAnalyses.length > 0 && (
+                    <div className="lg:col-span-2 p-4 bg-green-50 border border-green-200 rounded-xl">
+                      <div className="flex items-center gap-2 mb-2">
+                        <Link2 className="w-4 h-4 text-[#1B8A4C]" />
+                        <p className="text-xs font-semibold text-[#1B8A4C]">Подтянуть данные из финансового анализа</p>
+                      </div>
+                      <select value={linkedFinId} onChange={e => handleLinkFinAnalysis(e.target.value)}
+                        className="w-full px-3 py-2 border border-green-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#1B8A4C] bg-white">
+                        <option value="">— Выберите контрагента —</option>
+                        {finAnalyses.map(f => (
+                          <option key={f.id} value={f.id}>{f.code} ({f.p2_label})</option>
+                        ))}
+                      </select>
+                      {linkedFinId && <p className="text-xs text-green-700 mt-1">✅ Финансовые данные подтянуты автоматически</p>}
+                    </div>
+                  )}
                   <div>
                     <label className={lbl}>Код контрагента *</label>
                     <input type="text" value={form.bank_name} onChange={e => setF('bank_name', e.target.value)} placeholder="Контрагент-001" className={inp} />
@@ -516,7 +548,8 @@ export default function MarketRiskPage() {
 
               {tab === 2 && (
                 <div className="space-y-4">
-                  <p className="text-xs text-gray-400 bg-blue-50 border border-blue-100 rounded-lg p-2">💡 Все суммы в USD. Данные из годового/квартального отчёта банка.</p>
+                  {linkedFinId && <div className="p-3 bg-green-50 border border-green-200 rounded-lg"><p className="text-xs text-green-700">✅ Данные подтянуты из финансового анализа. Можно изменить вручную.</p></div>}
+                  <p className="text-xs text-gray-400 bg-blue-50 border border-blue-100 rounded-lg p-2">💡 Все суммы в USD.</p>
                   <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
                     <div><label className={lbl}>Общие активы (USD)</label>
                       <input type="text" inputMode="numeric" value={form.total_assets} onChange={e => setNum('total_assets', e.target.value)} placeholder="0" className={numInp} /></div>
@@ -544,6 +577,7 @@ export default function MarketRiskPage() {
 
               {tab === 3 && (
                 <div className="space-y-4">
+                  {linkedFinId && <div className="p-3 bg-green-50 border border-green-200 rounded-lg"><p className="text-xs text-green-700">✅ Данные подтянуты из финансового анализа.</p></div>}
                   <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
                     <div><label className={lbl}>Чистая прибыль (USD)</label>
                       <input type="text" inputMode="numeric" value={form.net_profit} onChange={e => setNum('net_profit', e.target.value)} placeholder="0" className={numInp} /></div>
