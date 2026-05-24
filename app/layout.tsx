@@ -2,7 +2,7 @@ import type { Metadata } from 'next'
 import './globals.css'
 
 export const metadata: Metadata = {
-  title: 'Risk Management Platform | Служба управления рисками',
+  title: 'Risk Management System | Служба управления рисками',
   description: 'ОАО «Алиф Банк» — Платформа управления рисками Службы управления рисками',
   icons: {
     icon: '/favicon.ico',
