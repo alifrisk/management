@@ -1,7 +1,9 @@
 'use client'
 import { useState, useEffect, useCallback } from 'react'
 import { supabase } from '@/supabase/client'
-import { Plus, Eye, Trash2, X, Loader2, CheckCircle2, AlertCircle, Download } from 'lucide-react'
+import { Plus, Eye, Trash2, X, Loader2, CheckCircle2, AlertCircle, Download, Filter } from 'lucide-react'
+
+const MONTHS = ['Январь','Февраль','Март','Апрель','Май','Июнь','Июль','Август','Сентябрь','Октябрь','Ноябрь','Декабрь']
 
 interface FinAnalysis {
   id: string; code: string; analyst_name: string
@@ -90,13 +92,18 @@ export default function FinancialAnalysisPage() {
   const [error, setError] = useState<string | null>(null)
   const [viewing, setViewing] = useState<FinAnalysis | null>(null)
   const [tab, setTab] = useState(1)
+  const [filterYear, setFilterYear] = useState('')
+  const [filterMonth, setFilterMonth] = useState('')
 
   const fetch_ = useCallback(async () => {
     setLoading(true)
-    const { data } = await supabase.from('counterparty_financials').select('*').order('created_at', { ascending: false })
+    let query = supabase.from('counterparty_financials').select('*').order('created_at', { ascending: false })
+    if (filterYear) query = query.gte('created_at', `${filterYear}-01-01`).lte('created_at', `${filterYear}-12-31`)
+    if (filterYear && filterMonth) query = query.gte('created_at', `${filterYear}-${filterMonth}-01`).lte('created_at', `${filterYear}-${filterMonth}-31`)
+    const { data } = await query
     setAnalyses(data || [])
     setLoading(false)
-  }, [])
+  }, [filterYear, filterMonth])
 
   useEffect(() => { fetch_() }, [fetch_])
 
@@ -213,6 +220,25 @@ export default function FinancialAnalysisPage() {
             <p className="text-xs text-gray-500 mt-0.5">{s.label}</p>
           </div>
         ))}
+      </div>
+
+      <div className="bg-white rounded-xl border border-gray-100 p-4 shadow-sm flex items-center gap-3 flex-wrap">
+        <Filter className="w-4 h-4 text-gray-400" />
+        <select value={filterYear} onChange={e => { setFilterYear(e.target.value); setFilterMonth('') }}
+          className="px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#1B8A4C] bg-white">
+          <option value="">Все годы</option>
+          {[2026,2025,2024].map(y => <option key={y} value={y}>{y}</option>)}
+        </select>
+        <select value={filterMonth} onChange={e => setFilterMonth(e.target.value)}
+          className="px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#1B8A4C] bg-white">
+          <option value="">Все месяцы</option>
+          {MONTHS.map((m,i) => <option key={i} value={String(i+1).padStart(2,'0')}>{m}</option>)}
+        </select>
+        {(filterYear || filterMonth) && (
+          <button onClick={() => { setFilterYear(''); setFilterMonth('') }} className="text-xs text-gray-500 hover:text-gray-700 flex items-center gap-1">
+            <X className="w-3.5 h-3.5" /> Сбросить
+          </button>
+        )}
       </div>
 
       <div className="bg-white rounded-xl border border-gray-100 shadow-sm overflow-hidden">
