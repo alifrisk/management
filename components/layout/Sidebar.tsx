@@ -5,7 +5,7 @@ import { usePathname } from 'next/navigation'
 import { supabase } from '@/supabase/client'
 import { UserProfile } from '@/types'
 import { cn } from '@/lib/utils'
-import { Shield, FileText, TrendingUp, Droplets, LayoutDashboard, ChevronDown, ChevronRight, LogOut, Settings, Users, Menu, X, ClipboardList, BarChart3, Map, FolderOpen, ClipboardCheck, BookUser, Activity, Building2 } from 'lucide-react'
+import { Shield, FileText, TrendingUp, Droplets, LayoutDashboard, ChevronDown, ChevronRight, LogOut, Settings, Users, Menu, X, ClipboardList, BarChart3, Map, FolderOpen, ClipboardCheck, BookUser, Activity, Building2, ListTodo } from 'lucide-react'
 
 interface SidebarProps { user: UserProfile }
 
@@ -40,6 +40,14 @@ const NAV_ITEMS = [
   { title: 'Ликвидность', href: '/liquidity', icon: <Droplets className="w-4 h-4" />, adminOnly: true, children: [{ title: 'Стресс-тест', href: '/liquidity', icon: <BarChart3 className="w-3.5 h-3.5" /> }] },
   { title: 'ВНД СУР', href: '/vnd', icon: <FolderOpen className="w-4 h-4" />, adminOnly: false, children: [{ title: 'Документы', href: '/vnd', icon: <FolderOpen className="w-3.5 h-3.5" /> }] },
   { title: 'Реестр рекомендаций', href: '/recommendations', icon: <ClipboardCheck className="w-4 h-4" />, adminOnly: false, children: [{ title: 'Рекомендации', href: '/recommendations', icon: <ClipboardList className="w-3.5 h-3.5" /> }] },
+  {
+    title: 'Задачи СУР', href: '/tasks', icon: <ListTodo className="w-4 h-4" />, adminOnly: true, wip: true,
+    children: [
+      { title: 'Стратегические', href: '/tasks', icon: <BarChart3 className="w-3.5 h-3.5" />, wip: true },
+      { title: 'Еженедельные', href: '/tasks', icon: <ClipboardList className="w-3.5 h-3.5" />, wip: true },
+      { title: 'Бэклог', href: '/tasks', icon: <ClipboardList className="w-3.5 h-3.5" />, wip: true },
+    ],
+  },
 ]
 
 export default function Sidebar({ user }: SidebarProps) {
@@ -95,6 +103,9 @@ export default function Sidebar({ user }: SidebarProps) {
                   )}>
                   <span className="flex-shrink-0 text-green-200">{item.icon}</span>
                   <span className="flex-1 text-left font-medium">{item.title}</span>
+                  {'wip' in item && item.wip && (
+                    <span className="text-[9px] bg-yellow-400/20 text-yellow-200 px-1.5 py-0.5 rounded-full mr-1">скоро</span>
+                  )}
                   {openMenu === item.href ? <ChevronDown className="w-3.5 h-3.5 text-green-200" /> : <ChevronRight className="w-3.5 h-3.5 text-green-200" />}
                 </button>
                 {openMenu === item.href && (
