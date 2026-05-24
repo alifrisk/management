@@ -132,6 +132,21 @@ export default function FinancialAnalysisPage() {
   const p1_roe = n('p1_equity') > 0 ? (n('p1_net_profit') / n('p1_equity') * 100) : 0
   const p2_roe = n('p2_equity') > 0 ? (n('p2_net_profit') / n('p2_equity') * 100) : 0
 
+  async function downloadWord(a: FinAnalysis) {
+    try {
+      const res = await fetch('/api/market-risk/export-word-fin', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ analysis: a }),
+      })
+      if (!res.ok) throw new Error('Ошибка сервера')
+      const blob = await res.blob()
+      const url = URL.createObjectURL(blob)
+      const link = document.createElement('a')
+      link.href = url; link.download = 'FinAnalysis.docx'; link.click()
+      URL.revokeObjectURL(url)
+    } catch (e: unknown) { alert('Ошибка: ' + (e instanceof Error ? e.message : String(e))) }
+  }
+
   async function handleGenerate() {
     if (!form.code.trim()) { setError('Введите код контрагента'); return }
     setGenerating(true); setError(null)
@@ -271,6 +286,7 @@ export default function FinancialAnalysisPage() {
                     <td className="px-4 py-3">
                       <div className="flex items-center gap-1">
                         <button onClick={() => setViewing(a)} className="p-1.5 text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg"><Eye className="w-3.5 h-3.5" /></button>
+                        <button onClick={() => downloadWord(a)} className="p-1.5 text-gray-400 hover:text-[#1B8A4C] hover:bg-green-50 rounded-lg"><Download className="w-3.5 h-3.5" /></button>
                         <button onClick={() => handleDelete(a.id)} className="p-1.5 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg"><Trash2 className="w-3.5 h-3.5" /></button>
                       </div>
                     </td>
@@ -313,6 +329,7 @@ export default function FinancialAnalysisPage() {
               )}
             </div>
             <div className="flex justify-end gap-3 p-6 border-t border-gray-100">
+              <button onClick={() => downloadWord(viewing)} className="flex items-center gap-2 px-4 py-2 bg-[#1B8A4C] text-white rounded-lg text-sm font-medium hover:bg-[#177040]"><Download className="w-4 h-4" /> Word</button>
               <button onClick={() => setViewing(null)} className="px-4 py-2 border border-gray-200 rounded-lg text-sm text-gray-600 hover:bg-gray-50">Закрыть</button>
             </div>
           </div>
@@ -373,6 +390,22 @@ export default function FinancialAnalysisPage() {
                     <FR label="Собственный капитал" f1="p1_equity" f2="p2_equity" form={form} setF={setF} />
                     <FR label="ИТОГО ПАССИВ" bold auto v1={p1_total_passiv} v2={p2_total_passiv} f1="" f2="" form={form} setF={setF} />
                   </FT>
+                  {/* ✅ Balance check */}
+                  {(p1_total_assets > 0 || p2_total_assets > 0) && (
+                    <div className="grid grid-cols-2 gap-3">
+                      {p1_total_assets > 0 && (
+                        <div className={`p-3 rounded-lg border text-xs font-medium ${Math.abs(p1_total_assets - (p1_total_liab + n('p1_equity'))) < 1 ? 'bg-green-50 border-green-200 text-green-700' : 'bg-red-50 border-red-200 text-red-700'}`}>
+                          {form.p1_label || 'Период 1'}: {Math.abs(p1_total_assets - (p1_total_liab + n('p1_equity'))) < 1 ? '✅ Баланс сходится' : `⚠️ Разница: ${new Intl.NumberFormat('ru-RU').format(Math.round(Math.abs(p1_total_assets - (p1_total_liab + n('p1_equity')))))}`}
+                        </div>
+                      )}
+                      {p2_total_assets > 0 && (
+                        <div className={`p-3 rounded-lg border text-xs font-medium ${Math.abs(p2_total_assets - (p2_total_liab + n('p2_equity'))) < 1 ? 'bg-green-50 border-green-200 text-green-700' : 'bg-red-50 border-red-200 text-red-700'}`}>
+                          {form.p2_label || 'Период 2'}: {Math.abs(p2_total_assets - (p2_total_liab + n('p2_equity'))) < 1 ? '✅ Баланс сходится' : `⚠️ Разница: ${new Intl.NumberFormat('ru-RU').format(Math.round(Math.abs(p2_total_assets - (p2_total_liab + n('p2_equity')))))}`}
+                        </div>
+                      )}
+                    </div>
+                  )}
+
                   {(p1_car > 0 || p2_car > 0) && (
                     <div className="grid grid-cols-2 gap-3">
                       <div className={`p-3 rounded-lg ${p2_car >= 13 ? 'bg-green-50' : p2_car >= 10 ? 'bg-yellow-50' : 'bg-red-50'}`}>
