@@ -1,5 +1,4 @@
 'use client'
-
 import { useState, useEffect, useCallback } from 'react'
 import { supabase } from '@/supabase/client'
 import { Plus, Download, Eye, Trash2, X, AlertTriangle, CheckCircle, TrendingDown, Filter } from 'lucide-react'
@@ -9,7 +8,6 @@ interface StressTest {
   test_name: string
   analyst_name: string
   test_date: string
-  // Обязательства
   due_to_banks: number
   current_accounts: number
   alif_mobi: number
@@ -17,25 +15,19 @@ interface StressTest {
   term_deposits: number
   borrowings: number
   other_liabilities: number
-  // Кредитные линии
   credit_line_salom: number
   credit_line_sme: number
-  // Буфер ликвидности
   cash_equivalents: number
   cash_only: number
-  // Результаты T+1
   outflow_t1: number; drawdown_t1: number; need_t1: number
   coverage_cash_t1: number; coverage_only_t1: number; risk_t1: string
-  // Результаты T+7
   outflow_t7: number; drawdown_t7: number; need_t7: number
   coverage_cash_t7: number; coverage_only_t7: number; risk_t7: string
-  // Результаты T+30
   outflow_t30: number; drawdown_t30: number; need_t30: number
   coverage_cash_t30: number; coverage_only_t30: number; risk_t30: string
   created_at: string
 }
 
-// Коэффициенты из Excel (пессимистический сценарий)
 const STRESS_RATES = {
   due_to_banks:     { t1: 1.00, t7: 1.00, t30: 1.00 },
   current_accounts: { t1: 0.20, t7: 0.35, t30: 0.50 },
@@ -76,6 +68,14 @@ const MONTHS = ['Январь','Февраль','Март','Апрель','Ма�
 const fmt = (n: number) => n ? new Intl.NumberFormat('ru-RU').format(Math.round(n)) : '—'
 const pct = (n: number) => n ? (n * 100).toFixed(0) + '%' : '—'
 
+// ✅ Форматирование чисел с пробелами
+const formatNum = (v: string) => {
+  const num = v.replace(/\D/g, '')
+  if (!num) return ''
+  return new Intl.NumberFormat('ru-RU').format(Number(num))
+}
+const parseNum = (v: string) => Number(v.replace(/\D/g, '')) || 0
+
 const EMPTY: Record<string, string> = {
   test_name: '', analyst_name: '',
   due_to_banks: '', current_accounts: '', alif_mobi: '', savings: '',
@@ -107,8 +107,10 @@ export default function LiquidityPage() {
 
   useEffect(() => { fetch_() }, [fetch_])
 
-  const n = (k: string) => Number(form[k]) || 0
+  // ✅ Parse formatted numbers
+  const n = (k: string) => parseNum(form[k] || '')
   const setF = (k: string, v: string) => setForm(p => ({ ...p, [k]: v }))
+  const setNum = (k: string, v: string) => setForm(p => ({ ...p, [k]: formatNum(v) }))
 
   const computed = calcStress({
     due_to_banks: n('due_to_banks'), current_accounts: n('current_accounts'),
@@ -172,7 +174,6 @@ export default function LiquidityPage() {
   const inp = "w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#1B8A4C] bg-white text-right"
   const lbl = "block text-xs font-medium text-gray-600 mb-1"
 
-  // Results summary row component
   const HorizonCard = ({ h, data }: { h: string; data: { liab: number; draw: number; need: number; cov_cash: number; cov_only: number; risk: string } }) => (
     <div className={`p-4 rounded-xl border-2 ${data.risk === 'High' ? 'border-red-200 bg-red-50' : data.risk === 'Elevated' ? 'border-yellow-200 bg-yellow-50' : 'border-green-200 bg-green-50'}`}>
       <div className="flex items-center justify-between mb-3">
@@ -207,7 +208,6 @@ export default function LiquidityPage() {
         </button>
       </div>
 
-      {/* KPI */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
         {[
           { label: 'Всего тестов', value: tests.length, c: 'text-gray-900' },
@@ -222,7 +222,6 @@ export default function LiquidityPage() {
         ))}
       </div>
 
-      {/* Filters */}
       <div className="bg-white rounded-xl border border-gray-100 p-4 shadow-sm flex items-center gap-3 flex-wrap">
         <Filter className="w-4 h-4 text-gray-400" />
         <select value={filterYear} onChange={e => { setFilterYear(e.target.value); setFilterMonth('') }}
@@ -242,7 +241,6 @@ export default function LiquidityPage() {
         )}
       </div>
 
-      {/* Table */}
       <div className="bg-white rounded-xl border border-gray-100 shadow-sm overflow-hidden">
         <div className="overflow-x-auto">
           <table className="w-full text-sm">
@@ -286,7 +284,6 @@ export default function LiquidityPage() {
         </div>
       </div>
 
-      {/* View Modal */}
       {viewing && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50">
           <div className="bg-white rounded-2xl shadow-2xl w-full max-w-3xl max-h-[90vh] flex flex-col">
@@ -332,7 +329,6 @@ export default function LiquidityPage() {
         </div>
       )}
 
-      {/* Form Modal */}
       {showModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50">
           <div className="bg-white rounded-2xl shadow-2xl w-full max-w-3xl max-h-[95vh] flex flex-col">
@@ -345,20 +341,15 @@ export default function LiquidityPage() {
             </div>
             <div className="flex-1 overflow-y-auto p-5 space-y-5">
               {error && <div className="flex items-center gap-2 p-3 bg-red-50 border border-red-100 rounded-lg"><span className="text-sm text-red-600">{error}</span></div>}
-
-              {/* Live results */}
               <div className="grid grid-cols-3 gap-3">
                 <HorizonCard h="T+1" data={computed.t1} />
                 <HorizonCard h="T+7" data={computed.t7} />
                 <HorizonCard h="T+30" data={computed.t30} />
               </div>
-
               <div className="grid grid-cols-2 gap-3">
                 <div><label className={lbl}>Название теста *</label><input type="text" value={form.test_name} onChange={e => setF('test_name', e.target.value)} placeholder="Стресс-тест Март 2026" className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#1B8A4C] bg-white" /></div>
                 <div><label className={lbl}>Аналитик</label><input type="text" value={form.analyst_name} onChange={e => setF('analyst_name', e.target.value)} placeholder="ФИО" className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#1B8A4C] bg-white" /></div>
               </div>
-
-              {/* Liabilities */}
               <div>
                 <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-3">Обязательства (TJS)</p>
                 <div className="grid grid-cols-2 gap-3">
@@ -373,16 +364,14 @@ export default function LiquidityPage() {
                   ].map(f => (
                     <div key={f.key}>
                       <label className={lbl}>{f.label}</label>
-                      <input type="text" inputMode="numeric" value={form[f.key]} onChange={e => setF(f.key, e.target.value.replace(/\D/g,''))} placeholder="0" className={inp} />
+                      <input type="text" inputMode="numeric" value={form[f.key]} onChange={e => setNum(f.key, e.target.value)} placeholder="0" className={inp} />
                       <p className="text-xs text-gray-400 mt-0.5">Стресс: {f.rates}</p>
                     </div>
                   ))}
                 </div>
               </div>
-
-              {/* Credit lines */}
               <div>
-                <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-3">Кредитные линии — потенциальное использование (TJS)</p>
+                <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-3">Кредитные линии (TJS)</p>
                 <div className="grid grid-cols-2 gap-3">
                   {[
                     { key: 'credit_line_salom', label: 'Кредитная линия Salom', rates: '5% / 7% / 10%' },
@@ -390,31 +379,28 @@ export default function LiquidityPage() {
                   ].map(f => (
                     <div key={f.key}>
                       <label className={lbl}>{f.label}</label>
-                      <input type="text" inputMode="numeric" value={form[f.key]} onChange={e => setF(f.key, e.target.value.replace(/\D/g,''))} placeholder="0" className={inp} />
+                      <input type="text" inputMode="numeric" value={form[f.key]} onChange={e => setNum(f.key, e.target.value)} placeholder="0" className={inp} />
                       <p className="text-xs text-gray-400 mt-0.5">Стресс: {f.rates}</p>
                     </div>
                   ))}
                 </div>
               </div>
-
-              {/* Liquidity buffer */}
               <div>
                 <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-3">Буфер ликвидности (TJS)</p>
                 <div className="grid grid-cols-2 gap-3">
                   <div>
                     <label className={lbl}>Cash & Cash Equivalents</label>
-                    <input type="text" inputMode="numeric" value={form.cash_equivalents} onChange={e => setF('cash_equivalents', e.target.value.replace(/\D/g,''))} placeholder="0" className={inp} />
+                    <input type="text" inputMode="numeric" value={form.cash_equivalents} onChange={e => setNum('cash_equivalents', e.target.value)} placeholder="0" className={inp} />
                     <p className="text-xs text-gray-400 mt-0.5">Наличные + счета в ЦБ + краткосрочные ЦБ</p>
                   </div>
                   <div>
                     <label className={lbl}>Cash Only (наличные)</label>
-                    <input type="text" inputMode="numeric" value={form.cash_only} onChange={e => setF('cash_only', e.target.value.replace(/\D/g,''))} placeholder="0" className={inp} />
+                    <input type="text" inputMode="numeric" value={form.cash_only} onChange={e => setNum('cash_only', e.target.value)} placeholder="0" className={inp} />
                     <p className="text-xs text-gray-400 mt-0.5">Только физические наличные деньги</p>
                   </div>
                 </div>
               </div>
             </div>
-
             <div className="flex items-center justify-end gap-3 p-5 border-t border-gray-100">
               <button onClick={() => setShowModal(false)} className="px-4 py-2 border border-gray-200 rounded-lg text-sm text-gray-600 hover:bg-gray-50">Отмена</button>
               <button onClick={handleSave} disabled={saving}
