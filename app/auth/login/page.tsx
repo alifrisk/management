@@ -78,7 +78,7 @@ export default function LoginPage() {
     <div className="min-h-screen flex items-center justify-center p-4" style={{background: 'linear-gradient(135deg, #0f3d24 0%, #1a7a43 50%, #1B8A4C 100%)'}}>
       <div className="relative w-full max-w-md">
         <div className="text-center mb-8">
-          <h1 className="text-3xl font-bold text-white tracking-tight">Risk Management Platform</h1>
+          <h1 className="text-3xl font-bold text-white tracking-tight">Risk Management System</h1>
         </div>
 
         <div className="bg-white rounded-2xl shadow-2xl p-8">
