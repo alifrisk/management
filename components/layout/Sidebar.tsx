@@ -1,12 +1,11 @@
 'use client'
-
 import { useState, useEffect } from 'react'
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import { supabase } from '@/supabase/client'
 import { UserProfile } from '@/types'
 import { cn } from '@/lib/utils'
-import { Shield, FileText, TrendingUp, Droplets, LayoutDashboard, ChevronDown, ChevronRight, LogOut, Settings, Users, Menu, X, ClipboardList, BarChart3, Map, FolderOpen, ClipboardCheck, BookUser, Activity } from 'lucide-react'
+import { Shield, FileText, TrendingUp, Droplets, LayoutDashboard, ChevronDown, ChevronRight, LogOut, Settings, Users, Menu, X, ClipboardList, BarChart3, Map, FolderOpen, ClipboardCheck, BookUser, Activity, Building2 } from 'lucide-react'
 
 interface SidebarProps { user: UserProfile }
 
@@ -18,7 +17,7 @@ const NAV_ITEMS = [
       { title: 'Реестр инцидентов', href: '/operational-risk/registry', icon: <ClipboardList className="w-3.5 h-3.5" /> },
       { title: 'Дашборд аналитика', href: '/operational-risk/dashboard', icon: <BarChart3 className="w-3.5 h-3.5" /> },
       { title: 'Картирование рисков', href: '/operational-risk/mapping', icon: <Map className="w-3.5 h-3.5" /> },
-      { title: 'Стресс-тест', href: '/operational-risk/stress-test', icon: <Activity className="w-3.5 h-3.5" /> },
+      { title: 'Стресс-тест', href: '/operational-risk/stress-test', icon: <Activity className="w-3.5 h-3.5" />, wip: true },
     ],
   },
   {
@@ -26,14 +25,16 @@ const NAV_ITEMS = [
     children: [
       { title: 'Заключения SME', href: '/credit-risk', icon: <FileText className="w-3.5 h-3.5" /> },
       { title: 'Реестр заёмщиков', href: '/borrowers', icon: <BookUser className="w-3.5 h-3.5" /> },
-      { title: 'Стресс-тест', href: '/credit-risk/stress-test', icon: <Activity className="w-3.5 h-3.5" /> },
+      { title: 'Стресс-тест', href: '/credit-risk/stress-test', icon: <Activity className="w-3.5 h-3.5" />, wip: true },
     ],
   },
   {
     title: 'Рыночный риск', href: '/market-risk', icon: <TrendingUp className="w-4 h-4" />, adminOnly: true,
     children: [
+      { title: 'Фин. анализ контрагента', href: '/market-risk/financial-analysis', icon: <BarChart3 className="w-3.5 h-3.5" /> },
       { title: 'Оценка контрагентов', href: '/market-risk', icon: <TrendingUp className="w-3.5 h-3.5" /> },
-      { title: 'Стресс-тест', href: '/market-risk/stress-test', icon: <Activity className="w-3.5 h-3.5" /> },
+      { title: 'Реестр контрагентов', href: '/counterparties', icon: <Building2 className="w-3.5 h-3.5" /> },
+      { title: 'Стресс-тест', href: '/market-risk/stress-test', icon: <Activity className="w-3.5 h-3.5" />, wip: true },
     ],
   },
   { title: 'Ликвидность', href: '/liquidity', icon: <Droplets className="w-4 h-4" />, adminOnly: true, children: [{ title: 'Стресс-тест', href: '/liquidity', icon: <BarChart3 className="w-3.5 h-3.5" /> }] },
@@ -54,10 +55,7 @@ export default function Sidebar({ user }: SidebarProps) {
     return null
   }
   const [openMenu, setOpenMenu] = useState<string | null>(getActiveMenu)
-
-  useEffect(() => {
-    setOpenMenu(getActiveMenu())
-  }, [pathname])
+  useEffect(() => { setOpenMenu(getActiveMenu()) }, [pathname])
 
   function toggleMenu(href: string) {
     setOpenMenu(prev => prev === href ? null : href)
@@ -72,7 +70,6 @@ export default function Sidebar({ user }: SidebarProps) {
   const initials = user.full_name
     ? user.full_name.split(' ').map((n: string) => n[0]).slice(0, 2).join('')
     : user.email[0].toUpperCase()
-
   const roleMap: Record<string, string> = { admin: 'Администратор', observer: 'Наблюдатель', coordinator: 'Риск-координатор', user: 'Пользователь' }
   const roleLabel = roleMap[user.role] || user.role
 
@@ -87,18 +84,15 @@ export default function Sidebar({ user }: SidebarProps) {
           <X className="w-5 h-5" />
         </button>
       </div>
-
       <nav className="flex-1 px-3 py-4 space-y-0.5 overflow-y-auto">
         {NAV_ITEMS.filter(item => isAdmin || !item.adminOnly).map((item) => (
           <div key={item.href}>
             {item.children ? (
               <>
-                <button
-                  onClick={() => toggleMenu(item.href)}
+                <button onClick={() => toggleMenu(item.href)}
                   className={cn('w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm transition-all',
                     item.children.some(c => pathname.startsWith(c.href)) ? 'bg-white/20 text-white' : 'text-green-100 hover:bg-white/10 hover:text-white'
-                  )}
-                >
+                  )}>
                   <span className="flex-shrink-0 text-green-200">{item.icon}</span>
                   <span className="flex-1 text-left font-medium">{item.title}</span>
                   {openMenu === item.href ? <ChevronDown className="w-3.5 h-3.5 text-green-200" /> : <ChevronRight className="w-3.5 h-3.5 text-green-200" />}
@@ -111,7 +105,10 @@ export default function Sidebar({ user }: SidebarProps) {
                           pathname === child.href ? 'bg-white/20 text-white font-medium' : 'text-green-100/80 hover:bg-white/10 hover:text-white'
                         )}>
                         <span className="text-green-200 flex-shrink-0">{child.icon}</span>
-                        {child.title}
+                        <span className="flex-1">{child.title}</span>
+                        {'wip' in child && child.wip && (
+                          <span className="text-[9px] bg-yellow-400/20 text-yellow-200 px-1.5 py-0.5 rounded-full">скоро</span>
+                        )}
                       </Link>
                     ))}
                   </div>
@@ -128,7 +125,6 @@ export default function Sidebar({ user }: SidebarProps) {
             )}
           </div>
         ))}
-
         {isAdmin && (
           <div className="pt-3 mt-3 border-t border-white/10">
             <p className="text-green-300/50 text-xs font-medium px-3 mb-2 uppercase tracking-wider">Администрирование</p>
@@ -147,12 +143,9 @@ export default function Sidebar({ user }: SidebarProps) {
           </div>
         )}
       </nav>
-
       <div className="px-3 py-3 border-t border-white/10">
         <div className="flex items-center gap-3 px-2 py-2 rounded-lg">
-          <div className="flex-shrink-0 w-8 h-8 bg-white/20 rounded-full flex items-center justify-center text-white text-xs font-semibold">
-            {initials}
-          </div>
+          <div className="flex-shrink-0 w-8 h-8 bg-white/20 rounded-full flex items-center justify-center text-white text-xs font-semibold">{initials}</div>
           <div className="flex-1 min-w-0">
             <p className="text-white text-sm font-medium truncate">{user.full_name || user.email}</p>
             <p className="text-green-200/60 text-xs">{roleLabel}</p>
@@ -167,26 +160,18 @@ export default function Sidebar({ user }: SidebarProps) {
 
   return (
     <>
-      {/* ✅ Logout диалог вынесен из sidebar — всегда по центру */}
       {showLogoutConfirm && (
         <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-[200] p-4">
           <div className="bg-white rounded-2xl p-6 w-72 shadow-2xl">
             <h3 className="font-semibold text-gray-900 mb-1 text-sm text-center">Выйти из системы?</h3>
             <p className="text-xs text-gray-500 mb-5 text-center">Вы уверены что хотите выйти?</p>
             <div className="flex gap-2">
-              <button onClick={() => setShowLogoutConfirm(false)}
-                className="flex-1 py-2.5 border border-gray-200 rounded-xl text-xs font-medium text-gray-600 hover:bg-gray-50">
-                Отмена
-              </button>
-              <button onClick={confirmLogout}
-                className="flex-1 py-2.5 bg-red-500 hover:bg-red-600 rounded-xl text-xs font-medium text-white">
-                Выйти
-              </button>
+              <button onClick={() => setShowLogoutConfirm(false)} className="flex-1 py-2.5 border border-gray-200 rounded-xl text-xs font-medium text-gray-600 hover:bg-gray-50">Отмена</button>
+              <button onClick={confirmLogout} className="flex-1 py-2.5 bg-red-500 hover:bg-red-600 rounded-xl text-xs font-medium text-white">Выйти</button>
             </div>
           </div>
         </div>
       )}
-
       <button onClick={() => setMobileOpen(true)} className="lg:hidden fixed top-4 left-4 z-50 p-2 bg-[#1B8A4C] text-white rounded-lg shadow-lg">
         <Menu className="w-5 h-5" />
       </button>
