@@ -1,9 +1,7 @@
 import { NextResponse } from 'next/server'
-
 export async function POST(request: Request) {
   try {
     const d = await request.json()
-
     const scoreRows = [
       ['Международный рейтинг', d.score_intl_rating],
       ['Национальный рейтинг', d.score_national_rating],
@@ -18,11 +16,8 @@ export async function POST(request: Request) {
       ['Рентабельность (ROE)', d.score_profitability],
       ['Ликвидность (LCR)', d.score_liquidity],
     ].map(([l, v]) => `${l}: ${v}/4`).join('\n')
-
     const prompt = `Ты старший риск-аналитик банка Алиф Банк (Таджикистан) с 15-летним опытом оценки банков-контрагентов.
-
 Напиши профессиональное заключение об оценке надёжности банка-контрагента. Стиль: чёткий, аналитический, с конкретными цифрами и выводами. Не более 450 слов.
-
 ═══ БАНК ═══
 Наименование: ${d.bank_name}
 Страна: ${d.country || 'не указана'}
@@ -31,36 +26,26 @@ export async function POST(request: Request) {
 Национальный рейтинг: ${d.national_rating_value || 'отсутствует'}
 Санкции: ${d.sanctions_status}
 Репутация в СМИ: ${d.negative_media_status}
-
 ═══ ФИНАНСОВЫЕ ПОКАЗАТЕЛИ ═══
 CAR (достаточность капитала): ${d.car}% ${d.car >= 13 ? '✓' : d.car >= 10 ? '~' : '✗'} (норма ≥13%)
 ROE (рентабельность капитала): ${d.roe}% ${d.roe >= 10 ? '✓' : d.roe >= 5 ? '~' : '✗'} (норма ≥10%)
 Коэффициент ликвидности: ${d.lcr}% ${d.lcr >= 100 ? '✓' : d.lcr >= 80 ? '~' : '✗'} (норма ≥100%)
-
 ═══ МАТРИЦА НАДЁЖНОСТИ ═══
 ${scoreRows}
-
 ИТОГ: ${d.total}/60 баллов → ${d.category.label}
 Рекомендуемый лимит по матрице: ${d.category.limit}
-
 Структура заключения (строго):
-
 1. ХАРАКТЕРИСТИКА КОНТРАГЕНТА
 Краткая оценка банка: история, рейтинги, репутация. 2-3 предложения.
-
 2. ФИНАНСОВЫЙ АНАЛИЗ
 Прокомментируй CAR, ROE и ликвидность с цифрами. Укажи что в норме, что вызывает опасения.
-
 3. РИСКИ
 Конкретно 2-3 ключевых риска работы с данным контрагентом.
-
 4. РЕКОМЕНДАЦИЯ И ЛИМИТ
 Чёткое решение с обоснованием. Лимит должен соответствовать категории из матрицы (${d.category.limit}). Укажи условия для пересмотра лимита.
-
 Завершить ТОЧНО так:
 РЕКОМЕНДАЦИЯ: Установить лимит ${d.category.limit}
 УРОВЕНЬ РИСКА: [Низкий / Средний / Высокий]`
-
     const response = await fetch('https://api.anthropic.com/v1/messages', {
       method: 'POST',
       headers: {
@@ -69,22 +54,18 @@ ${scoreRows}
         'anthropic-version': '2023-06-01',
       },
       body: JSON.stringify({
-        model: 'claude-sonnet-4-5',
+        model: 'claude-sonnet-4-20250514',
         max_tokens: 1500,
         messages: [{ role: 'user', content: prompt }]
       })
     })
-
     const data = await response.json()
     if (!response.ok) throw new Error(`API: ${data?.error?.message || response.status}`)
     const text = data.content?.[0]?.text || ''
     if (!text) throw new Error('Пустой ответ AI')
-
     const recommMatch = text.match(/РЕКОМЕНДАЦИЯ:\s*(.+)/i)
-    // If AI failed to give recommendation - use matrix result
     const recommendation = recommMatch ? recommMatch[1].trim() : `Установить лимит ${d.category.limit}`
     const conclusion = text.replace(/РЕКОМЕНДАЦИЯ:.*$/gim, '').replace(/УРОВЕНЬ РИСКА:.*$/gim, '').trim()
-
     return NextResponse.json({ conclusion, recommendation })
   } catch (error) {
     console.error('Market risk error:', error)
