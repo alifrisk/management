@@ -33,7 +33,7 @@ export default function ForgotPasswordPage() {
     <div className="min-h-screen bg-gradient-to-br from-[#0f3d24] via-[#1B8A4C] to-[#2EAD62] flex items-center justify-center p-4">
       <div className="w-full max-w-md">
         <div className="text-center mb-6">
-          <h1 className="text-2xl font-bold text-white">Risk Management Platform</h1>
+          <h1 className="text-2xl font-bold text-white">Risk Management System</h1>
         </div>
         <div className="bg-white rounded-2xl shadow-2xl p-8">
           {success ? (
