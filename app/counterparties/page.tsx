@@ -27,7 +27,7 @@ export default function CounterpartiesPage() {
   const [assessments, setAssessments] = useState<Assessment[]>([])
   const [loading, setLoading] = useState(true)
   const [editingId, setEditingId] = useState<string | null>(null)
-  const [editForm, setEditForm] = useState({ real_name: '', inn: '', country: '', notes: '' })
+  const [editForm, setEditForm] = useState({ real_name: '', country: '', notes: '' })
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
@@ -45,7 +45,7 @@ export default function CounterpartiesPage() {
   useEffect(() => { fetch_() }, [fetch_])
 
   function openEdit(c: Counterparty) {
-    setEditForm({ real_name: c.real_name || '', inn: c.inn || '', country: c.country || '', notes: c.notes || '' })
+    setEditForm({ real_name: c.real_name || '', country: c.country || '', notes: c.notes || '' })
     setEditingId(c.id)
     setError(null)
   }
@@ -55,7 +55,6 @@ export default function CounterpartiesPage() {
     setSaving(true)
     const { error: e } = await supabase.from('counterparties').update({
       real_name: editForm.real_name || null,
-      inn: editForm.inn || null,
       country: editForm.country || null,
       notes: editForm.notes || null,
       updated_at: new Date().toISOString(),
@@ -75,12 +74,12 @@ export default function CounterpartiesPage() {
   }
 
   function exportToExcel() {
-    const headers = ['Код контрагента', 'Реальное название', 'ИНН', 'Страна', 'Примечание', 'Кол-во оценок', 'Последняя оценка', 'Лимит', 'Дата добавления']
+    const headers = ['Код контрагента', 'Реальное название', 'Страна', 'Примечание', 'Кол-во оценок', 'Последняя оценка', 'Лимит', 'Дата добавления']
     const rows = counterparties.map(c => {
       const ca = assessments.filter(a => a.bank_name === c.code)
       const last = ca[0]
       return [
-        c.code, c.real_name || '', c.inn || '', c.country || '', c.notes || '',
+        c.code, c.real_name || '', c.country || '', c.notes || '',
         ca.length,
         last ? `${last.total_score}/60 — ${last.reliability_category}` : '—',
         last ? last.limit_recommendation : '—',
@@ -117,7 +116,7 @@ export default function CounterpartiesPage() {
       <div className="bg-blue-50 border border-blue-100 rounded-xl p-4">
         <p className="text-sm text-blue-800">
           <strong>Как работает:</strong> При создании оценки аналитик вводит код контрагента (например "Контрагент-001").
-          Здесь добавляется реальное название и ИНН — они не передаются в AI.
+          Здесь добавляется реальное название банка — оно не передаётся в AI.
         </p>
       </div>
 
@@ -162,9 +161,8 @@ export default function CounterpartiesPage() {
                   </div>
 
                   {!isEditing ? (
-                    <div className="mt-3 grid grid-cols-4 gap-3">
+                    <div className="mt-3 grid grid-cols-3 gap-3">
                       <div><p className="text-xs text-gray-400">Реальное название</p><p className="text-sm font-medium text-gray-900 mt-0.5">{c.real_name || <span className="text-gray-300 italic">не указано</span>}</p></div>
-                      <div><p className="text-xs text-gray-400">ИНН</p><p className="text-sm font-medium text-gray-900 mt-0.5">{c.inn || <span className="text-gray-300 italic">не указан</span>}</p></div>
                       <div><p className="text-xs text-gray-400">Страна</p><p className="text-sm font-medium text-gray-900 mt-0.5">{c.country || '—'}</p></div>
                       <div><p className="text-xs text-gray-400">Примечание</p><p className="text-sm text-gray-600 mt-0.5">{c.notes || '—'}</p></div>
                     </div>
@@ -174,11 +172,9 @@ export default function CounterpartiesPage() {
                       <div className="grid grid-cols-2 gap-3">
                         <div><label className="block text-xs font-medium text-gray-600 mb-1">Реальное название</label>
                           <input type="text" value={editForm.real_name} onChange={e => setEditForm(p => ({...p, real_name: e.target.value}))} placeholder="ОАО 'Банк...'" className={inp} /></div>
-                        <div><label className="block text-xs font-medium text-gray-600 mb-1">ИНН</label>
-                          <input type="text" value={editForm.inn} onChange={e => setEditForm(p => ({...p, inn: e.target.value}))} placeholder="000000000" className={inp} /></div>
                         <div><label className="block text-xs font-medium text-gray-600 mb-1">Страна</label>
                           <input type="text" value={editForm.country} onChange={e => setEditForm(p => ({...p, country: e.target.value}))} placeholder="Таджикистан" className={inp} /></div>
-                        <div><label className="block text-xs font-medium text-gray-600 mb-1">Примечание</label>
+                        <div className="col-span-2"><label className="block text-xs font-medium text-gray-600 mb-1">Примечание</label>
                           <input type="text" value={editForm.notes} onChange={e => setEditForm(p => ({...p, notes: e.target.value}))} placeholder="Дополнительная информация..." className={inp} /></div>
                       </div>
                       <div className="flex justify-end gap-2">
