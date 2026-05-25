@@ -38,6 +38,8 @@ interface FinAnalysis {
   p1_interest_income: number; p2_interest_income: number
   p1_interest_expense: number; p2_interest_expense: number
   p1_fee_income: number; p2_fee_income: number
+  p1_fx_income: number; p2_fx_income: number
+  p1_other_income: number; p2_other_income: number
   p1_operating_expense: number; p2_operating_expense: number
   p1_provisions: number; p2_provisions: number
   p1_net_profit: number; p2_net_profit: number
@@ -53,7 +55,8 @@ const EMPTY = {
   p1_deposits: '', p2_deposits: '', p1_borrowings: '', p2_borrowings: '',
   p1_other_liab: '', p2_other_liab: '', p1_equity: '', p2_equity: '',
   p1_interest_income: '', p2_interest_income: '', p1_interest_expense: '', p2_interest_expense: '',
-  p1_fee_income: '', p2_fee_income: '', p1_operating_expense: '', p2_operating_expense: '',
+  p1_fee_income: '', p2_fee_income: '', p1_fx_income: '', p2_fx_income: '',
+  p1_other_income: '', p2_other_income: '', p1_operating_expense: '', p2_operating_expense: '',
   p1_provisions: '', p2_provisions: '', p1_net_profit: '', p2_net_profit: '',
 }
 
@@ -169,8 +172,8 @@ export default function FinancialAnalysisPage() {
   const p2_total_passiv = p2_total_liab + n('p2_equity')
   const p1_nim = n('p1_interest_income') - n('p1_interest_expense')
   const p2_nim = n('p2_interest_income') - n('p2_interest_expense')
-  const p1_op_income = p1_nim + n('p1_fee_income')
-  const p2_op_income = p2_nim + n('p2_fee_income')
+  const p1_op_income = p1_nim + n('p1_fee_income') + n('p1_fx_income') + n('p1_other_income')
+  const p2_op_income = p2_nim + n('p2_fee_income') + n('p2_fx_income') + n('p2_other_income')
   const p1_pre_tax = p1_op_income - n('p1_operating_expense') - n('p1_provisions')
   const p2_pre_tax = p2_op_income - n('p2_operating_expense') - n('p2_provisions')
 
@@ -211,6 +214,8 @@ export default function FinancialAnalysisPage() {
           p1_total_liab: toUSD1(p1_total_liab), p2_total_liab: toUSD2(p2_total_liab),
           p1_equity: toUSD1(n('p1_equity')), p2_equity: toUSD2(n('p2_equity')),
           p1_nim: toUSD1(p1_nim), p2_nim: toUSD2(p2_nim),
+          p1_fx_income: toUSD1(n('p1_fx_income')), p2_fx_income: toUSD2(n('p2_fx_income')),
+          p1_other_income: toUSD1(n('p1_other_income')), p2_other_income: toUSD2(n('p2_other_income')),
           p1_op_income: toUSD1(p1_op_income), p2_op_income: toUSD2(p2_op_income),
           p1_net_profit: toUSD1(n('p1_net_profit')), p2_net_profit: toUSD2(n('p2_net_profit')),
           p1_car: Math.round(p1_car * 10) / 10, p2_car: Math.round(p2_car * 10) / 10,
@@ -240,6 +245,8 @@ export default function FinancialAnalysisPage() {
         p1_interest_income: vals('p1_interest_income'), p2_interest_income: vals('p2_interest_income'),
         p1_interest_expense: vals('p1_interest_expense'), p2_interest_expense: vals('p2_interest_expense'),
         p1_fee_income: vals('p1_fee_income'), p2_fee_income: vals('p2_fee_income'),
+        p1_fx_income: vals('p1_fx_income'), p2_fx_income: vals('p2_fx_income'),
+        p1_other_income: vals('p1_other_income'), p2_other_income: vals('p2_other_income'),
         p1_operating_expense: vals('p1_operating_expense'), p2_operating_expense: vals('p2_operating_expense'),
         p1_provisions: vals('p1_provisions'), p2_provisions: vals('p2_provisions'),
         p1_net_profit: vals('p1_net_profit'), p2_net_profit: vals('p2_net_profit'),
@@ -532,6 +539,8 @@ export default function FinancialAnalysisPage() {
                   <FR label="Процентные расходы" f1="p1_interest_expense" f2="p2_interest_expense" form={form} setF={setF} p1rate={p1_rate} p2rate={p2_rate} currSymbol={currSymbol} notUSD={!isUSD} />
                   <FR label="▶ Чистый процентный доход (NIM)" bold auto v1={p1_nim} v2={p2_nim} f1="" f2="" form={form} setF={setF} p1rate={p1_rate} p2rate={p2_rate} currSymbol={currSymbol} notUSD={!isUSD} />
                   <FR label="Комиссионные доходы" f1="p1_fee_income" f2="p2_fee_income" form={form} setF={setF} p1rate={p1_rate} p2rate={p2_rate} currSymbol={currSymbol} notUSD={!isUSD} />
+                  <FR label="Доход от FX операций" f1="p1_fx_income" f2="p2_fx_income" form={form} setF={setF} p1rate={p1_rate} p2rate={p2_rate} currSymbol={currSymbol} notUSD={!isUSD} />
+                  <FR label="Прочие операционные доходы" f1="p1_other_income" f2="p2_other_income" form={form} setF={setF} p1rate={p1_rate} p2rate={p2_rate} currSymbol={currSymbol} notUSD={!isUSD} />
                   <FR label="▶ Операционный доход" bold auto v1={p1_op_income} v2={p2_op_income} f1="" f2="" form={form} setF={setF} p1rate={p1_rate} p2rate={p2_rate} currSymbol={currSymbol} notUSD={!isUSD} />
                   <FR label="Операционные расходы" f1="p1_operating_expense" f2="p2_operating_expense" form={form} setF={setF} p1rate={p1_rate} p2rate={p2_rate} currSymbol={currSymbol} notUSD={!isUSD} />
                   <FR label="Резервы на потери по кредитам" f1="p1_provisions" f2="p2_provisions" form={form} setF={setF} p1rate={p1_rate} p2rate={p2_rate} currSymbol={currSymbol} notUSD={!isUSD} />
