@@ -112,8 +112,8 @@ function FT({ title, p1, p2, currency, children }: { title: string; p1: string; 
         <thead>
           <tr className="bg-[#1B8A4C] text-white">
             <th className="text-left px-3 py-2 text-xs font-medium w-1/2">Показатель</th>
-            <th className="text-center px-3 py-2 text-xs font-medium w-1/4">{p1 || 'Период 1'} ({sym})</th>
-            <th className="text-center px-3 py-2 text-xs font-medium w-1/4">{p2 || 'Период 2'} ({sym})</th>
+            <th className="text-center px-3 py-2 text-xs font-medium w-1/4">{p1 || 'Период 1'} (тыс. {sym})</th>
+            <th className="text-center px-3 py-2 text-xs font-medium w-1/4">{p2 || 'Период 2'} (тыс. {sym})</th>
           </tr>
         </thead>
         <tbody className="divide-y divide-gray-100">{children}</tbody>
@@ -311,7 +311,7 @@ export default function FinancialAnalysisPage() {
         <table className="w-full text-sm">
           <thead>
             <tr className="bg-gray-50 border-b border-gray-100">
-              {['Контрагент','Аналитик','Периоды','Валюта','Активы П2 (USD)','CAR П2','ROE П2','Дата',''].map(h => (
+              {['Контрагент','Аналитик','Периоды','Валюта','Активы П2 (тыс. $)','CAR П2','ROE П2','Дата',''].map(h => (
                 <th key={h} className="text-left px-4 py-3 text-xs font-medium text-gray-500 uppercase whitespace-nowrap">{h}</th>
               ))}
             </tr>
@@ -372,10 +372,10 @@ export default function FinancialAnalysisPage() {
             <div className="flex-1 overflow-y-auto p-6 space-y-4">
               <div className="grid grid-cols-4 gap-3">
                 {[
-                  ['Активы П1 (USD)', `$${fmt((viewing.p1_usd_rate||1) > 1 ? (viewing.p1_cash + viewing.p1_receivables + viewing.p1_investments + viewing.p1_loans_issued + viewing.p1_fixed_assets + viewing.p1_other_assets) / (viewing.p1_usd_rate||1) : (viewing.p1_cash + viewing.p1_receivables + viewing.p1_investments + viewing.p1_loans_issued + viewing.p1_fixed_assets + viewing.p1_other_assets))}`],
-                  ['Активы П2 (USD)', `$${fmt((viewing.p2_usd_rate||1) > 1 ? (viewing.p2_cash + viewing.p2_receivables + viewing.p2_investments + viewing.p2_loans_issued + viewing.p2_fixed_assets + viewing.p2_other_assets) / (viewing.p2_usd_rate||1) : (viewing.p2_cash + viewing.p2_receivables + viewing.p2_investments + viewing.p2_loans_issued + viewing.p2_fixed_assets + viewing.p2_other_assets))}`],
-                  ['Прибыль П1 (USD)', `$${fmt((viewing.p1_usd_rate||1) > 1 ? viewing.p1_net_profit / (viewing.p1_usd_rate||1) : viewing.p1_net_profit)}`],
-                  ['Прибыль П2 (USD)', `$${fmt((viewing.p2_usd_rate||1) > 1 ? viewing.p2_net_profit / (viewing.p2_usd_rate||1) : viewing.p2_net_profit)}`],
+                  ['Активы П1 (тыс. $)', `$${fmt((viewing.p1_usd_rate||1) > 1 ? (viewing.p1_cash + viewing.p1_receivables + viewing.p1_investments + viewing.p1_loans_issued + viewing.p1_fixed_assets + viewing.p1_other_assets) / (viewing.p1_usd_rate||1) : (viewing.p1_cash + viewing.p1_receivables + viewing.p1_investments + viewing.p1_loans_issued + viewing.p1_fixed_assets + viewing.p1_other_assets))}`],
+                  ['Активы П2 (тыс. $)', `$${fmt((viewing.p2_usd_rate||1) > 1 ? (viewing.p2_cash + viewing.p2_receivables + viewing.p2_investments + viewing.p2_loans_issued + viewing.p2_fixed_assets + viewing.p2_other_assets) / (viewing.p2_usd_rate||1) : (viewing.p2_cash + viewing.p2_receivables + viewing.p2_investments + viewing.p2_loans_issued + viewing.p2_fixed_assets + viewing.p2_other_assets))}`],
+                  ['Прибыль П1 (тыс. $)', `$${fmt((viewing.p1_usd_rate||1) > 1 ? viewing.p1_net_profit / (viewing.p1_usd_rate||1) : viewing.p1_net_profit)}`],
+                  ['Прибыль П2 (тыс. $)', `$${fmt((viewing.p2_usd_rate||1) > 1 ? viewing.p2_net_profit / (viewing.p2_usd_rate||1) : viewing.p2_net_profit)}`],
                 ].map(([l, v]) => (
                   <div key={l} className="bg-gray-50 rounded-lg p-3">
                     <p className="text-xs text-gray-400">{l}</p>
@@ -468,8 +468,8 @@ export default function FinancialAnalysisPage() {
 
                   <div className="lg:col-span-2 bg-blue-50 border border-blue-100 rounded-lg p-3">
                     <p className="text-xs text-blue-800">
-                      💡 Вводите цифры из отчётности в валюте отчёта ({form.currency}).
-                      {!isUSD && ' Система автоматически конвертирует в USD для расчётов и AI анализа.'}
+                      💡 Вводите суммы в <strong>тысячах</strong> {form.currency} (напр. 1 000 = 1 млн).
+                      {!isUSD && ' Система конвертирует в USD автоматически.'}
                     </p>
                   </div>
                 </div>
@@ -514,11 +514,11 @@ export default function FinancialAnalysisPage() {
                   {(p1_car > 0 || p2_car > 0) && (
                     <div className="grid grid-cols-2 gap-3">
                       <div className={`p-3 rounded-lg ${p2_car >= 13 ? 'bg-green-50' : p2_car >= 10 ? 'bg-yellow-50' : 'bg-red-50'}`}>
-                        <p className="text-xs text-gray-500">CAR П1 → П2 (USD)</p>
+                        <p className="text-xs text-gray-500">CAR П1 → П2</p>
                         <p className={`text-xl font-bold ${p2_car >= 13 ? 'text-green-600' : p2_car >= 10 ? 'text-yellow-600' : 'text-red-600'}`}>{p1_car.toFixed(1)}% → {p2_car.toFixed(1)}%</p>
                       </div>
                       <div className={`p-3 rounded-lg ${p2_roe >= 10 ? 'bg-green-50' : p2_roe >= 5 ? 'bg-yellow-50' : 'bg-red-50'}`}>
-                        <p className="text-xs text-gray-500">ROE П1 → П2 (USD)</p>
+                        <p className="text-xs text-gray-500">ROE П1 → П2</p>
                         <p className={`text-xl font-bold ${p2_roe >= 10 ? 'text-green-600' : p2_roe >= 5 ? 'text-yellow-600' : 'text-red-600'}`}>{p1_roe.toFixed(1)}% → {p2_roe.toFixed(1)}%</p>
                       </div>
                     </div>
