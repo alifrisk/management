@@ -5,9 +5,26 @@ import { Plus, Eye, Trash2, X, Loader2, CheckCircle2, AlertCircle, Download, Fil
 
 const MONTHS = ['Январь','Февраль','Март','Апрель','Май','Июнь','Июль','Август','Сентябрь','Октябрь','Ноябрь','Декабрь']
 
+const CURRENCIES = [
+  { code: 'USD', name: 'Доллар США', symbol: '$' },
+  { code: 'RUB', name: 'Российский рубль', symbol: '₽' },
+  { code: 'EUR', name: 'Евро', symbol: '€' },
+  { code: 'AED', name: 'Дирхам ОАЭ', symbol: 'AED' },
+  { code: 'UZS', name: 'Узбекский сум', symbol: 'UZS' },
+  { code: 'KZT', name: 'Казахстанский тенге', symbol: '₸' },
+  { code: 'GEL', name: 'Грузинский лари', symbol: '₾' },
+  { code: 'AMD', name: 'Армянский драм', symbol: '֏' },
+  { code: 'CNY', name: 'Китайский юань', symbol: '¥' },
+  { code: 'TJS', name: 'Таджикский сомони', symbol: 'TJS' },
+  { code: 'TRY', name: 'Турецкая лира', symbol: '₺' },
+  { code: 'JPY', name: 'Японская иена', symbol: '¥' },
+  { code: 'BHD', name: 'Бахрейнский динар', symbol: 'BHD' },
+]
+
 interface FinAnalysis {
   id: string; code: string; analyst_name: string
   p1_label: string; p2_label: string
+  currency: string; usd_rate: number
   p1_cash: number; p2_cash: number
   p1_receivables: number; p2_receivables: number
   p1_investments: number; p2_investments: number
@@ -29,6 +46,7 @@ interface FinAnalysis {
 
 const EMPTY = {
   code: '', analyst_name: '', p1_label: '', p2_label: '',
+  currency: 'USD', usd_rate: '1',
   p1_cash: '', p2_cash: '', p1_receivables: '', p2_receivables: '',
   p1_investments: '', p2_investments: '', p1_loans_issued: '', p2_loans_issued: '',
   p1_fixed_assets: '', p2_fixed_assets: '', p1_other_assets: '', p2_other_assets: '',
@@ -47,25 +65,45 @@ interface FRProps {
   label: string; f1: string; f2: string
   form: Record<string, string>; setF: (k: string, v: string) => void
   bold?: boolean; auto?: boolean; v1?: number; v2?: number
+  rate?: number; currSymbol?: string
 }
-function FR({ label, f1, f2, bold, auto, v1, v2, form, setF }: FRProps) {
-  const cls = "w-full px-2 py-2 border border-gray-200 rounded text-sm focus:outline-none focus:ring-2 focus:ring-[#1B8A4C] text-right bg-white"
+function FR({ label, f1, f2, bold, auto, v1, v2, form, setF, rate = 1, currSymbol = '$' }: FRProps) {
+  const cls = "w-full px-2 py-1.5 border border-gray-200 rounded text-sm focus:outline-none focus:ring-2 focus:ring-[#1B8A4C] text-right bg-white"
+  const isUSD = currSymbol === '$'
+  const toUSD = (v: number) => rate > 0 && rate !== 1 ? v / rate : v
+
   return (
     <tr className={bold ? 'bg-gray-50' : 'hover:bg-blue-50/20'}>
-      <td className={`px-3 py-2 text-xs ${bold ? 'font-semibold text-gray-800' : 'text-gray-600'}`}>{label}</td>
+      <td className={`px-3 py-1.5 text-xs ${bold ? 'font-semibold text-gray-800' : 'text-gray-600'}`}>{label}</td>
       <td className="px-2 py-1">
-        {auto ? <div className={`text-sm font-bold text-right pr-2 ${(v1||0) < 0 ? 'text-red-600' : bold ? 'text-[#1B8A4C]' : 'text-gray-900'}`}>{fmt(v1||0)}</div>
-          : <input type="text" inputMode="numeric" value={form[f1] || ''} onChange={e => setF(f1, fmtN(e.target.value))} className={cls} placeholder="0" />}
+        {auto
+          ? <div className="space-y-0.5">
+              <div className={`text-sm font-bold text-right pr-2 ${(v1||0) < 0 ? 'text-red-600' : bold ? 'text-[#1B8A4C]' : 'text-gray-900'}`}>{fmt(v1||0)}</div>
+              {!isUSD && v1 !== undefined && v1 > 0 && <div className="text-xs text-gray-400 text-right pr-2">≈ ${fmt(toUSD(v1))}</div>}
+            </div>
+          : <div className="space-y-0.5">
+              <input type="text" inputMode="numeric" value={form[f1] || ''} onChange={e => setF(f1, fmtN(e.target.value))} className={cls} placeholder="0" />
+              {!isUSD && parseN(form[f1]) > 0 && <div className="text-xs text-gray-400 text-right">≈ ${fmt(toUSD(parseN(form[f1])))}</div>}
+            </div>}
       </td>
       <td className="px-2 py-1">
-        {auto ? <div className={`text-sm font-bold text-right pr-2 ${(v2||0) < 0 ? 'text-red-600' : bold ? 'text-[#1B8A4C]' : 'text-gray-900'}`}>{fmt(v2||0)}</div>
-          : <input type="text" inputMode="numeric" value={form[f2] || ''} onChange={e => setF(f2, fmtN(e.target.value))} className={cls} placeholder="0" />}
+        {auto
+          ? <div className="space-y-0.5">
+              <div className={`text-sm font-bold text-right pr-2 ${(v2||0) < 0 ? 'text-red-600' : bold ? 'text-[#1B8A4C]' : 'text-gray-900'}`}>{fmt(v2||0)}</div>
+              {!isUSD && v2 !== undefined && v2 > 0 && <div className="text-xs text-gray-400 text-right pr-2">≈ ${fmt(toUSD(v2))}</div>}
+            </div>
+          : <div className="space-y-0.5">
+              <input type="text" inputMode="numeric" value={form[f2] || ''} onChange={e => setF(f2, fmtN(e.target.value))} className={cls} placeholder="0" />
+              {!isUSD && parseN(form[f2]) > 0 && <div className="text-xs text-gray-400 text-right">≈ ${fmt(toUSD(parseN(form[f2])))}</div>}
+            </div>}
       </td>
     </tr>
   )
 }
 
-function FT({ title, p1, p2, children }: { title: string; p1: string; p2: string; children: React.ReactNode }) {
+function FT({ title, p1, p2, currency, children }: { title: string; p1: string; p2: string; currency: string; children: React.ReactNode }) {
+  const curr = CURRENCIES.find(c => c.code === currency)
+  const sym = curr?.symbol || currency
   return (
     <div className="mb-5">
       <h3 className="text-xs font-bold text-gray-500 uppercase tracking-wide mb-2">{title}</h3>
@@ -73,8 +111,8 @@ function FT({ title, p1, p2, children }: { title: string; p1: string; p2: string
         <thead>
           <tr className="bg-[#1B8A4C] text-white">
             <th className="text-left px-3 py-2 text-xs font-medium w-1/2">Показатель</th>
-            <th className="text-center px-3 py-2 text-xs font-medium w-1/4">{p1 || 'Период 1'}</th>
-            <th className="text-center px-3 py-2 text-xs font-medium w-1/4">{p2 || 'Период 2'}</th>
+            <th className="text-center px-3 py-2 text-xs font-medium w-1/4">{p1 || 'Период 1'} ({sym})</th>
+            <th className="text-center px-3 py-2 text-xs font-medium w-1/4">{p2 || 'Период 2'} ({sym})</th>
           </tr>
         </thead>
         <tbody className="divide-y divide-gray-100">{children}</tbody>
@@ -109,10 +147,17 @@ export default function FinancialAnalysisPage() {
 
   const setF = (k: string, v: string) => setForm(p => ({ ...p, [k]: v }))
   const n = (k: string) => parseN(form[k] || '')
+  const rate = Number(form.usd_rate) || 1
+  const isUSD = form.currency === 'USD'
+  // Convert to USD for calculations
+  const toUSD = (v: number) => isUSD ? v : v / rate
+  const nUSD = (k: string) => toUSD(n(k))
+
   const p1 = form.p1_label || 'Период 1'
   const p2 = form.p2_label || 'Период 2'
+  const currSymbol = CURRENCIES.find(c => c.code === form.currency)?.symbol || '$'
 
-  // Computed
+  // Computed in original currency
   const p1_total_assets = n('p1_cash') + n('p1_receivables') + n('p1_investments') + n('p1_loans_issued') + n('p1_fixed_assets') + n('p1_other_assets')
   const p2_total_assets = n('p2_cash') + n('p2_receivables') + n('p2_investments') + n('p2_loans_issued') + n('p2_fixed_assets') + n('p2_other_assets')
   const p1_total_liab = n('p1_deposits') + n('p1_borrowings') + n('p1_other_liab')
@@ -126,11 +171,13 @@ export default function FinancialAnalysisPage() {
   const p1_pre_tax = p1_op_income - n('p1_operating_expense') - n('p1_provisions')
   const p2_pre_tax = p2_op_income - n('p2_operating_expense') - n('p2_provisions')
 
-  // Ratios
-  const p1_car = p1_total_assets > 0 ? (n('p1_equity') / p1_total_assets * 100) : 0
-  const p2_car = p2_total_assets > 0 ? (n('p2_equity') / p2_total_assets * 100) : 0
-  const p1_roe = n('p1_equity') > 0 ? (n('p1_net_profit') / n('p1_equity') * 100) : 0
-  const p2_roe = n('p2_equity') > 0 ? (n('p2_net_profit') / n('p2_equity') * 100) : 0
+  // Computed in USD for ratios
+  const p1_total_assets_usd = toUSD(p1_total_assets)
+  const p2_total_assets_usd = toUSD(p2_total_assets)
+  const p1_car = p1_total_assets_usd > 0 ? (nUSD('p1_equity') / p1_total_assets_usd * 100) : 0
+  const p2_car = p2_total_assets_usd > 0 ? (nUSD('p2_equity') / p2_total_assets_usd * 100) : 0
+  const p1_roe = nUSD('p1_equity') > 0 ? (nUSD('p1_net_profit') / nUSD('p1_equity') * 100) : 0
+  const p2_roe = nUSD('p2_equity') > 0 ? (nUSD('p2_net_profit') / nUSD('p2_equity') * 100) : 0
 
   async function downloadWord(a: FinAnalysis) {
     try {
@@ -151,28 +198,38 @@ export default function FinancialAnalysisPage() {
     if (!form.code.trim()) { setError('Введите код контрагента'); return }
     setGenerating(true); setError(null)
     try {
+      // Send USD values to AI
+      const p1_nim_usd = toUSD(p1_nim)
+      const p2_nim_usd = toUSD(p2_nim)
+      const p1_op_usd = toUSD(p1_op_income)
+      const p2_op_usd = toUSD(p2_op_income)
+
       const res = await fetch('/api/market-risk/financial-analysis', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           code: form.code, p1_label: p1, p2_label: p2,
-          p1_total_assets, p2_total_assets,
-          p1_total_liab, p2_total_liab,
-          p1_equity: n('p1_equity'), p2_equity: n('p2_equity'),
-          p1_nim, p2_nim, p1_op_income, p2_op_income,
-          p1_net_profit: n('p1_net_profit'), p2_net_profit: n('p2_net_profit'),
+          currency: form.currency, usd_rate: rate,
+          p1_total_assets: p1_total_assets_usd, p2_total_assets: p2_total_assets_usd,
+          p1_total_liab: toUSD(p1_total_liab), p2_total_liab: toUSD(p2_total_liab),
+          p1_equity: nUSD('p1_equity'), p2_equity: nUSD('p2_equity'),
+          p1_nim: p1_nim_usd, p2_nim: p2_nim_usd,
+          p1_op_income: p1_op_usd, p2_op_income: p2_op_usd,
+          p1_net_profit: nUSD('p1_net_profit'), p2_net_profit: nUSD('p2_net_profit'),
           p1_car: Math.round(p1_car * 10) / 10, p2_car: Math.round(p2_car * 10) / 10,
           p1_roe: Math.round(p1_roe * 10) / 10, p2_roe: Math.round(p2_roe * 10) / 10,
-          p1_provisions: n('p1_provisions'), p2_provisions: n('p2_provisions'),
+          p1_provisions: nUSD('p1_provisions'), p2_provisions: nUSD('p2_provisions'),
         }),
       })
       const data = await res.json()
       if (data.error) throw new Error(data.error)
 
+      // Save original currency values to DB
       const vals = (k: string) => parseN(form[k] || '')
       const { error: dbErr } = await supabase.from('counterparty_financials').insert({
         code: form.code, analyst_name: form.analyst_name,
         p1_label: p1, p2_label: p2,
+        currency: form.currency, usd_rate: rate,
         p1_cash: vals('p1_cash'), p2_cash: vals('p2_cash'),
         p1_receivables: vals('p1_receivables'), p2_receivables: vals('p2_receivables'),
         p1_investments: vals('p1_investments'), p2_investments: vals('p2_investments'),
@@ -192,10 +249,7 @@ export default function FinancialAnalysisPage() {
         ai_conclusion: data.conclusion,
       })
       if (dbErr) throw new Error(dbErr.message)
-
-      // Auto-create counterparty registry entry
       await supabase.from('counterparties').upsert({ code: form.code, updated_at: new Date().toISOString() }, { onConflict: 'code', ignoreDuplicates: true })
-
       setShowModal(false); setForm(EMPTY); setTab(1); fetch_()
     } catch (err: unknown) {
       setError('Ошибка: ' + (err instanceof Error ? err.message : String(err)))
@@ -260,26 +314,32 @@ export default function FinancialAnalysisPage() {
         <table className="w-full text-sm">
           <thead>
             <tr className="bg-gray-50 border-b border-gray-100">
-              {['Контрагент','Аналитик','Периоды','Активы П2','CAR П2','ROE П2','Дата',''].map(h => (
+              {['Контрагент','Аналитик','Периоды','Валюта','Активы П2 (USD)','CAR П2','ROE П2','Дата',''].map(h => (
                 <th key={h} className="text-left px-4 py-3 text-xs font-medium text-gray-500 uppercase whitespace-nowrap">{h}</th>
               ))}
             </tr>
           </thead>
           <tbody className="divide-y divide-gray-50">
-            {loading ? <tr><td colSpan={8} className="text-center py-12 text-gray-400">Загрузка...</td></tr>
-              : analyses.length === 0 ? <tr><td colSpan={8} className="text-center py-12 text-gray-400">Нет анализов</td></tr>
+            {loading ? <tr><td colSpan={9} className="text-center py-12 text-gray-400">Загрузка...</td></tr>
+              : analyses.length === 0 ? <tr><td colSpan={9} className="text-center py-12 text-gray-400">Нет анализов</td></tr>
               : analyses.map(a => {
-                const car2 = a.p2_equity && (a.p2_cash + a.p2_receivables + a.p2_investments + a.p2_loans_issued + a.p2_fixed_assets + a.p2_other_assets) > 0
-                  ? (a.p2_equity / (a.p2_cash + a.p2_receivables + a.p2_investments + a.p2_loans_issued + a.p2_fixed_assets + a.p2_other_assets) * 100).toFixed(1)
-                  : null
-                const roe2 = a.p2_equity > 0 ? (a.p2_net_profit / a.p2_equity * 100).toFixed(1) : null
-                const assets2 = a.p2_cash + a.p2_receivables + a.p2_investments + a.p2_loans_issued + a.p2_fixed_assets + a.p2_other_assets
+                const r = a.usd_rate || 1
+                const toUsd = (v: number) => a.currency === 'USD' ? v : v / r
+                const assets2raw = a.p2_cash + a.p2_receivables + a.p2_investments + a.p2_loans_issued + a.p2_fixed_assets + a.p2_other_assets
+                const assets2 = toUsd(assets2raw)
+                const car2 = assets2 > 0 ? (toUsd(a.p2_equity) / assets2 * 100).toFixed(1) : null
+                const roe2 = a.p2_equity > 0 ? (toUsd(a.p2_net_profit) / toUsd(a.p2_equity) * 100).toFixed(1) : null
                 return (
                   <tr key={a.id} className="hover:bg-gray-50">
                     <td className="px-4 py-3 font-semibold text-gray-900">{a.code}</td>
                     <td className="px-4 py-3 text-gray-600">{a.analyst_name || '—'}</td>
                     <td className="px-4 py-3 text-xs text-gray-500">{a.p1_label} → {a.p2_label}</td>
-                    <td className="px-4 py-3 text-sm font-medium">{assets2 > 0 ? fmt(assets2) : '—'}</td>
+                    <td className="px-4 py-3">
+                      <span className="text-xs bg-blue-50 text-blue-700 px-2 py-0.5 rounded-full font-medium">
+                        {a.currency || 'USD'}{a.currency && a.currency !== 'USD' ? ` (×${a.usd_rate})` : ''}
+                      </span>
+                    </td>
+                    <td className="px-4 py-3 text-sm font-medium">{assets2 > 0 ? `$${fmt(assets2)}` : '—'}</td>
                     <td className="px-4 py-3 text-sm font-medium">{car2 ? `${car2}%` : '—'}</td>
                     <td className="px-4 py-3 text-sm font-medium">{roe2 ? `${roe2}%` : '—'}</td>
                     <td className="px-4 py-3 text-xs text-gray-400">{new Date(a.created_at).toLocaleDateString('ru-RU')}</td>
@@ -302,16 +362,21 @@ export default function FinancialAnalysisPage() {
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50">
           <div className="bg-white rounded-2xl shadow-2xl w-full max-w-3xl max-h-[90vh] flex flex-col">
             <div className="flex items-center justify-between p-6 border-b border-gray-100">
-              <h2 className="text-lg font-semibold">{viewing.code} — Финансовый анализ</h2>
+              <div>
+                <h2 className="text-lg font-semibold">{viewing.code} — Финансовый анализ</h2>
+                {viewing.currency && viewing.currency !== 'USD' && (
+                  <p className="text-xs text-gray-400 mt-0.5">Валюта отчёта: {viewing.currency} · Курс: 1 USD = {viewing.usd_rate} {viewing.currency}</p>
+                )}
+              </div>
               <button onClick={() => setViewing(null)}><X className="w-5 h-5 text-gray-400" /></button>
             </div>
             <div className="flex-1 overflow-y-auto p-6 space-y-4">
               <div className="grid grid-cols-4 gap-3">
                 {[
-                  ['Активы П1', fmt(viewing.p1_cash + viewing.p1_receivables + viewing.p1_investments + viewing.p1_loans_issued + viewing.p1_fixed_assets + viewing.p1_other_assets)],
-                  ['Активы П2', fmt(viewing.p2_cash + viewing.p2_receivables + viewing.p2_investments + viewing.p2_loans_issued + viewing.p2_fixed_assets + viewing.p2_other_assets)],
-                  ['Чистая прибыль П1', fmt(viewing.p1_net_profit)],
-                  ['Чистая прибыль П2', fmt(viewing.p2_net_profit)],
+                  ['Активы П1 (USD)', `$${fmt((viewing.usd_rate||1) > 1 ? (viewing.p1_cash + viewing.p1_receivables + viewing.p1_investments + viewing.p1_loans_issued + viewing.p1_fixed_assets + viewing.p1_other_assets) / (viewing.usd_rate||1) : (viewing.p1_cash + viewing.p1_receivables + viewing.p1_investments + viewing.p1_loans_issued + viewing.p1_fixed_assets + viewing.p1_other_assets))}`],
+                  ['Активы П2 (USD)', `$${fmt((viewing.usd_rate||1) > 1 ? (viewing.p2_cash + viewing.p2_receivables + viewing.p2_investments + viewing.p2_loans_issued + viewing.p2_fixed_assets + viewing.p2_other_assets) / (viewing.usd_rate||1) : (viewing.p2_cash + viewing.p2_receivables + viewing.p2_investments + viewing.p2_loans_issued + viewing.p2_fixed_assets + viewing.p2_other_assets))}`],
+                  ['Прибыль П1 (USD)', `$${fmt((viewing.usd_rate||1) > 1 ? viewing.p1_net_profit / (viewing.usd_rate||1) : viewing.p1_net_profit)}`],
+                  ['Прибыль П2 (USD)', `$${fmt((viewing.usd_rate||1) > 1 ? viewing.p2_net_profit / (viewing.usd_rate||1) : viewing.p2_net_profit)}`],
                 ].map(([l, v]) => (
                   <div key={l} className="bg-gray-50 rounded-lg p-3">
                     <p className="text-xs text-gray-400">{l}</p>
@@ -365,42 +430,71 @@ export default function FinancialAnalysisPage() {
                   <div><label className={lbl}>Аналитик</label><input type="text" value={form.analyst_name} onChange={e => setF('analyst_name', e.target.value)} placeholder="ФИО" className={inp} /></div>
                   <div><label className={lbl}>Название периода 1</label><input type="text" value={form.p1_label} onChange={e => setF('p1_label', e.target.value)} placeholder="31.12.2024" className={inp} /></div>
                   <div><label className={lbl}>Название периода 2</label><input type="text" value={form.p2_label} onChange={e => setF('p2_label', e.target.value)} placeholder="31.03.2025" className={inp} /></div>
+
+                  {/* ✅ Валюта и курс */}
+                  <div>
+                    <label className={lbl}>Валюта отчётности</label>
+                    <select value={form.currency} onChange={e => { setF('currency', e.target.value); if (e.target.value === 'USD') setF('usd_rate', '1') }} className={inp}>
+                      {CURRENCIES.map(c => <option key={c.code} value={c.code}>{c.symbol} {c.name} ({c.code})</option>)}
+                    </select>
+                  </div>
+                  <div>
+                    <label className={lbl}>
+                      {form.currency === 'USD' ? 'Курс (USD — основная валюта)' : `Курс: 1 USD = ? ${form.currency}`}
+                    </label>
+                    <input
+                      type="text" inputMode="decimal"
+                      value={form.usd_rate}
+                      onChange={e => setF('usd_rate', e.target.value)}
+                      disabled={form.currency === 'USD'}
+                      placeholder={form.currency === 'USD' ? '1' : 'Например: 92.5'}
+                      className={`${inp} ${form.currency === 'USD' ? 'bg-gray-50 text-gray-400' : ''}`}
+                    />
+                    {form.currency !== 'USD' && Number(form.usd_rate) > 0 && (
+                      <p className="text-xs text-green-700 mt-1">1 USD = {form.usd_rate} {form.currency} · Данные будут конвертированы автоматически</p>
+                    )}
+                  </div>
+
                   <div className="lg:col-span-2 bg-blue-50 border border-blue-100 rounded-lg p-3">
-                    <p className="text-xs text-blue-800">💡 Все суммы в USD. После заполнения AI сгенерирует профессиональный финансовый анализ.</p>
+                    <p className="text-xs text-blue-800">
+                      💡 Вводите цифры из отчётности в валюте отчёта ({form.currency}).
+                      {!isUSD && ' Система автоматически конвертирует в USD для расчётов и AI анализа.'}
+                    </p>
                   </div>
                 </div>
               )}
 
               {tab === 2 && (
                 <div className="space-y-2">
-                  <FT title="АКТИВ" p1={p1} p2={p2}>
-                    <FR label="Денежные средства и счета в ЦБ" f1="p1_cash" f2="p2_cash" form={form} setF={setF} />
-                    <FR label="Средства в других банках" f1="p1_receivables" f2="p2_receivables" form={form} setF={setF} />
-                    <FR label="Инвестиционные ценные бумаги" f1="p1_investments" f2="p2_investments" form={form} setF={setF} />
-                    <FR label="Кредитный портфель (нетто)" f1="p1_loans_issued" f2="p2_loans_issued" form={form} setF={setF} />
-                    <FR label="Основные средства" f1="p1_fixed_assets" f2="p2_fixed_assets" form={form} setF={setF} />
-                    <FR label="Прочие активы" f1="p1_other_assets" f2="p2_other_assets" form={form} setF={setF} />
-                    <FR label="ИТОГО АКТИВ" bold auto v1={p1_total_assets} v2={p2_total_assets} f1="" f2="" form={form} setF={setF} />
+                  <FT title="АКТИВ" p1={p1} p2={p2} currency={form.currency}>
+                    <FR label="Денежные средства и счета в ЦБ" f1="p1_cash" f2="p2_cash" form={form} setF={setF} rate={rate} currSymbol={currSymbol} />
+                    <FR label="Средства в других банках" f1="p1_receivables" f2="p2_receivables" form={form} setF={setF} rate={rate} currSymbol={currSymbol} />
+                    <FR label="Инвестиционные ценные бумаги" f1="p1_investments" f2="p2_investments" form={form} setF={setF} rate={rate} currSymbol={currSymbol} />
+                    <FR label="Кредитный портфель (нетто)" f1="p1_loans_issued" f2="p2_loans_issued" form={form} setF={setF} rate={rate} currSymbol={currSymbol} />
+                    <FR label="Основные средства" f1="p1_fixed_assets" f2="p2_fixed_assets" form={form} setF={setF} rate={rate} currSymbol={currSymbol} />
+                    <FR label="Прочие активы" f1="p1_other_assets" f2="p2_other_assets" form={form} setF={setF} rate={rate} currSymbol={currSymbol} />
+                    <FR label="ИТОГО АКТИВ" bold auto v1={p1_total_assets} v2={p2_total_assets} f1="" f2="" form={form} setF={setF} rate={rate} currSymbol={currSymbol} />
                   </FT>
-                  <FT title="ПАССИВ" p1={p1} p2={p2}>
-                    <FR label="Депозиты клиентов" f1="p1_deposits" f2="p2_deposits" form={form} setF={setF} />
-                    <FR label="Заёмные средства (МБК, займы)" f1="p1_borrowings" f2="p2_borrowings" form={form} setF={setF} />
-                    <FR label="Прочие обязательства" f1="p1_other_liab" f2="p2_other_liab" form={form} setF={setF} />
-                    <FR label="Итого обязательства" bold auto v1={p1_total_liab} v2={p2_total_liab} f1="" f2="" form={form} setF={setF} />
-                    <FR label="Собственный капитал" f1="p1_equity" f2="p2_equity" form={form} setF={setF} />
-                    <FR label="ИТОГО ПАССИВ" bold auto v1={p1_total_passiv} v2={p2_total_passiv} f1="" f2="" form={form} setF={setF} />
+                  <FT title="ПАССИВ" p1={p1} p2={p2} currency={form.currency}>
+                    <FR label="Депозиты клиентов" f1="p1_deposits" f2="p2_deposits" form={form} setF={setF} rate={rate} currSymbol={currSymbol} />
+                    <FR label="Заёмные средства (МБК, займы)" f1="p1_borrowings" f2="p2_borrowings" form={form} setF={setF} rate={rate} currSymbol={currSymbol} />
+                    <FR label="Прочие обязательства" f1="p1_other_liab" f2="p2_other_liab" form={form} setF={setF} rate={rate} currSymbol={currSymbol} />
+                    <FR label="Итого обязательства" bold auto v1={p1_total_liab} v2={p2_total_liab} f1="" f2="" form={form} setF={setF} rate={rate} currSymbol={currSymbol} />
+                    <FR label="Собственный капитал" f1="p1_equity" f2="p2_equity" form={form} setF={setF} rate={rate} currSymbol={currSymbol} />
+                    <FR label="ИТОГО ПАССИВ" bold auto v1={p1_total_passiv} v2={p2_total_passiv} f1="" f2="" form={form} setF={setF} rate={rate} currSymbol={currSymbol} />
                   </FT>
-                  {/* ✅ Balance check */}
+
+                  {/* Balance check */}
                   {(p1_total_assets > 0 || p2_total_assets > 0) && (
                     <div className="grid grid-cols-2 gap-3">
                       {p1_total_assets > 0 && (
-                        <div className={`p-3 rounded-lg border text-xs font-medium ${Math.abs(p1_total_assets - (p1_total_liab + n('p1_equity'))) < 1 ? 'bg-green-50 border-green-200 text-green-700' : 'bg-red-50 border-red-200 text-red-700'}`}>
-                          {form.p1_label || 'Период 1'}: {Math.abs(p1_total_assets - (p1_total_liab + n('p1_equity'))) < 1 ? '✅ Баланс сходится' : `⚠️ Разница: ${new Intl.NumberFormat('ru-RU').format(Math.round(Math.abs(p1_total_assets - (p1_total_liab + n('p1_equity')))))}`}
+                        <div className={`p-3 rounded-lg border text-xs font-medium ${Math.abs(p1_total_assets - p1_total_passiv) < 1 ? 'bg-green-50 border-green-200 text-green-700' : 'bg-red-50 border-red-200 text-red-700'}`}>
+                          {p1}: {Math.abs(p1_total_assets - p1_total_passiv) < 1 ? '✅ Баланс сходится' : `⚠️ Разница: ${fmt(Math.abs(p1_total_assets - p1_total_passiv))} ${currSymbol}`}
                         </div>
                       )}
                       {p2_total_assets > 0 && (
-                        <div className={`p-3 rounded-lg border text-xs font-medium ${Math.abs(p2_total_assets - (p2_total_liab + n('p2_equity'))) < 1 ? 'bg-green-50 border-green-200 text-green-700' : 'bg-red-50 border-red-200 text-red-700'}`}>
-                          {form.p2_label || 'Период 2'}: {Math.abs(p2_total_assets - (p2_total_liab + n('p2_equity'))) < 1 ? '✅ Баланс сходится' : `⚠️ Разница: ${new Intl.NumberFormat('ru-RU').format(Math.round(Math.abs(p2_total_assets - (p2_total_liab + n('p2_equity')))))}`}
+                        <div className={`p-3 rounded-lg border text-xs font-medium ${Math.abs(p2_total_assets - p2_total_passiv) < 1 ? 'bg-green-50 border-green-200 text-green-700' : 'bg-red-50 border-red-200 text-red-700'}`}>
+                          {p2}: {Math.abs(p2_total_assets - p2_total_passiv) < 1 ? '✅ Баланс сходится' : `⚠️ Разница: ${fmt(Math.abs(p2_total_assets - p2_total_passiv))} ${currSymbol}`}
                         </div>
                       )}
                     </div>
@@ -409,11 +503,11 @@ export default function FinancialAnalysisPage() {
                   {(p1_car > 0 || p2_car > 0) && (
                     <div className="grid grid-cols-2 gap-3">
                       <div className={`p-3 rounded-lg ${p2_car >= 13 ? 'bg-green-50' : p2_car >= 10 ? 'bg-yellow-50' : 'bg-red-50'}`}>
-                        <p className="text-xs text-gray-500">CAR П1 → П2</p>
+                        <p className="text-xs text-gray-500">CAR П1 → П2 (USD)</p>
                         <p className={`text-xl font-bold ${p2_car >= 13 ? 'text-green-600' : p2_car >= 10 ? 'text-yellow-600' : 'text-red-600'}`}>{p1_car.toFixed(1)}% → {p2_car.toFixed(1)}%</p>
                       </div>
                       <div className={`p-3 rounded-lg ${p2_roe >= 10 ? 'bg-green-50' : p2_roe >= 5 ? 'bg-yellow-50' : 'bg-red-50'}`}>
-                        <p className="text-xs text-gray-500">ROE П1 → П2</p>
+                        <p className="text-xs text-gray-500">ROE П1 → П2 (USD)</p>
                         <p className={`text-xl font-bold ${p2_roe >= 10 ? 'text-green-600' : p2_roe >= 5 ? 'text-yellow-600' : 'text-red-600'}`}>{p1_roe.toFixed(1)}% → {p2_roe.toFixed(1)}%</p>
                       </div>
                     </div>
@@ -422,16 +516,16 @@ export default function FinancialAnalysisPage() {
               )}
 
               {tab === 3 && (
-                <FT title="ОТЧЁТ О ПРИБЫЛЯХ И УБЫТКАХ" p1={p1} p2={p2}>
-                  <FR label="Процентные доходы" f1="p1_interest_income" f2="p2_interest_income" form={form} setF={setF} />
-                  <FR label="Процентные расходы" f1="p1_interest_expense" f2="p2_interest_expense" form={form} setF={setF} />
-                  <FR label="▶ Чистый процентный доход (NIM)" bold auto v1={p1_nim} v2={p2_nim} f1="" f2="" form={form} setF={setF} />
-                  <FR label="Комиссионные доходы" f1="p1_fee_income" f2="p2_fee_income" form={form} setF={setF} />
-                  <FR label="▶ Операционный доход" bold auto v1={p1_op_income} v2={p2_op_income} f1="" f2="" form={form} setF={setF} />
-                  <FR label="Операционные расходы" f1="p1_operating_expense" f2="p2_operating_expense" form={form} setF={setF} />
-                  <FR label="Резервы на потери по кредитам" f1="p1_provisions" f2="p2_provisions" form={form} setF={setF} />
-                  <FR label="▶ Прибыль до налогов" bold auto v1={p1_pre_tax} v2={p2_pre_tax} f1="" f2="" form={form} setF={setF} />
-                  <FR label="▶ Чистая прибыль" bold f1="p1_net_profit" f2="p2_net_profit" form={form} setF={setF} />
+                <FT title="ОТЧЁТ О ПРИБЫЛЯХ И УБЫТКАХ" p1={p1} p2={p2} currency={form.currency}>
+                  <FR label="Процентные доходы" f1="p1_interest_income" f2="p2_interest_income" form={form} setF={setF} rate={rate} currSymbol={currSymbol} />
+                  <FR label="Процентные расходы" f1="p1_interest_expense" f2="p2_interest_expense" form={form} setF={setF} rate={rate} currSymbol={currSymbol} />
+                  <FR label="▶ Чистый процентный доход (NIM)" bold auto v1={p1_nim} v2={p2_nim} f1="" f2="" form={form} setF={setF} rate={rate} currSymbol={currSymbol} />
+                  <FR label="Комиссионные доходы" f1="p1_fee_income" f2="p2_fee_income" form={form} setF={setF} rate={rate} currSymbol={currSymbol} />
+                  <FR label="▶ Операционный доход" bold auto v1={p1_op_income} v2={p2_op_income} f1="" f2="" form={form} setF={setF} rate={rate} currSymbol={currSymbol} />
+                  <FR label="Операционные расходы" f1="p1_operating_expense" f2="p2_operating_expense" form={form} setF={setF} rate={rate} currSymbol={currSymbol} />
+                  <FR label="Резервы на потери по кредитам" f1="p1_provisions" f2="p2_provisions" form={form} setF={setF} rate={rate} currSymbol={currSymbol} />
+                  <FR label="▶ Прибыль до налогов" bold auto v1={p1_pre_tax} v2={p2_pre_tax} f1="" f2="" form={form} setF={setF} rate={rate} currSymbol={currSymbol} />
+                  <FR label="▶ Чистая прибыль" bold f1="p1_net_profit" f2="p2_net_profit" form={form} setF={setF} rate={rate} currSymbol={currSymbol} />
                 </FT>
               )}
             </div>
