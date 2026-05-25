@@ -94,10 +94,11 @@ export async function POST(request: Request) {
     })
 
     const colWidths = [3800, 2200, 2200, 1154]
+    const displayCurr = (a.currency && a.currency !== 'USD') ? a.currency : 'USD'
     const headerRow = new TableRow({ children: [
-      cell('Показатель (USD)', { green: true, bold: true }),
-      cell(a.p1_label || 'Период 1', { green: true, bold: true, center: true }),
-      cell(a.p2_label || 'Период 2', { green: true, bold: true, center: true }),
+      cell(`Показатель (тыс. ${displayCurr})`, { green: true, bold: true }),
+      cell(`${a.p1_label || 'Период 1'} (тыс.)`, { green: true, bold: true, center: true }),
+      cell(`${a.p2_label || 'Период 2'} (тыс.)`, { green: true, bold: true, center: true }),
       cell('Динамика', { green: true, bold: true, center: true }),
     ]})
 
@@ -197,7 +198,8 @@ export async function POST(request: Request) {
 
           sectionHead('5', 'ЗАКЛЮЧЕНИЕ И ВЫВОДЫ'),
           ...conclusionParagraphs,
-          para('', { after: 300 }),
+          para('', { after: 60 }),
+          para(`* Все суммы в таблицах указаны в тысячах ${(a.currency && a.currency !== 'USD') ? a.currency + '. Конвертация в USD выполнена по курсам периодов.' : 'долларов США (USD).'}`, { size: 18, color: '888888', after: 240 }),
 
           new Table({
             width: { size: 9354, type: WidthType.DXA }, columnWidths: [4677, 4677],
