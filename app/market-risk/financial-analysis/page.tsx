@@ -335,7 +335,7 @@ export default function FinancialAnalysisPage() {
                     <td className="px-4 py-3 text-xs text-gray-500">{a.p1_label} → {a.p2_label}</td>
                     <td className="px-4 py-3">
                       <span className="text-xs bg-blue-50 text-blue-700 px-2 py-0.5 rounded-full font-medium">
-                        {a.currency || 'USD'}{a.currency && a.currency !== 'USD' ? ` (×${a.usd_rate})` : ''}
+                        {a.currency || 'USD'}{a.currency && a.currency !== 'USD' ? ` П1:×${a.p1_usd_rate} П2:×${a.p2_usd_rate}` : ''}
                       </span>
                     </td>
                     <td className="px-4 py-3 text-sm font-medium">{assets2 > 0 ? `$${fmt(assets2)}` : '—'}</td>
