@@ -30,7 +30,7 @@ interface FinAnalysis {
   p2_loans_issued: number; p2_fixed_assets: number; p2_other_assets: number
   p2_deposits: number; p2_borrowings: number; p2_other_liab: number
   p2_equity: number; p2_net_profit: number
-  p2_label: string
+  p2_label: string; counterparty_type?: string
 }
 
 const MONTHS = ['Январь','Февраль','Март','Апрель','Май','Июнь','Июль','Август','Сентябрь','Октябрь','Ноябрь','Декабрь']
@@ -222,7 +222,7 @@ export default function MarketRiskPage() {
     if (filterYear && filterMonth) query = query.gte('assessment_date', `${filterYear}-${filterMonth}-01`).lte('assessment_date', `${filterYear}-${filterMonth}-31`)
     const [{ data: aData }, { data: fData }] = await Promise.all([
       query,
-      supabase.from('counterparty_financials').select('id, code, p2_label, currency, p2_usd_rate, p2_cash, p2_receivables, p2_investments, p2_loans_issued, p2_fixed_assets, p2_other_assets, p2_deposits, p2_borrowings, p2_other_liab, p2_equity, p2_net_profit').order('created_at', { ascending: false }),
+      supabase.from('counterparty_financials').select('id, code, p2_label, currency, p2_usd_rate, counterparty_type, p2_cash, p2_receivables, p2_investments, p2_loans_issued, p2_fixed_assets, p2_other_assets, p2_deposits, p2_borrowings, p2_other_liab, p2_equity, p2_net_profit').order('created_at', { ascending: false }),
     ])
     setAssessments(aData || [])
     setFinAnalyses(fData || [])
@@ -252,6 +252,7 @@ export default function MarketRiskPage() {
     setForm(p => ({
       ...p,
       bank_name: fin.code,
+      counterparty_type: fin.counterparty_type || 'Банк',
       total_assets: fmtN(totalAssets),
       liquid_assets: fmtN(toUSD(fin.p2_cash + fin.p2_investments)),
       total_capital: fmtN(toUSD(fin.p2_equity)),
@@ -266,7 +267,7 @@ export default function MarketRiskPage() {
     if (!form.bank_name.trim()) { setError('Введите код контрагента'); return }
     setGenerating(true); setError(null)
     try {
-      const payload = { ...form, ...computed.scores, car: computed.car, roe: computed.roe, lcr: computed.lcr, total: computed.total, category }
+      const payload = { ...form, counterparty_type: form.counterparty_type || 'Банк', ...computed.scores, car: computed.car, roe: computed.roe, lcr: computed.lcr, total: computed.total, category }
       const res = await fetch('/api/market-risk/generate', {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload),
