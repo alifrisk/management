@@ -264,8 +264,8 @@ export default function DashboardPage() {
             <YAxis yAxisId="right" orientation="right" tick={{ fontSize: 11 }} />
             <Tooltip formatter={(v: number, name: string) => name === 'Кол-во' ? [v, name] : [fmt(v), name]} />
             <Legend />
-            <Bar yAxisId="left" dataKey="loss" name="Ущерб (TJS)" fill="#EF4444" radius={[4,4,0,0]} />
-            <Bar yAxisId="left" dataKey="recovery" name="Возврат (TJS)" fill="#1B8A4C" radius={[4,4,0,0]} />
+            <Bar yAxisId="left" dataKey="loss" name="Ущерб (TJS)" fill="#EF4444" radius={[4,4,0,0]}><LabelList dataKey="loss" position="top" style={{ fontSize: 9 }} formatter={(v: number) => v > 0 ? fmt(v) : ''} /></Bar>
+            <Bar yAxisId="left" dataKey="recovery" name="Возврат (TJS)" fill="#1B8A4C" radius={[4,4,0,0]}><LabelList dataKey="recovery" position="top" style={{ fontSize: 9 }} formatter={(v: number) => v > 0 ? fmt(v) : ''} /></Bar>
             <Line yAxisId="right" type="monotone" dataKey="count" name="Кол-во" stroke="#8B5CF6" strokeWidth={2} dot={{ r: 5 }} />
           </ComposedChart>
         </ResponsiveContainer>
@@ -282,8 +282,8 @@ export default function DashboardPage() {
               <YAxis dataKey="name" type="category" tick={{ fontSize: 9 }} width={150} />
               <Tooltip formatter={(v: number) => fmt(v)} />
               <Legend />
-              <Bar dataKey="loss" name="Ущерб" fill="#EF4444" radius={[0,4,4,0]} />
-              <Bar dataKey="recovery" name="Возврат" fill="#1B8A4C" radius={[0,4,4,0]} />
+              <Bar dataKey="loss" name="Ущерб" fill="#EF4444" radius={[0,4,4,0]}><LabelList dataKey="loss" position="right" style={{ fontSize: 9 }} formatter={(v: number) => v > 0 ? fmt(v) : ''} /></Bar>
+              <Bar dataKey="recovery" name="Возврат" fill="#1B8A4C" radius={[0,4,4,0]}><LabelList dataKey="recovery" position="right" style={{ fontSize: 9 }} formatter={(v: number) => v > 0 ? fmt(v) : ''} /></Bar>
             </BarChart>
           </ResponsiveContainer>
         </div>
@@ -296,8 +296,8 @@ export default function DashboardPage() {
               <YAxis dataKey="name" type="category" tick={{ fontSize: 9 }} width={130} />
               <Tooltip formatter={(v: number) => fmt(v)} />
               <Legend />
-              <Bar dataKey="loss" name="Ущерб" fill="#EF4444" radius={[0,4,4,0]} />
-              <Bar dataKey="recovery" name="Возврат" fill="#1B8A4C" radius={[0,4,4,0]} />
+              <Bar dataKey="loss" name="Ущерб" fill="#EF4444" radius={[0,4,4,0]}><LabelList dataKey="loss" position="right" style={{ fontSize: 9 }} formatter={(v: number) => v > 0 ? fmt(v) : ''} /></Bar>
+              <Bar dataKey="recovery" name="Возврат" fill="#1B8A4C" radius={[0,4,4,0]}><LabelList dataKey="recovery" position="right" style={{ fontSize: 9 }} formatter={(v: number) => v > 0 ? fmt(v) : ''} /></Bar>
             </BarChart>
           </ResponsiveContainer>
         </div>
@@ -313,8 +313,8 @@ export default function DashboardPage() {
             <YAxis dataKey="name" type="category" tick={{ fontSize: 10 }} width={120} />
             <Tooltip formatter={(v: number) => fmt(v)} />
             <Legend />
-            <Bar dataKey="loss" name="Ущерб" fill="#EF4444" radius={[0,4,4,0]} />
-            <Bar dataKey="recovery" name="Возврат" fill="#1B8A4C" radius={[0,4,4,0]} />
+            <Bar dataKey="loss" name="Ущерб" fill="#EF4444" radius={[0,4,4,0]}><LabelList dataKey="loss" position="right" style={{ fontSize: 9 }} formatter={(v: number) => v > 0 ? fmt(v) : ''} /></Bar>
+            <Bar dataKey="recovery" name="Возврат" fill="#1B8A4C" radius={[0,4,4,0]}><LabelList dataKey="recovery" position="right" style={{ fontSize: 9 }} formatter={(v: number) => v > 0 ? fmt(v) : ''} /></Bar>
           </BarChart>
         </ResponsiveContainer>
       </div>
@@ -340,7 +340,7 @@ export default function DashboardPage() {
           <p className={title}>По статусу инцидентов</p>
           <ResponsiveContainer width="100%" height={220}>
             <PieChart>
-              <Pie data={statusData} dataKey="value" nameKey="name" cx="50%" cy="45%" outerRadius={75}>
+              <Pie data={statusData} dataKey="value" nameKey="name" cx="50%" cy="45%" outerRadius={75} label={({ name, value }) => `${name}: ${value}`} labelLine={true}>
                 {statusData.map((_, i) => <Cell key={i} fill={['#3B82F6','#F59E0B','#1B8A4C'][i]} />)}
               </Pie>
               <Tooltip />
@@ -356,7 +356,7 @@ export default function DashboardPage() {
           <p className={title}>По частоте повторений</p>
           <ResponsiveContainer width="100%" height={220}>
             <PieChart>
-              <Pie data={frequencyData} dataKey="value" nameKey="name" cx="50%" cy="45%" outerRadius={75}>
+              <Pie data={frequencyData} dataKey="value" nameKey="name" cx="50%" cy="45%" outerRadius={75} label={({ name, value }) => `${name}: ${value}`} labelLine={true}>
                 {frequencyData.map((_, i) => <Cell key={i} fill={COLORS[i]} />)}
               </Pie>
               <Tooltip />
