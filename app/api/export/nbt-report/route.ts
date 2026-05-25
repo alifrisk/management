@@ -1,28 +1,21 @@
 import { NextResponse } from 'next/server'
 import { readFileSync } from 'fs'
 import { join } from 'path'
-
 interface CellOpts {
   gray?: boolean; bold?: boolean; left?: boolean
   colSpan?: number; rowSpan?: number; center?: boolean
 }
-
 interface ParaOpts {
   right?: boolean; center?: boolean; after?: number
   indent?: boolean; bold?: boolean; size?: number; before?: number
 }
-
 export async function POST(request: Request) {
   try {
     const { incident } = await request.json()
-
     const discoveryDate = incident.discovery_date
       ? new Date(incident.discovery_date).toLocaleDateString('ru-RU')
       : '—'
-    const incidentDate = incident.incident_date
-      ? new Date(incident.incident_date).toLocaleDateString('ru-RU')
-      : '—'
-    const todayDate = new Date().toLocaleDateString('ru-RU')
+    // ✅ Fix 3: Use discoveryDate for table (not incidentDate)
     const loss = incident.loss_amount_tjs
       ? new Intl.NumberFormat('ru-RU').format(incident.loss_amount_tjs)
       : '—'
@@ -31,19 +24,14 @@ export async function POST(request: Request) {
       : '—'
     const description = incident.case_description || incident.disclosure || incident.cause || '—'
     const department = incident.department || '—'
-
     const {
       Document, Packer, Paragraph, TextRun, Table, TableRow, TableCell,
       AlignmentType, BorderStyle, WidthType, VerticalAlign, ShadingType, ImageRun
     } = await import('docx')
-
     const b = { style: BorderStyle.SINGLE, size: 4, color: '000000' }
     const borders = { top: b, bottom: b, left: b, right: b }
     const nob = { style: BorderStyle.NONE, size: 0, color: 'FFFFFF' }
     const noborders = { top: nob, bottom: nob, left: nob, right: nob }
-    const bLight = { style: BorderStyle.SINGLE, size: 2, color: 'CCCCCC' }
-    const bordersLight = { top: bLight, bottom: bLight, left: bLight, right: bLight }
-
     const makeCell = (text: string, opts: CellOpts = {}) =>
       new TableCell({
         borders,
@@ -57,7 +45,6 @@ export async function POST(request: Request) {
           children: [new TextRun({ text: String(text || ''), size: 16, bold: !!opts.bold, font: 'Times New Roman' })]
         })]
       })
-
     const makePara = (text: string, opts: ParaOpts = {}) =>
       new Paragraph({
         alignment: opts.right ? AlignmentType.RIGHT : opts.center ? AlignmentType.CENTER : AlignmentType.BOTH,
@@ -74,17 +61,13 @@ export async function POST(request: Request) {
           font: 'Times New Roman'
         })]
       })
-
     const makeNB = (children: InstanceType<typeof Paragraph>[]) =>
       new TableCell({ borders: noborders, children })
-
-    // Read logo - works on both local and Vercel
     let logoData: Buffer | null = null
     try {
       logoData = readFileSync(join(process.cwd(), 'public', 'nbt-header.png'))
     } catch {
       try {
-        // Vercel fallback - fetch from public URL
         const baseUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://alif-risk-platform.vercel.app'
         const res = await fetch(`${baseUrl}/nbt-header.png`)
         if (res.ok) {
@@ -93,22 +76,19 @@ export async function POST(request: Request) {
         }
       } catch { /* no logo */ }
     }
-
     // ==================
-    // SECTION 1: Portrait - Letter (улучшенный дизайн)
+    // SECTION 1: Portrait - Letter
     // ==================
     const section1Children = [
-      // Логотип — больше и выше
+      // ✅ Fix 5: Logo larger and higher
       ...(logoData ? [new Paragraph({
         alignment: AlignmentType.LEFT,
-        spacing: { after: 400, before: 0 },
+        spacing: { after: 600, before: 0 },
         children: [new ImageRun({
           data: new Uint8Array(logoData),
-          transformation: { width: 600, height: 93 }
+          transformation: { width: 680, height: 105 }
         })]
       })] : []),
-
-      // Горизонтальная линия под логотипом
       new Table({
         width: { size: 9354, type: WidthType.DXA },
         columnWidths: [9354],
@@ -120,10 +100,7 @@ export async function POST(request: Request) {
           children: [new Paragraph({ children: [] })]
         })] })]
       }),
-
       makePara('', { after: 200 }),
-
-      // Адресат справа
       new Table({
         width: { size: 9354, type: WidthType.DXA },
         columnWidths: [4677, 4677],
@@ -131,23 +108,17 @@ export async function POST(request: Request) {
           makeNB([makePara('')]),
           makeNB([
             makePara('Ба Бонки миллии Тоҷикистон', { right: true, bold: true, size: 24, after: 40 }),
-            makePara('(Бахши назорати хавфҳо)', { right: true, size: 22, after: 0 }),
+            // ✅ Fix 1: Correct department name
+            makePara('(Хадамоти идоракунии хавфҳо)', { right: true, size: 22, after: 0 }),
           ])
         ]})]
       }),
-
       makePara('', { after: 160 }),
-
-      // Основной текст письма
       makePara('ҶСК «Алиф Бонк» (минбаъд дар матн - "Бонк") ба Шумо эҳтироми худро баён намуда, ҳисоботи умумии мониторинги хавфи амалиётиро оид ба ҳодисаҳои дорои хавфи амалиётии моддӣ, ки боиси зарар дар ҳаҷми 5 000 сомонӣ ва зиёда аз он оварда расонидаанд, мувофиқи банди 54-и Дастурамали №240 Бонки миллии Тоҷикистон барои санаи ҷорӣ пешниҳод менамояд.', {
         indent: true, after: 160, size: 24
       }),
-
       makePara('Замимаи №1 дар ҳаҷми 1 варақ', { after: 320, size: 24 }),
-
       makePara('Бо эҳтиром,', { after: 400, size: 24 }),
-
-      // Подпись
       new Table({
         width: { size: 9354, type: WidthType.DXA },
         columnWidths: [4677, 4677],
@@ -156,10 +127,7 @@ export async function POST(request: Request) {
           makeNB([makePara('Атобек Гуланор', { right: true, size: 24 })])
         ]})]
       }),
-
       makePara('', { after: 240 }),
-
-      // Разделитель
       new Table({
         width: { size: 9354, type: WidthType.DXA },
         columnWidths: [9354],
@@ -171,26 +139,20 @@ export async function POST(request: Request) {
           children: [new Paragraph({ children: [] })]
         })] })]
       }),
-
       makePara('', { after: 80 }),
-
-      // Исполнитель
+      // ✅ Fix 2: Remove date, keep only executor and phone
       makePara('Иҷрокунанда: Камила Мародмамадова', { after: 40, size: 20 }),
-      makePara('Тел.: +992884034004', { after: 40, size: 20 }),
-      makePara(`Сана: ${todayDate}`, { after: 0, size: 20 }),
+      makePara('Тел.: +992884034004', { after: 0, size: 20 }),
     ]
-
     // ==================
     // SECTION 2: Landscape - Table (Annex)
     // ==================
     const section2Children = [
       makePara('Замима №1', { right: true, bold: true, after: 40 }),
-      makePara(`ба мактуби ҶСК "Алиф Бонк" аз "${todayDate}"`, { right: true, after: 200, size: 20 }),
-
+      // ✅ Fix 4: Remove "ба мактуби ҶСК..." line
       makePara('Ҳисобот оид ба ҳодисаҳои хавфҳои амалиётӣ,', { center: true, bold: true, after: 40, size: 22 }),
       makePara('ки ба зарар дар ҳаҷми 5000 сомонӣ ва зиёда аз он оварда расонидаанд', { center: true, bold: true, after: 40, size: 22 }),
       makePara(`дар ҶСК "Алиф Бонк" барои "${discoveryDate}"`, { center: true, bold: true, after: 200, size: 22 }),
-
       new Table({
         width: { size: 14400, type: WidthType.DXA },
         columnWidths: [400, 2200, 1100, 900, 650, 650, 650, 650, 650, 650, 650, 1200, 1200],
@@ -199,7 +161,8 @@ export async function POST(request: Request) {
             makeCell('№', { gray: true, bold: true }),
             makeCell('Муҳтавои ҳодисаҳои хавфи амалиётӣ (сабабҳои зарар)', { gray: true, bold: true }),
             makeCell('Ҷойе', { gray: true, bold: true }),
-            makeCell('Санаи ҳодиса', { gray: true, bold: true }),
+            // ✅ Fix 3: "Санаи ошкоршавӣ" instead of "Санаи ҳодиса"
+            makeCell('Санаи ошкоршавӣ', { gray: true, bold: true }),
             makeCell('Ҷаримаҳо', { gray: true, bold: true }),
             makeCell('Хароҷоти судӣ', { gray: true, bold: true }),
             makeCell('Ҷуброни кормандон', { gray: true, bold: true }),
@@ -214,7 +177,8 @@ export async function POST(request: Request) {
             makeCell('1'),
             makeCell(description, { left: true }),
             makeCell(department),
-            makeCell(incidentDate),
+            // ✅ Fix 3: Use discoveryDate in data row
+            makeCell(discoveryDate),
             makeCell(''), makeCell(''), makeCell(''), makeCell(''),
             makeCell(''), makeCell(''), makeCell(''),
             makeCell(loss, { bold: true }),
@@ -236,7 +200,6 @@ export async function POST(request: Request) {
         ]
       }),
     ]
-
     const doc = new Document({
       sections: [
         {
@@ -259,9 +222,7 @@ export async function POST(request: Request) {
         }
       ]
     })
-
     const buffer = await Packer.toBuffer(doc)
-
     return new NextResponse(new Uint8Array(buffer), {
       headers: {
         'Content-Type': 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
