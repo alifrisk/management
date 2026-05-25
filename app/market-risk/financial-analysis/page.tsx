@@ -372,10 +372,10 @@ export default function FinancialAnalysisPage() {
             <div className="flex-1 overflow-y-auto p-6 space-y-4">
               <div className="grid grid-cols-4 gap-3">
                 {[
-                  ['Активы П1 (USD)', `$${fmt((viewing.usd_rate||1) > 1 ? (viewing.p1_cash + viewing.p1_receivables + viewing.p1_investments + viewing.p1_loans_issued + viewing.p1_fixed_assets + viewing.p1_other_assets) / (viewing.usd_rate||1) : (viewing.p1_cash + viewing.p1_receivables + viewing.p1_investments + viewing.p1_loans_issued + viewing.p1_fixed_assets + viewing.p1_other_assets))}`],
-                  ['Активы П2 (USD)', `$${fmt((viewing.usd_rate||1) > 1 ? (viewing.p2_cash + viewing.p2_receivables + viewing.p2_investments + viewing.p2_loans_issued + viewing.p2_fixed_assets + viewing.p2_other_assets) / (viewing.usd_rate||1) : (viewing.p2_cash + viewing.p2_receivables + viewing.p2_investments + viewing.p2_loans_issued + viewing.p2_fixed_assets + viewing.p2_other_assets))}`],
-                  ['Прибыль П1 (USD)', `$${fmt((viewing.usd_rate||1) > 1 ? viewing.p1_net_profit / (viewing.usd_rate||1) : viewing.p1_net_profit)}`],
-                  ['Прибыль П2 (USD)', `$${fmt((viewing.usd_rate||1) > 1 ? viewing.p2_net_profit / (viewing.usd_rate||1) : viewing.p2_net_profit)}`],
+                  ['Активы П1 (USD)', `$${fmt((viewing.p1_usd_rate||1) > 1 ? (viewing.p1_cash + viewing.p1_receivables + viewing.p1_investments + viewing.p1_loans_issued + viewing.p1_fixed_assets + viewing.p1_other_assets) / (viewing.p1_usd_rate||1) : (viewing.p1_cash + viewing.p1_receivables + viewing.p1_investments + viewing.p1_loans_issued + viewing.p1_fixed_assets + viewing.p1_other_assets))}`],
+                  ['Активы П2 (USD)', `$${fmt((viewing.p2_usd_rate||1) > 1 ? (viewing.p2_cash + viewing.p2_receivables + viewing.p2_investments + viewing.p2_loans_issued + viewing.p2_fixed_assets + viewing.p2_other_assets) / (viewing.p2_usd_rate||1) : (viewing.p2_cash + viewing.p2_receivables + viewing.p2_investments + viewing.p2_loans_issued + viewing.p2_fixed_assets + viewing.p2_other_assets))}`],
+                  ['Прибыль П1 (USD)', `$${fmt((viewing.p1_usd_rate||1) > 1 ? viewing.p1_net_profit / (viewing.p1_usd_rate||1) : viewing.p1_net_profit)}`],
+                  ['Прибыль П2 (USD)', `$${fmt((viewing.p2_usd_rate||1) > 1 ? viewing.p2_net_profit / (viewing.p2_usd_rate||1) : viewing.p2_net_profit)}`],
                 ].map(([l, v]) => (
                   <div key={l} className="bg-gray-50 rounded-lg p-3">
                     <p className="text-xs text-gray-400">{l}</p>
