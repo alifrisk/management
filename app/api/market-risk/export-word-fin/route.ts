@@ -162,6 +162,8 @@ export async function POST(request: Request) {
               tableRow('Процентные расходы', a.p1_interest_expense||0, a.p2_interest_expense||0),
               tableRow('Чистый процентный доход (NIM)', p1_nim, p2_nim, true),
               tableRow('Комиссионные доходы', a.p1_fee_income||0, a.p2_fee_income||0),
+              tableRow('Доход от FX операций', a.p1_fx_income||0, a.p2_fx_income||0),
+              tableRow('Прочие операционные доходы', a.p1_other_income||0, a.p2_other_income||0),
               tableRow('Операционный доход', p1_op_income, p2_op_income, true),
               tableRow('Операционные расходы', a.p1_operating_expense||0, a.p2_operating_expense||0),
               tableRow('Резервы на потери', a.p1_provisions||0, a.p2_provisions||0),
