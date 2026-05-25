@@ -266,7 +266,7 @@ export default function DashboardPage() {
             <Legend />
             <Bar yAxisId="left" dataKey="loss" name="Ущерб (TJS)" fill="#EF4444" radius={[4,4,0,0]}><LabelList dataKey="loss" position="top" style={{ fontSize: 9 }} formatter={(v: number) => v > 0 ? fmt(v) : ''} /></Bar>
             <Bar yAxisId="left" dataKey="recovery" name="Возврат (TJS)" fill="#1B8A4C" radius={[4,4,0,0]}><LabelList dataKey="recovery" position="top" style={{ fontSize: 9 }} formatter={(v: number) => v > 0 ? fmt(v) : ''} /></Bar>
-            <Line yAxisId="right" type="monotone" dataKey="count" name="Кол-во" stroke="#8B5CF6" strokeWidth={2} dot={{ r: 5 }} />
+            <Line yAxisId="right" type="monotone" dataKey="count" name="Кол-во" stroke="#8B5CF6" strokeWidth={2} dot={{ r: 5 }}><LabelList dataKey="count" position="top" style={{ fontSize: 10, fill: "#8B5CF6", fontWeight: "bold" }} formatter={(v: number) => v > 0 ? v : ""} /></Line>
           </ComposedChart>
         </ResponsiveContainer>
       </div>
