@@ -2,7 +2,6 @@
 import { useState, useEffect, useCallback } from 'react'
 import { supabase } from '@/supabase/client'
 import { Plus, Download, Eye, Trash2, X, AlertTriangle, CheckCircle, TrendingDown, Filter } from 'lucide-react'
-
 interface StressTest {
   id: string
   test_name: string
@@ -10,7 +9,7 @@ interface StressTest {
   test_date: string
   due_to_banks: number
   current_accounts: number
-  alif_mobi: number
+  electronic_wallet: number
   savings: number
   term_deposits: number
   borrowings: number
@@ -27,11 +26,10 @@ interface StressTest {
   coverage_cash_t30: number; coverage_only_t30: number; risk_t30: string
   created_at: string
 }
-
 const STRESS_RATES = {
   due_to_banks:     { t1: 1.00, t7: 1.00, t30: 1.00 },
   current_accounts: { t1: 0.20, t7: 0.35, t30: 0.50 },
-  alif_mobi:        { t1: 0.10, t7: 0.15, t30: 0.20 },
+  electronic_wallet:        { t1: 0.10, t7: 0.15, t30: 0.20 },
   savings:          { t1: 0.03, t7: 0.07, t30: 0.10 },
   term_deposits:    { t1: 0.05, t7: 0.20, t30: 0.35 },
   borrowings:       { t1: 0.00, t7: 0.00, t30: 0.00 },
@@ -39,13 +37,12 @@ const STRESS_RATES = {
   credit_line_salom:{ t1: 0.05, t7: 0.07, t30: 0.10 },
   credit_line_sme:  { t1: 0.00, t7: 0.00, t30: 0.00 },
 }
-
 function calcStress(f: Record<string, number>) {
   const calc = (horizon: 't1' | 't7' | 't30') => {
     const liab = (
       f.due_to_banks * STRESS_RATES.due_to_banks[horizon] +
       f.current_accounts * STRESS_RATES.current_accounts[horizon] +
-      f.alif_mobi * STRESS_RATES.alif_mobi[horizon] +
+      f.electronic_wallet * STRESS_RATES.electronic_wallet[horizon] +
       f.savings * STRESS_RATES.savings[horizon] +
       f.term_deposits * STRESS_RATES.term_deposits[horizon] +
       f.borrowings * STRESS_RATES.borrowings[horizon] +
@@ -63,27 +60,22 @@ function calcStress(f: Record<string, number>) {
   }
   return { t1: calc('t1'), t7: calc('t7'), t30: calc('t30') }
 }
-
 const MONTHS = ['Январь','Февраль','Март','Апрель','Май','Июнь','Июль','Август','Сентябрь','Октябрь','Ноябрь','Декабрь']
 const fmt = (n: number) => n ? new Intl.NumberFormat('ru-RU').format(Math.round(n)) : '—'
 const pct = (n: number) => n ? (n * 100).toFixed(0) + '%' : '—'
-
-// ✅ Форматирование чисел с пробелами
 const formatNum = (v: string) => {
   const num = v.replace(/\D/g, '')
   if (!num) return ''
   return new Intl.NumberFormat('ru-RU').format(Number(num))
 }
 const parseNum = (v: string) => Number(v.replace(/\D/g, '')) || 0
-
 const EMPTY: Record<string, string> = {
   test_name: '', analyst_name: '',
-  due_to_banks: '', current_accounts: '', alif_mobi: '', savings: '',
+  due_to_banks: '', current_accounts: '', electronic_wallet: '', savings: '',
   term_deposits: '', borrowings: '', other_liabilities: '',
   credit_line_salom: '', credit_line_sme: '',
   cash_equivalents: '', cash_only: '',
 }
-
 export default function LiquidityPage() {
   const [tests, setTests] = useState<StressTest[]>([])
   const [loading, setLoading] = useState(true)
@@ -94,7 +86,6 @@ export default function LiquidityPage() {
   const [viewing, setViewing] = useState<StressTest | null>(null)
   const [filterYear, setFilterYear] = useState('')
   const [filterMonth, setFilterMonth] = useState('')
-
   const fetch_ = useCallback(async () => {
     setLoading(true)
     let query = supabase.from('liquidity_stress_tests').select('*').order('created_at', { ascending: false })
@@ -104,26 +95,20 @@ export default function LiquidityPage() {
     setTests(data || [])
     setLoading(false)
   }, [filterYear, filterMonth])
-
   useEffect(() => { fetch_() }, [fetch_])
-
-  // ✅ Parse formatted numbers
   const n = (k: string) => parseNum(form[k] || '')
   const setF = (k: string, v: string) => setForm(p => ({ ...p, [k]: v }))
   const setNum = (k: string, v: string) => setForm(p => ({ ...p, [k]: formatNum(v) }))
-
   const computed = calcStress({
     due_to_banks: n('due_to_banks'), current_accounts: n('current_accounts'),
-    alif_mobi: n('alif_mobi'), savings: n('savings'), term_deposits: n('term_deposits'),
+    electronic_wallet: n('electronic_wallet'), savings: n('savings'), term_deposits: n('term_deposits'),
     borrowings: n('borrowings'), other_liabilities: n('other_liabilities'),
     credit_line_salom: n('credit_line_salom'), credit_line_sme: n('credit_line_sme'),
     cash_equivalents: n('cash_equivalents'), cash_only: n('cash_only'),
   })
-
   const riskColor = (r: string) => r === 'High' ? 'text-red-600 bg-red-50' : r === 'Elevated' ? 'text-yellow-600 bg-yellow-50' : 'text-green-600 bg-green-50'
   const riskLabel = (r: string) => r === 'High' ? 'Высокий' : r === 'Elevated' ? 'Повышенный' : 'Нормальный'
   const covColor = (v: number) => v >= 1.1 ? 'text-green-600' : v >= 1 ? 'text-yellow-600' : 'text-red-600'
-
   async function handleSave() {
     if (!form.test_name.trim()) { setError('Введите название теста'); return }
     setSaving(true); setError(null)
@@ -132,7 +117,7 @@ export default function LiquidityPage() {
         test_name: form.test_name, analyst_name: form.analyst_name,
         test_date: new Date().toISOString().split('T')[0],
         due_to_banks: n('due_to_banks'), current_accounts: n('current_accounts'),
-        alif_mobi: n('alif_mobi'), savings: n('savings'), term_deposits: n('term_deposits'),
+        electronic_wallet: n('electronic_wallet'), savings: n('savings'), term_deposits: n('term_deposits'),
         borrowings: n('borrowings'), other_liabilities: n('other_liabilities'),
         credit_line_salom: n('credit_line_salom'), credit_line_sme: n('credit_line_sme'),
         cash_equivalents: n('cash_equivalents'), cash_only: n('cash_only'),
@@ -149,7 +134,6 @@ export default function LiquidityPage() {
       setError('Ошибка: ' + (err instanceof Error ? err.message : String(err)))
     } finally { setSaving(false) }
   }
-
   async function downloadWord(t: StressTest) {
     try {
       const res = await fetch('/api/liquidity/export-word', {
@@ -164,16 +148,13 @@ export default function LiquidityPage() {
       URL.revokeObjectURL(url)
     } catch (e: unknown) { alert('Ошибка: ' + (e instanceof Error ? e.message : String(e))) }
   }
-
   async function handleDelete(id: string) {
     if (!confirm('Удалить?')) return
     await supabase.from('liquidity_stress_tests').delete().eq('id', id)
     fetch_()
   }
-
   const inp = "w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#1B8A4C] bg-white text-right"
   const lbl = "block text-xs font-medium text-gray-600 mb-1"
-
   const HorizonCard = ({ h, data }: { h: string; data: { liab: number; draw: number; need: number; cov_cash: number; cov_only: number; risk: string } }) => (
     <div className={`p-4 rounded-xl border-2 ${data.risk === 'High' ? 'border-red-200 bg-red-50' : data.risk === 'Elevated' ? 'border-yellow-200 bg-yellow-50' : 'border-green-200 bg-green-50'}`}>
       <div className="flex items-center justify-between mb-3">
@@ -194,7 +175,6 @@ export default function LiquidityPage() {
       </div>
     </div>
   )
-
   return (
     <div className="max-w-6xl mx-auto space-y-5">
       <div className="flex items-center justify-between flex-wrap gap-3">
@@ -207,7 +187,6 @@ export default function LiquidityPage() {
           <Plus className="w-4 h-4" /> Новый стресс-тест
         </button>
       </div>
-
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
         {[
           { label: 'Всего тестов', value: tests.length, c: 'text-gray-900' },
@@ -221,7 +200,6 @@ export default function LiquidityPage() {
           </div>
         ))}
       </div>
-
       <div className="bg-white rounded-xl border border-gray-100 p-4 shadow-sm flex items-center gap-3 flex-wrap">
         <Filter className="w-4 h-4 text-gray-400" />
         <select value={filterYear} onChange={e => { setFilterYear(e.target.value); setFilterMonth('') }}
@@ -240,7 +218,6 @@ export default function LiquidityPage() {
           </button>
         )}
       </div>
-
       <div className="bg-white rounded-xl border border-gray-100 shadow-sm overflow-hidden">
         <div className="overflow-x-auto">
           <table className="w-full text-sm">
@@ -283,7 +260,6 @@ export default function LiquidityPage() {
           </table>
         </div>
       </div>
-
       {viewing && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50">
           <div className="bg-white rounded-2xl shadow-2xl w-full max-w-3xl max-h-[90vh] flex flex-col">
@@ -303,7 +279,7 @@ export default function LiquidityPage() {
                   {[
                     ['Межбанковские обязательства', viewing.due_to_banks],
                     ['Текущие счета', viewing.current_accounts],
-                    ['Alif Mobi остатки', viewing.alif_mobi],
+                    ['Электронный кошелёк', viewing.electronic_wallet],
                     ['Накопительные счета', viewing.savings],
                     ['Срочные депозиты', viewing.term_deposits],
                     ['Заимствования', viewing.borrowings],
@@ -328,7 +304,6 @@ export default function LiquidityPage() {
           </div>
         </div>
       )}
-
       {showModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50">
           <div className="bg-white rounded-2xl shadow-2xl w-full max-w-3xl max-h-[95vh] flex flex-col">
@@ -356,7 +331,7 @@ export default function LiquidityPage() {
                   {[
                     { key: 'due_to_banks', label: 'Межбанковские обязательства', rates: '100% / 100% / 100%' },
                     { key: 'current_accounts', label: 'Текущие счета клиентов', rates: '20% / 35% / 50%' },
-                    { key: 'alif_mobi', label: 'Alif Mobi остатки', rates: '10% / 15% / 20%' },
+                    { key: 'electronic_wallet', label: 'Электронный кошелёк', rates: '10% / 15% / 20%' },
                     { key: 'savings', label: 'Накопительные счета', rates: '3% / 7% / 10%' },
                     { key: 'term_deposits', label: 'Срочные депозиты', rates: '5% / 20% / 35%' },
                     { key: 'borrowings', label: 'Заимствования', rates: '0% / 0% / 0%' },
