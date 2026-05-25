@@ -65,13 +65,13 @@ interface FRProps {
   label: string; f1: string; f2: string
   form: Record<string, string>; setF: (k: string, v: string) => void
   bold?: boolean; auto?: boolean; v1?: number; v2?: number
-  p1rate?: number; p2rate?: number; currSymbol?: string
+  p1rate?: number; p2rate?: number; currSymbol?: string; notUSD?: boolean
 }
 function FR({ label, f1, f2, bold, auto, v1, v2, form, setF, p1rate = 1, p2rate = 1, currSymbol = '$' }: FRProps) {
   const cls = "w-full px-2 py-1.5 border border-gray-200 rounded text-sm focus:outline-none focus:ring-2 focus:ring-[#1B8A4C] text-right bg-white"
-  const isUSD = currSymbol === '$'
-  const toUSD1 = (v: number) => p1rate > 1 ? v / p1rate : v
-  const toUSD2 = (v: number) => p2rate > 1 ? v / p2rate : v
+  const shouldConvert = notUSD && p1rate > 0
+  const toUSD1 = (v: number) => shouldConvert ? v / p1rate : v
+  const toUSD2 = (v: number) => (notUSD && p2rate > 0) ? v / p2rate : v
 
   return (
     <tr className={bold ? 'bg-gray-50' : 'hover:bg-blue-50/20'}>
@@ -80,22 +80,22 @@ function FR({ label, f1, f2, bold, auto, v1, v2, form, setF, p1rate = 1, p2rate 
         {auto
           ? <div className="space-y-0.5">
               <div className={`text-sm font-bold text-right pr-2 ${(v1||0) < 0 ? 'text-red-600' : bold ? 'text-[#1B8A4C]' : 'text-gray-900'}`}>{fmt(v1||0)}</div>
-              {!isUSD && v1 !== undefined && v1 > 0 && <div className="text-xs text-gray-400 text-right pr-2">≈ ${fmt(toUSD1(v1))}</div>}
+              {shouldConvert && v1 !== undefined && v1 > 0 && <div className="text-xs text-gray-400 text-right pr-2">≈ ${fmt(toUSD1(v1))}</div>}
             </div>
           : <div className="space-y-0.5">
               <input type="text" inputMode="numeric" value={form[f1] || ''} onChange={e => setF(f1, fmtN(e.target.value))} className={cls} placeholder="0" />
-              {!isUSD && parseN(form[f1]) > 0 && <div className="text-xs text-gray-400 text-right">≈ ${fmt(toUSD1(parseN(form[f1])))}</div>}
+              {shouldConvert && parseN(form[f1]) > 0 && <div className="text-xs text-gray-400 text-right">≈ ${fmt(toUSD1(parseN(form[f1])))}</div>}
             </div>}
       </td>
       <td className="px-2 py-1">
         {auto
           ? <div className="space-y-0.5">
               <div className={`text-sm font-bold text-right pr-2 ${(v2||0) < 0 ? 'text-red-600' : bold ? 'text-[#1B8A4C]' : 'text-gray-900'}`}>{fmt(v2||0)}</div>
-              {!isUSD && v2 !== undefined && v2 > 0 && <div className="text-xs text-gray-400 text-right pr-2">≈ ${fmt(toUSD2(v2))}</div>}
+              {(notUSD && p2rate > 0) && v2 !== undefined && v2 > 0 && <div className="text-xs text-gray-400 text-right pr-2">≈ ${fmt(toUSD2(v2))}</div>}
             </div>
           : <div className="space-y-0.5">
               <input type="text" inputMode="numeric" value={form[f2] || ''} onChange={e => setF(f2, fmtN(e.target.value))} className={cls} placeholder="0" />
-              {!isUSD && parseN(form[f2]) > 0 && <div className="text-xs text-gray-400 text-right">≈ ${fmt(toUSD2(parseN(form[f2])))}</div>}
+              {(notUSD && p2rate > 0) && parseN(form[f2]) > 0 && <div className="text-xs text-gray-400 text-right">≈ ${fmt(toUSD2(parseN(form[f2])))}</div>}
             </div>}
       </td>
     </tr>
@@ -478,21 +478,21 @@ export default function FinancialAnalysisPage() {
               {tab === 2 && (
                 <div className="space-y-2">
                   <FT title="АКТИВ" p1={p1} p2={p2} currency={form.currency}>
-                    <FR label="Денежные средства и счета в ЦБ" f1="p1_cash" f2="p2_cash" form={form} setF={setF} p1rate={p1_rate} p2rate={p2_rate} currSymbol={currSymbol} />
-                    <FR label="Средства в других банках" f1="p1_receivables" f2="p2_receivables" form={form} setF={setF} p1rate={p1_rate} p2rate={p2_rate} currSymbol={currSymbol} />
-                    <FR label="Инвестиционные ценные бумаги" f1="p1_investments" f2="p2_investments" form={form} setF={setF} p1rate={p1_rate} p2rate={p2_rate} currSymbol={currSymbol} />
-                    <FR label="Кредитный портфель (нетто)" f1="p1_loans_issued" f2="p2_loans_issued" form={form} setF={setF} p1rate={p1_rate} p2rate={p2_rate} currSymbol={currSymbol} />
-                    <FR label="Основные средства" f1="p1_fixed_assets" f2="p2_fixed_assets" form={form} setF={setF} p1rate={p1_rate} p2rate={p2_rate} currSymbol={currSymbol} />
-                    <FR label="Прочие активы" f1="p1_other_assets" f2="p2_other_assets" form={form} setF={setF} p1rate={p1_rate} p2rate={p2_rate} currSymbol={currSymbol} />
-                    <FR label="ИТОГО АКТИВ" bold auto v1={p1_total_assets} v2={p2_total_assets} f1="" f2="" form={form} setF={setF} p1rate={p1_rate} p2rate={p2_rate} currSymbol={currSymbol} />
+                    <FR label="Денежные средства и счета в ЦБ" f1="p1_cash" f2="p2_cash" form={form} setF={setF} p1rate={p1_rate} p2rate={p2_rate} currSymbol={currSymbol} notUSD={!isUSD} />
+                    <FR label="Средства в других банках" f1="p1_receivables" f2="p2_receivables" form={form} setF={setF} p1rate={p1_rate} p2rate={p2_rate} currSymbol={currSymbol} notUSD={!isUSD} />
+                    <FR label="Инвестиционные ценные бумаги" f1="p1_investments" f2="p2_investments" form={form} setF={setF} p1rate={p1_rate} p2rate={p2_rate} currSymbol={currSymbol} notUSD={!isUSD} />
+                    <FR label="Кредитный портфель (нетто)" f1="p1_loans_issued" f2="p2_loans_issued" form={form} setF={setF} p1rate={p1_rate} p2rate={p2_rate} currSymbol={currSymbol} notUSD={!isUSD} />
+                    <FR label="Основные средства" f1="p1_fixed_assets" f2="p2_fixed_assets" form={form} setF={setF} p1rate={p1_rate} p2rate={p2_rate} currSymbol={currSymbol} notUSD={!isUSD} />
+                    <FR label="Прочие активы" f1="p1_other_assets" f2="p2_other_assets" form={form} setF={setF} p1rate={p1_rate} p2rate={p2_rate} currSymbol={currSymbol} notUSD={!isUSD} />
+                    <FR label="ИТОГО АКТИВ" bold auto v1={p1_total_assets} v2={p2_total_assets} f1="" f2="" form={form} setF={setF} p1rate={p1_rate} p2rate={p2_rate} currSymbol={currSymbol} notUSD={!isUSD} />
                   </FT>
                   <FT title="ПАССИВ" p1={p1} p2={p2} currency={form.currency}>
-                    <FR label="Депозиты клиентов" f1="p1_deposits" f2="p2_deposits" form={form} setF={setF} p1rate={p1_rate} p2rate={p2_rate} currSymbol={currSymbol} />
-                    <FR label="Заёмные средства (МБК, займы)" f1="p1_borrowings" f2="p2_borrowings" form={form} setF={setF} p1rate={p1_rate} p2rate={p2_rate} currSymbol={currSymbol} />
-                    <FR label="Прочие обязательства" f1="p1_other_liab" f2="p2_other_liab" form={form} setF={setF} p1rate={p1_rate} p2rate={p2_rate} currSymbol={currSymbol} />
-                    <FR label="Итого обязательства" bold auto v1={p1_total_liab} v2={p2_total_liab} f1="" f2="" form={form} setF={setF} p1rate={p1_rate} p2rate={p2_rate} currSymbol={currSymbol} />
-                    <FR label="Собственный капитал" f1="p1_equity" f2="p2_equity" form={form} setF={setF} p1rate={p1_rate} p2rate={p2_rate} currSymbol={currSymbol} />
-                    <FR label="ИТОГО ПАССИВ" bold auto v1={p1_total_passiv} v2={p2_total_passiv} f1="" f2="" form={form} setF={setF} p1rate={p1_rate} p2rate={p2_rate} currSymbol={currSymbol} />
+                    <FR label="Депозиты клиентов" f1="p1_deposits" f2="p2_deposits" form={form} setF={setF} p1rate={p1_rate} p2rate={p2_rate} currSymbol={currSymbol} notUSD={!isUSD} />
+                    <FR label="Заёмные средства (МБК, займы)" f1="p1_borrowings" f2="p2_borrowings" form={form} setF={setF} p1rate={p1_rate} p2rate={p2_rate} currSymbol={currSymbol} notUSD={!isUSD} />
+                    <FR label="Прочие обязательства" f1="p1_other_liab" f2="p2_other_liab" form={form} setF={setF} p1rate={p1_rate} p2rate={p2_rate} currSymbol={currSymbol} notUSD={!isUSD} />
+                    <FR label="Итого обязательства" bold auto v1={p1_total_liab} v2={p2_total_liab} f1="" f2="" form={form} setF={setF} p1rate={p1_rate} p2rate={p2_rate} currSymbol={currSymbol} notUSD={!isUSD} />
+                    <FR label="Собственный капитал" f1="p1_equity" f2="p2_equity" form={form} setF={setF} p1rate={p1_rate} p2rate={p2_rate} currSymbol={currSymbol} notUSD={!isUSD} />
+                    <FR label="ИТОГО ПАССИВ" bold auto v1={p1_total_passiv} v2={p2_total_passiv} f1="" f2="" form={form} setF={setF} p1rate={p1_rate} p2rate={p2_rate} currSymbol={currSymbol} notUSD={!isUSD} />
                   </FT>
 
                   {/* Balance check */}
@@ -528,15 +528,15 @@ export default function FinancialAnalysisPage() {
 
               {tab === 3 && (
                 <FT title="ОТЧЁТ О ПРИБЫЛЯХ И УБЫТКАХ" p1={p1} p2={p2} currency={form.currency}>
-                  <FR label="Процентные доходы" f1="p1_interest_income" f2="p2_interest_income" form={form} setF={setF} p1rate={p1_rate} p2rate={p2_rate} currSymbol={currSymbol} />
-                  <FR label="Процентные расходы" f1="p1_interest_expense" f2="p2_interest_expense" form={form} setF={setF} p1rate={p1_rate} p2rate={p2_rate} currSymbol={currSymbol} />
-                  <FR label="▶ Чистый процентный доход (NIM)" bold auto v1={p1_nim} v2={p2_nim} f1="" f2="" form={form} setF={setF} p1rate={p1_rate} p2rate={p2_rate} currSymbol={currSymbol} />
-                  <FR label="Комиссионные доходы" f1="p1_fee_income" f2="p2_fee_income" form={form} setF={setF} p1rate={p1_rate} p2rate={p2_rate} currSymbol={currSymbol} />
-                  <FR label="▶ Операционный доход" bold auto v1={p1_op_income} v2={p2_op_income} f1="" f2="" form={form} setF={setF} p1rate={p1_rate} p2rate={p2_rate} currSymbol={currSymbol} />
-                  <FR label="Операционные расходы" f1="p1_operating_expense" f2="p2_operating_expense" form={form} setF={setF} p1rate={p1_rate} p2rate={p2_rate} currSymbol={currSymbol} />
-                  <FR label="Резервы на потери по кредитам" f1="p1_provisions" f2="p2_provisions" form={form} setF={setF} p1rate={p1_rate} p2rate={p2_rate} currSymbol={currSymbol} />
-                  <FR label="▶ Прибыль до налогов" bold auto v1={p1_pre_tax} v2={p2_pre_tax} f1="" f2="" form={form} setF={setF} p1rate={p1_rate} p2rate={p2_rate} currSymbol={currSymbol} />
-                  <FR label="▶ Чистая прибыль" bold f1="p1_net_profit" f2="p2_net_profit" form={form} setF={setF} p1rate={p1_rate} p2rate={p2_rate} currSymbol={currSymbol} />
+                  <FR label="Процентные доходы" f1="p1_interest_income" f2="p2_interest_income" form={form} setF={setF} p1rate={p1_rate} p2rate={p2_rate} currSymbol={currSymbol} notUSD={!isUSD} />
+                  <FR label="Процентные расходы" f1="p1_interest_expense" f2="p2_interest_expense" form={form} setF={setF} p1rate={p1_rate} p2rate={p2_rate} currSymbol={currSymbol} notUSD={!isUSD} />
+                  <FR label="▶ Чистый процентный доход (NIM)" bold auto v1={p1_nim} v2={p2_nim} f1="" f2="" form={form} setF={setF} p1rate={p1_rate} p2rate={p2_rate} currSymbol={currSymbol} notUSD={!isUSD} />
+                  <FR label="Комиссионные доходы" f1="p1_fee_income" f2="p2_fee_income" form={form} setF={setF} p1rate={p1_rate} p2rate={p2_rate} currSymbol={currSymbol} notUSD={!isUSD} />
+                  <FR label="▶ Операционный доход" bold auto v1={p1_op_income} v2={p2_op_income} f1="" f2="" form={form} setF={setF} p1rate={p1_rate} p2rate={p2_rate} currSymbol={currSymbol} notUSD={!isUSD} />
+                  <FR label="Операционные расходы" f1="p1_operating_expense" f2="p2_operating_expense" form={form} setF={setF} p1rate={p1_rate} p2rate={p2_rate} currSymbol={currSymbol} notUSD={!isUSD} />
+                  <FR label="Резервы на потери по кредитам" f1="p1_provisions" f2="p2_provisions" form={form} setF={setF} p1rate={p1_rate} p2rate={p2_rate} currSymbol={currSymbol} notUSD={!isUSD} />
+                  <FR label="▶ Прибыль до налогов" bold auto v1={p1_pre_tax} v2={p2_pre_tax} f1="" f2="" form={form} setF={setF} p1rate={p1_rate} p2rate={p2_rate} currSymbol={currSymbol} notUSD={!isUSD} />
+                  <FR label="▶ Чистая прибыль" bold f1="p1_net_profit" f2="p2_net_profit" form={form} setF={setF} p1rate={p1_rate} p2rate={p2_rate} currSymbol={currSymbol} notUSD={!isUSD} />
                 </FT>
               )}
             </div>
