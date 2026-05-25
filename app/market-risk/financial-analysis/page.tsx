@@ -43,12 +43,12 @@ interface FinAnalysis {
   p1_operating_expense: number; p2_operating_expense: number
   p1_provisions: number; p2_provisions: number
   p1_net_profit: number; p2_net_profit: number
-  ai_conclusion: string; created_at: string
+  counterparty_type: string; ai_conclusion: string; created_at: string
 }
 
 const EMPTY = {
   code: '', analyst_name: '', p1_label: '', p2_label: '',
-  currency: 'USD', p1_usd_rate: '1', p2_usd_rate: '1',
+  counterparty_type: 'Банк', currency: 'USD', p1_usd_rate: '1', p2_usd_rate: '1',
   p1_cash: '', p2_cash: '', p1_receivables: '', p2_receivables: '',
   p1_investments: '', p2_investments: '', p1_loans_issued: '', p2_loans_issued: '',
   p1_fixed_assets: '', p2_fixed_assets: '', p1_other_assets: '', p2_other_assets: '',
@@ -208,7 +208,7 @@ export default function FinancialAnalysisPage() {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          code: form.code, p1_label: p1, p2_label: p2,
+          code: form.code, counterparty_type: form.counterparty_type || 'Банк', p1_label: p1, p2_label: p2,
           currency: form.currency, p1_usd_rate: p1_rate, p2_usd_rate: p2_rate,
           p1_total_assets: p1_total_assets_usd, p2_total_assets: p2_total_assets_usd,
           p1_total_liab: toUSD1(p1_total_liab), p2_total_liab: toUSD2(p2_total_liab),
@@ -229,7 +229,7 @@ export default function FinancialAnalysisPage() {
       // Save original currency values to DB
       const vals = (k: string) => parseN(form[k] || '')
       const { error: dbErr } = await supabase.from('counterparty_financials').insert({
-        code: form.code, analyst_name: form.analyst_name,
+        code: form.code, analyst_name: form.analyst_name, counterparty_type: form.counterparty_type || 'Банк',
         p1_label: p1, p2_label: p2,
         currency: form.currency, p1_usd_rate: p1_rate, p2_usd_rate: p2_rate,
         p1_cash: vals('p1_cash'), p2_cash: vals('p2_cash'),
@@ -318,14 +318,14 @@ export default function FinancialAnalysisPage() {
         <table className="w-full text-sm">
           <thead>
             <tr className="bg-gray-50 border-b border-gray-100">
-              {['Контрагент','Аналитик','Периоды','Валюта','Активы П2 (тыс. $)','CAR П2','ROE П2','Дата',''].map(h => (
+              {['Контрагент','Тип','Аналитик','Периоды','Валюта','Активы П2 (тыс. $)','CAR П2','ROE П2','Дата',''].map(h => (
                 <th key={h} className="text-left px-4 py-3 text-xs font-medium text-gray-500 uppercase whitespace-nowrap">{h}</th>
               ))}
             </tr>
           </thead>
           <tbody className="divide-y divide-gray-50">
-            {loading ? <tr><td colSpan={9} className="text-center py-12 text-gray-400">Загрузка...</td></tr>
-              : analyses.length === 0 ? <tr><td colSpan={9} className="text-center py-12 text-gray-400">Нет анализов</td></tr>
+            {loading ? <tr><td colSpan={10} className="text-center py-12 text-gray-400">Загрузка...</td></tr>
+              : analyses.length === 0 ? <tr><td colSpan={10} className="text-center py-12 text-gray-400">Нет анализов</td></tr>
               : analyses.map(a => {
                 const r1 = a.p1_usd_rate || 1
                 const r2 = a.p2_usd_rate || 1
@@ -338,6 +338,9 @@ export default function FinancialAnalysisPage() {
                 return (
                   <tr key={a.id} className="hover:bg-gray-50">
                     <td className="px-4 py-3 font-semibold text-gray-900">{a.code}</td>
+                    <td className="px-4 py-3">
+                      <span className="text-xs bg-gray-100 text-gray-600 px-2 py-0.5 rounded-full">{a.counterparty_type || 'Банк'}</span>
+                    </td>
                     <td className="px-4 py-3 text-gray-600">{a.analyst_name || '—'}</td>
                     <td className="px-4 py-3 text-xs text-gray-500">{a.p1_label} → {a.p2_label}</td>
                     <td className="px-4 py-3">
@@ -434,6 +437,14 @@ export default function FinancialAnalysisPage() {
                     <p className="text-xs text-gray-400 mt-1">Используйте код вместо реального названия</p>
                   </div>
                   <div><label className={lbl}>Аналитик</label><input type="text" value={form.analyst_name} onChange={e => setF('analyst_name', e.target.value)} placeholder="ФИО" className={inp} /></div>
+                  <div>
+                    <label className={lbl}>Тип контрагента</label>
+                    <select value={form.counterparty_type} onChange={e => setF('counterparty_type', e.target.value)} className={inp}>
+                      <option value="Банк">Банк</option>
+                      <option value="Брокерская компания">Брокерская компания</option>
+                      <option value="Инвестиционная компания">Инвестиционная компания</option>
+                    </select>
+                  </div>
                   <div><label className={lbl}>Название периода 1</label><input type="text" value={form.p1_label} onChange={e => setF('p1_label', e.target.value)} placeholder="31.12.2024" className={inp} /></div>
                   <div><label className={lbl}>Название периода 2</label><input type="text" value={form.p2_label} onChange={e => setF('p2_label', e.target.value)} placeholder="31.03.2025" className={inp} /></div>
 
