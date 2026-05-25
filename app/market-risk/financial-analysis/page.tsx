@@ -67,7 +67,7 @@ interface FRProps {
   bold?: boolean; auto?: boolean; v1?: number; v2?: number
   p1rate?: number; p2rate?: number; currSymbol?: string; notUSD?: boolean
 }
-function FR({ label, f1, f2, bold, auto, v1, v2, form, setF, p1rate = 1, p2rate = 1, currSymbol = '$' }: FRProps) {
+function FR({ label, f1, f2, bold, auto, v1, v2, form, setF, p1rate = 1, p2rate = 1, currSymbol = '$', notUSD = false }: FRProps) {
   const cls = "w-full px-2 py-1.5 border border-gray-200 rounded text-sm focus:outline-none focus:ring-2 focus:ring-[#1B8A4C] text-right bg-white"
   const shouldConvert = notUSD && p1rate > 0
   const toUSD1 = (v: number) => shouldConvert ? v / p1rate : v
