@@ -1,7 +1,7 @@
 'use client'
 import { useState, useEffect, useCallback } from 'react'
 import { supabase } from '@/supabase/client'
-import { Edit2, X, CheckCircle2, AlertCircle, BookUser, Download } from 'lucide-react'
+import { Edit2, X, CheckCircle2, AlertCircle, BookUser, Download, Trash2 } from 'lucide-react'
 interface Borrower {
   id: string
   code: string
@@ -55,6 +55,15 @@ export default function BorrowersPage() {
     if (e) { setError(e.message); setSaving(false); return }
     setEditingId(null); fetch_(); setSaving(false)
   }
+  async function handleDelete(b: Borrower) {
+    const conclusionCount = conclusions.filter(c => c.borrower_name === b.code).length
+    const msg = conclusionCount > 0
+      ? `Удалить "${b.code}" из реестра? Связанные заключения (${conclusionCount}) останутся.`
+      : `Удалить "${b.code}" из реестра?`
+    if (!confirm(msg)) return
+    await supabase.from('borrowers').delete().eq('id', b.id)
+    fetch_()
+  }
   function exportToExcel() {
     const fmt = (v: number) => v ? new Intl.NumberFormat('ru-RU').format(Math.round(v)) : '—'
     const headers = ['Код заёмщика', 'Реальное название', 'ИНН', 'Примечание', 'Кол-во заключений', 'Последнее заключение', 'Дата добавления']
@@ -62,11 +71,7 @@ export default function BorrowersPage() {
       const bc = conclusions.filter(c => c.borrower_name === b.code)
       const last = bc[0]
       return [
-        b.code,
-        b.real_name || '',
-        b.inn || '',
-        b.notes || '',
-        bc.length,
+        b.code, b.real_name || '', b.inn || '', b.notes || '', bc.length,
         last ? `${last.recommendation} — ${fmt(last.loan_amount)} ${last.loan_currency}` : '—',
         new Date(b.created_at).toLocaleDateString('ru-RU'),
       ]
@@ -130,10 +135,16 @@ export default function BorrowersPage() {
                       </div>
                     </div>
                     {!isEditing && (
-                      <button onClick={() => openEdit(b)}
-                        className="flex items-center gap-1.5 px-3 py-1.5 border border-gray-200 rounded-lg text-xs text-gray-600 hover:bg-gray-50">
-                        <Edit2 className="w-3.5 h-3.5" /> Заполнить данные
-                      </button>
+                      <div className="flex items-center gap-2">
+                        <button onClick={() => openEdit(b)}
+                          className="flex items-center gap-1.5 px-3 py-1.5 border border-gray-200 rounded-lg text-xs text-gray-600 hover:bg-gray-50">
+                          <Edit2 className="w-3.5 h-3.5" /> Заполнить данные
+                        </button>
+                        <button onClick={() => handleDelete(b)}
+                          className="p-1.5 border border-gray-200 rounded-lg text-gray-400 hover:text-red-600 hover:border-red-200 hover:bg-red-50 transition-colors">
+                          <Trash2 className="w-3.5 h-3.5" />
+                        </button>
+                      </div>
                     )}
                   </div>
                   {!isEditing ? (
