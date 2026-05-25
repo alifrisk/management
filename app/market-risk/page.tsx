@@ -25,6 +25,7 @@ interface Assessment {
 
 interface FinAnalysis {
   id: string; code: string
+  currency: string; p2_usd_rate: number
   p2_cash: number; p2_receivables: number; p2_investments: number
   p2_loans_issued: number; p2_fixed_assets: number; p2_other_assets: number
   p2_deposits: number; p2_borrowings: number; p2_other_liab: number
@@ -221,7 +222,7 @@ export default function MarketRiskPage() {
     if (filterYear && filterMonth) query = query.gte('assessment_date', `${filterYear}-${filterMonth}-01`).lte('assessment_date', `${filterYear}-${filterMonth}-31`)
     const [{ data: aData }, { data: fData }] = await Promise.all([
       query,
-      supabase.from('counterparty_financials').select('id, code, p2_label, p2_cash, p2_receivables, p2_investments, p2_loans_issued, p2_fixed_assets, p2_other_assets, p2_deposits, p2_borrowings, p2_other_liab, p2_equity, p2_net_profit').order('created_at', { ascending: false }),
+      supabase.from('counterparty_financials').select('id, code, p2_label, currency, p2_usd_rate, p2_cash, p2_receivables, p2_investments, p2_loans_issued, p2_fixed_assets, p2_other_assets, p2_deposits, p2_borrowings, p2_other_liab, p2_equity, p2_net_profit').order('created_at', { ascending: false }),
     ])
     setAssessments(aData || [])
     setFinAnalyses(fData || [])
@@ -243,18 +244,21 @@ export default function MarketRiskPage() {
     const fin = finAnalyses.find(f => f.id === finId)
     if (!fin) return
     const fmtN = (v: number) => v ? new Intl.NumberFormat('ru-RU').format(Math.round(v)) : ''
-    const totalAssets = fin.p2_cash + fin.p2_receivables + fin.p2_investments + fin.p2_loans_issued + fin.p2_fixed_assets + fin.p2_other_assets
-    const totalLiab = fin.p2_deposits + fin.p2_borrowings + fin.p2_other_liab
+    // ✅ Конвертируем в USD если валюта отчёта не USD
+    const rate = (fin.currency && fin.currency !== 'USD' && (fin.p2_usd_rate || 0) > 0) ? fin.p2_usd_rate : 1
+    const toUSD = (v: number) => Math.round(v / rate)
+    const totalAssets = toUSD(fin.p2_cash + fin.p2_receivables + fin.p2_investments + fin.p2_loans_issued + fin.p2_fixed_assets + fin.p2_other_assets)
+    const totalLiab = toUSD(fin.p2_deposits + fin.p2_borrowings + fin.p2_other_liab)
     setForm(p => ({
       ...p,
       bank_name: fin.code,
       total_assets: fmtN(totalAssets),
-      liquid_assets: fmtN(fin.p2_cash + fin.p2_investments),
-      total_capital: fmtN(fin.p2_equity),
-      short_term_liabilities: fmtN(fin.p2_deposits),
+      liquid_assets: fmtN(toUSD(fin.p2_cash + fin.p2_investments)),
+      total_capital: fmtN(toUSD(fin.p2_equity)),
+      short_term_liabilities: fmtN(toUSD(fin.p2_deposits)),
       total_liabilities: fmtN(totalLiab),
-      net_profit: fmtN(fin.p2_net_profit),
-      equity: fmtN(fin.p2_equity),
+      net_profit: fmtN(toUSD(fin.p2_net_profit)),
+      equity: fmtN(toUSD(fin.p2_equity)),
     }))
   }
 
