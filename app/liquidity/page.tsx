@@ -392,7 +392,7 @@ export default function LiquidityPage() {
               <button onClick={() => setShowModal(false)} className="px-4 py-2 border border-gray-200 rounded-lg text-sm text-gray-600 hover:bg-gray-50">Отмена</button>
               <button onClick={handleSave} disabled={saving}
                 className="flex items-center gap-2 px-4 py-2 bg-[#1B8A4C] text-white rounded-lg text-sm font-medium hover:bg-[#177040] disabled:opacity-50">
-                {saving ? 'Сохранение...' : <><CheckCircle className="w-4 h-4" /> Сохранить тест</>}
+                {saving ? 'Сохранение...' : <><CheckCircle className="w-4 h-4" /> Сохранить</>}
               </button>
             </div>
           </div>
