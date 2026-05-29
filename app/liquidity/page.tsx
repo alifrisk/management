@@ -1,12 +1,14 @@
 'use client'
 import { useState, useEffect, useCallback } from 'react'
 import { supabase } from '@/supabase/client'
-import { Plus, Download, Eye, Trash2, X, AlertTriangle, CheckCircle, TrendingDown, Filter } from 'lucide-react'
+import { Plus, Download, Eye, Trash2, X, AlertTriangle, CheckCircle, Filter } from 'lucide-react'
+
 interface StressTest {
   id: string
   test_name: string
   analyst_name: string
   test_date: string
+  scenario: string
   due_to_banks: number
   current_accounts: number
   electronic_wallet: number
@@ -26,31 +28,61 @@ interface StressTest {
   coverage_cash_t30: number; coverage_only_t30: number; risk_t30: string
   created_at: string
 }
-const STRESS_RATES = {
-  due_to_banks:     { t1: 1.00, t7: 1.00, t30: 1.00 },
-  current_accounts: { t1: 0.20, t7: 0.35, t30: 0.50 },
-  electronic_wallet:        { t1: 0.10, t7: 0.15, t30: 0.20 },
-  savings:          { t1: 0.03, t7: 0.07, t30: 0.10 },
-  term_deposits:    { t1: 0.05, t7: 0.20, t30: 0.35 },
-  borrowings:       { t1: 0.00, t7: 0.00, t30: 0.00 },
-  other_liabilities:{ t1: 0.00, t7: 0.00, t30: 0.00 },
-  credit_line_salom:{ t1: 0.05, t7: 0.07, t30: 0.10 },
-  credit_line_sme:  { t1: 0.00, t7: 0.00, t30: 0.00 },
+
+// ✅ Три сценария с разными коэффициентами
+const ALL_SCENARIOS = {
+  'Оптимистичный': {
+    due_to_banks:      { t1: 0.10, t7: 0.20, t30: 0.30 },
+    current_accounts:  { t1: 0.05, t7: 0.10, t30: 0.15 },
+    electronic_wallet: { t1: 0.02, t7: 0.05, t30: 0.08 },
+    savings:           { t1: 0.01, t7: 0.03, t30: 0.05 },
+    term_deposits:     { t1: 0.01, t7: 0.05, t30: 0.10 },
+    borrowings:        { t1: 0.00, t7: 0.00, t30: 0.00 },
+    other_liabilities: { t1: 0.00, t7: 0.00, t30: 0.00 },
+    credit_line_salom: { t1: 0.02, t7: 0.03, t30: 0.05 },
+    credit_line_sme:   { t1: 0.00, t7: 0.00, t30: 0.00 },
+  },
+  'Пессимистичный': {
+    due_to_banks:      { t1: 1.00, t7: 1.00, t30: 1.00 },
+    current_accounts:  { t1: 0.20, t7: 0.35, t30: 0.50 },
+    electronic_wallet: { t1: 0.10, t7: 0.15, t30: 0.20 },
+    savings:           { t1: 0.03, t7: 0.07, t30: 0.10 },
+    term_deposits:     { t1: 0.05, t7: 0.20, t30: 0.35 },
+    borrowings:        { t1: 0.00, t7: 0.00, t30: 0.00 },
+    other_liabilities: { t1: 0.00, t7: 0.00, t30: 0.00 },
+    credit_line_salom: { t1: 0.05, t7: 0.07, t30: 0.10 },
+    credit_line_sme:   { t1: 0.00, t7: 0.00, t30: 0.00 },
+  },
+  'Катастрофический': {
+    due_to_banks:      { t1: 1.00, t7: 1.00, t30: 1.00 },
+    current_accounts:  { t1: 0.40, t7: 0.60, t30: 0.80 },
+    electronic_wallet: { t1: 0.25, t7: 0.40, t30: 0.60 },
+    savings:           { t1: 0.10, t7: 0.20, t30: 0.35 },
+    term_deposits:     { t1: 0.15, t7: 0.40, t30: 0.60 },
+    borrowings:        { t1: 0.00, t7: 0.00, t30: 0.05 },
+    other_liabilities: { t1: 0.00, t7: 0.00, t30: 0.00 },
+    credit_line_salom: { t1: 0.10, t7: 0.15, t30: 0.20 },
+    credit_line_sme:   { t1: 0.00, t7: 0.00, t30: 0.00 },
+  },
 }
-function calcStress(f: Record<string, number>) {
+
+type ScenarioName = keyof typeof ALL_SCENARIOS
+
+function calcStress(f: Record<string, number>, scenario: ScenarioName) {
+  const rates = ALL_SCENARIOS[scenario]
   const calc = (horizon: 't1' | 't7' | 't30') => {
     const liab = (
-      f.due_to_banks * STRESS_RATES.due_to_banks[horizon] +
-      f.current_accounts * STRESS_RATES.current_accounts[horizon] +
-      f.electronic_wallet * STRESS_RATES.electronic_wallet[horizon] +
-      f.savings * STRESS_RATES.savings[horizon] +
-      f.term_deposits * STRESS_RATES.term_deposits[horizon] +
-      f.borrowings * STRESS_RATES.borrowings[horizon] +
-      f.other_liabilities * STRESS_RATES.other_liabilities[horizon]
+      f.due_to_banks      * rates.due_to_banks[horizon] +
+      f.current_accounts  * rates.current_accounts[horizon] +
+      f.electronic_wallet * rates.electronic_wallet[horizon] +
+      f.savings           * rates.savings[horizon] +
+      f.term_deposits     * rates.term_deposits[horizon] +
+      f.borrowings        * rates.borrowings[horizon] +
+      f.other_liabilities * rates.other_liabilities[horizon]
     )
     const draw = (
-      f.credit_line_salom * STRESS_RATES.credit_line_salom[horizon] +
-      f.credit_line_sme * STRESS_RATES.credit_line_sme[horizon]
+      f.credit_line_salom * rates.credit_line_salom[horizon] +
+      f.credit_line_sme   * rates.credit_line_sme[horizon]
     )
     const need = liab + draw
     const cov_cash = need > 0 ? f.cash_equivalents / need : 0
@@ -60,15 +92,12 @@ function calcStress(f: Record<string, number>) {
   }
   return { t1: calc('t1'), t7: calc('t7'), t30: calc('t30') }
 }
+
 const MONTHS = ['Январь','Февраль','Март','Апрель','Май','Июнь','Июль','Август','Сентябрь','Октябрь','Ноябрь','Декабрь']
 const fmt = (n: number) => n ? new Intl.NumberFormat('ru-RU').format(Math.round(n)) : '—'
-const pct = (n: number) => n ? (n * 100).toFixed(0) + '%' : '—'
-const formatNum = (v: string) => {
-  const num = v.replace(/\D/g, '')
-  if (!num) return ''
-  return new Intl.NumberFormat('ru-RU').format(Number(num))
-}
+const formatNum = (v: string) => { const num = v.replace(/\D/g, ''); if (!num) return ''; return new Intl.NumberFormat('ru-RU').format(Number(num)) }
 const parseNum = (v: string) => Number(v.replace(/\D/g, '')) || 0
+
 const EMPTY: Record<string, string> = {
   test_name: '', analyst_name: '',
   due_to_banks: '', current_accounts: '', electronic_wallet: '', savings: '',
@@ -76,16 +105,25 @@ const EMPTY: Record<string, string> = {
   credit_line_salom: '', credit_line_sme: '',
   cash_equivalents: '', cash_only: '',
 }
+
+const SCENARIO_STYLES: Record<ScenarioName, { bg: string; text: string; border: string; badge: string }> = {
+  'Оптимистичный':   { bg: 'bg-green-50',  text: 'text-green-700',  border: 'border-green-300',  badge: 'bg-green-100 text-green-700'  },
+  'Пессимистичный':  { bg: 'bg-yellow-50', text: 'text-yellow-700', border: 'border-yellow-300', badge: 'bg-yellow-100 text-yellow-700' },
+  'Катастрофический':{ bg: 'bg-red-50',    text: 'text-red-700',    border: 'border-red-300',    badge: 'bg-red-100 text-red-700'      },
+}
+
 export default function LiquidityPage() {
   const [tests, setTests] = useState<StressTest[]>([])
   const [loading, setLoading] = useState(true)
   const [showModal, setShowModal] = useState(false)
   const [form, setForm] = useState<Record<string, string>>(EMPTY)
+  const [scenario, setScenario] = useState<ScenarioName>('Пессимистичный')
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [viewing, setViewing] = useState<StressTest | null>(null)
   const [filterYear, setFilterYear] = useState('')
   const [filterMonth, setFilterMonth] = useState('')
+
   const fetch_ = useCallback(async () => {
     setLoading(true)
     let query = supabase.from('liquidity_stress_tests').select('*').order('created_at', { ascending: false })
@@ -95,26 +133,36 @@ export default function LiquidityPage() {
     setTests(data || [])
     setLoading(false)
   }, [filterYear, filterMonth])
+
   useEffect(() => { fetch_() }, [fetch_])
+
   const n = (k: string) => parseNum(form[k] || '')
   const setF = (k: string, v: string) => setForm(p => ({ ...p, [k]: v }))
   const setNum = (k: string, v: string) => setForm(p => ({ ...p, [k]: formatNum(v) }))
+
   const computed = calcStress({
     due_to_banks: n('due_to_banks'), current_accounts: n('current_accounts'),
     electronic_wallet: n('electronic_wallet'), savings: n('savings'), term_deposits: n('term_deposits'),
     borrowings: n('borrowings'), other_liabilities: n('other_liabilities'),
     credit_line_salom: n('credit_line_salom'), credit_line_sme: n('credit_line_sme'),
     cash_equivalents: n('cash_equivalents'), cash_only: n('cash_only'),
-  })
+  }, scenario)
+
+  const rates = ALL_SCENARIOS[scenario]
+
   const riskColor = (r: string) => r === 'High' ? 'text-red-600 bg-red-50' : r === 'Elevated' ? 'text-yellow-600 bg-yellow-50' : 'text-green-600 bg-green-50'
   const riskLabel = (r: string) => r === 'High' ? 'Высокий' : r === 'Elevated' ? 'Повышенный' : 'Нормальный'
   const covColor = (v: number) => v >= 1.1 ? 'text-green-600' : v >= 1 ? 'text-yellow-600' : 'text-red-600'
+
+  const fmtRate = (r: Record<string, number>) => `${(r.t1*100).toFixed(0)}% / ${(r.t7*100).toFixed(0)}% / ${(r.t30*100).toFixed(0)}%`
+
   async function handleSave() {
     if (!form.test_name.trim()) { setError('Введите название теста'); return }
     setSaving(true); setError(null)
     try {
       const { error: dbErr } = await supabase.from('liquidity_stress_tests').insert({
         test_name: form.test_name, analyst_name: form.analyst_name,
+        scenario,
         test_date: new Date().toISOString().split('T')[0],
         due_to_banks: n('due_to_banks'), current_accounts: n('current_accounts'),
         electronic_wallet: n('electronic_wallet'), savings: n('savings'), term_deposits: n('term_deposits'),
@@ -129,11 +177,12 @@ export default function LiquidityPage() {
         coverage_cash_t30: computed.t30.cov_cash, coverage_only_t30: computed.t30.cov_only, risk_t30: computed.t30.risk,
       })
       if (dbErr) throw new Error(dbErr.message)
-      setShowModal(false); setForm(EMPTY); fetch_()
+      setShowModal(false); setForm(EMPTY); setScenario('Пессимистичный'); fetch_()
     } catch (err: unknown) {
       setError('Ошибка: ' + (err instanceof Error ? err.message : String(err)))
     } finally { setSaving(false) }
   }
+
   async function downloadWord(t: StressTest) {
     try {
       const res = await fetch('/api/liquidity/export-word', {
@@ -148,13 +197,16 @@ export default function LiquidityPage() {
       URL.revokeObjectURL(url)
     } catch (e: unknown) { alert('Ошибка: ' + (e instanceof Error ? e.message : String(e))) }
   }
+
   async function handleDelete(id: string) {
     if (!confirm('Удалить?')) return
     await supabase.from('liquidity_stress_tests').delete().eq('id', id)
     fetch_()
   }
+
   const inp = "w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#1B8A4C] bg-white text-right"
   const lbl = "block text-xs font-medium text-gray-600 mb-1"
+
   const HorizonCard = ({ h, data }: { h: string; data: { liab: number; draw: number; need: number; cov_cash: number; cov_only: number; risk: string } }) => (
     <div className={`p-4 rounded-xl border-2 ${data.risk === 'High' ? 'border-red-200 bg-red-50' : data.risk === 'Elevated' ? 'border-yellow-200 bg-yellow-50' : 'border-green-200 bg-green-50'}`}>
       <div className="flex items-center justify-between mb-3">
@@ -187,18 +239,20 @@ export default function LiquidityPage() {
       </div>
     </div>
   )
+
   return (
     <div className="max-w-6xl mx-auto space-y-5">
       <div className="flex items-center justify-between flex-wrap gap-3">
         <div>
           <h1 className="text-xl font-semibold text-gray-900">Ликвидность — Стресс-тест</h1>
-          <p className="text-sm text-gray-500 mt-0.5">Пессимистический сценарий T+1 / T+7 / T+30</p>
+          <p className="text-sm text-gray-500 mt-0.5">Оптимистичный / Пессимистичный / Катастрофический · T+1 / T+7 / T+30</p>
         </div>
-        <button onClick={() => { setForm(EMPTY); setError(null); setShowModal(true) }}
+        <button onClick={() => { setForm(EMPTY); setScenario('Пессимистичный'); setError(null); setShowModal(true) }}
           className="flex items-center gap-2 px-4 py-2 bg-[#1B8A4C] text-white rounded-lg text-sm font-medium hover:bg-[#177040]">
           <Plus className="w-4 h-4" /> Новый стресс-тест
         </button>
       </div>
+
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
         {[
           { label: 'Всего тестов', value: tests.length, c: 'text-gray-900' },
@@ -212,6 +266,7 @@ export default function LiquidityPage() {
           </div>
         ))}
       </div>
+
       <div className="bg-white rounded-xl border border-gray-100 p-4 shadow-sm flex items-center gap-3 flex-wrap">
         <Filter className="w-4 h-4 text-gray-400" />
         <select value={filterYear} onChange={e => { setFilterYear(e.target.value); setFilterMonth('') }}
@@ -230,53 +285,70 @@ export default function LiquidityPage() {
           </button>
         )}
       </div>
+
       <div className="bg-white rounded-xl border border-gray-100 shadow-sm overflow-hidden">
         <div className="overflow-x-auto">
           <table className="w-full text-sm">
             <thead>
               <tr className="bg-gray-50 border-b border-gray-100">
-                {['Тест','Дата','T+1 риск','T+7 риск','T+30 риск','T+1 покрытие','T+7 покрытие','T+30 покрытие','Аналитик',''].map(h => (
+                {['Тест','Сценарий','Дата','T+1 риск','T+7 риск','T+30 риск','T+1 покрытие','T+7 покрытие','T+30 покрытие','Аналитик',''].map(h => (
                   <th key={h} className="text-left px-4 py-3 text-xs font-medium text-gray-500 uppercase whitespace-nowrap">{h}</th>
                 ))}
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-50">
-              {loading ? <tr><td colSpan={10} className="text-center py-12 text-gray-400">Загрузка...</td></tr>
-                : tests.length === 0 ? <tr><td colSpan={10} className="text-center py-12 text-gray-400">Нет стресс-тестов</td></tr>
-                : tests.map(t => (
-                  <tr key={t.id} className="hover:bg-gray-50">
-                    <td className="px-4 py-3 font-semibold text-gray-900">{t.test_name}</td>
-                    <td className="px-4 py-3 text-gray-500 text-xs">{new Date(t.created_at).toLocaleDateString('ru-RU')}</td>
-                    {[{r:t.risk_t1},{r:t.risk_t7},{r:t.risk_t30}].map(({r},i) => (
-                      <td key={i} className="px-4 py-3">
-                        <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium ${riskColor(r)}`}>
-                          {r === 'High' ? <AlertTriangle className="w-3 h-3" /> : <CheckCircle className="w-3 h-3" />}
-                          {riskLabel(r)}
-                        </span>
+              {loading ? <tr><td colSpan={11} className="text-center py-12 text-gray-400">Загрузка...</td></tr>
+                : tests.length === 0 ? <tr><td colSpan={11} className="text-center py-12 text-gray-400">Нет стресс-тестов</td></tr>
+                : tests.map(t => {
+                  const sc = (t.scenario || 'Пессимистичный') as ScenarioName
+                  const style = SCENARIO_STYLES[sc] || SCENARIO_STYLES['Пессимистичный']
+                  return (
+                    <tr key={t.id} className="hover:bg-gray-50">
+                      <td className="px-4 py-3 font-semibold text-gray-900">{t.test_name}</td>
+                      <td className="px-4 py-3">
+                        <span className={`text-xs font-medium px-2 py-0.5 rounded-full ${style.badge}`}>{sc}</span>
                       </td>
-                    ))}
-                    {[{v:t.coverage_cash_t1},{v:t.coverage_cash_t7},{v:t.coverage_cash_t30}].map(({v},i) => (
-                      <td key={i} className={`px-4 py-3 font-bold text-sm ${covColor(v)}`}>{(v*100).toFixed(0)}%</td>
-                    ))}
-                    <td className="px-4 py-3 text-gray-600 text-xs">{t.analyst_name || '—'}</td>
-                    <td className="px-4 py-3">
-                      <div className="flex items-center gap-1">
-                        <button onClick={() => setViewing(t)} className="p-1.5 text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg"><Eye className="w-3.5 h-3.5" /></button>
-                        <button onClick={() => downloadWord(t)} className="p-1.5 text-gray-400 hover:text-[#1B8A4C] hover:bg-green-50 rounded-lg"><Download className="w-3.5 h-3.5" /></button>
-                        <button onClick={() => handleDelete(t.id)} className="p-1.5 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg"><Trash2 className="w-3.5 h-3.5" /></button>
-                      </div>
-                    </td>
-                  </tr>
-                ))}
+                      <td className="px-4 py-3 text-gray-500 text-xs">{new Date(t.created_at).toLocaleDateString('ru-RU')}</td>
+                      {[{r:t.risk_t1},{r:t.risk_t7},{r:t.risk_t30}].map(({r},i) => (
+                        <td key={i} className="px-4 py-3">
+                          <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium ${riskColor(r)}`}>
+                            {r === 'High' ? <AlertTriangle className="w-3 h-3" /> : <CheckCircle className="w-3 h-3" />}
+                            {riskLabel(r)}
+                          </span>
+                        </td>
+                      ))}
+                      {[{v:t.coverage_cash_t1},{v:t.coverage_cash_t7},{v:t.coverage_cash_t30}].map(({v},i) => (
+                        <td key={i} className={`px-4 py-3 font-bold text-sm ${covColor(v)}`}>{(v*100).toFixed(0)}%</td>
+                      ))}
+                      <td className="px-4 py-3 text-gray-600 text-xs">{t.analyst_name || '—'}</td>
+                      <td className="px-4 py-3">
+                        <div className="flex items-center gap-1">
+                          <button onClick={() => setViewing(t)} className="p-1.5 text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg"><Eye className="w-3.5 h-3.5" /></button>
+                          <button onClick={() => downloadWord(t)} className="p-1.5 text-gray-400 hover:text-[#1B8A4C] hover:bg-green-50 rounded-lg"><Download className="w-3.5 h-3.5" /></button>
+                          <button onClick={() => handleDelete(t.id)} className="p-1.5 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg"><Trash2 className="w-3.5 h-3.5" /></button>
+                        </div>
+                      </td>
+                    </tr>
+                  )
+                })}
             </tbody>
           </table>
         </div>
       </div>
+
+      {/* View Modal */}
       {viewing && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50">
           <div className="bg-white rounded-2xl shadow-2xl w-full max-w-3xl max-h-[90vh] flex flex-col">
             <div className="flex items-center justify-between p-6 border-b border-gray-100">
-              <h2 className="text-lg font-semibold">{viewing.test_name}</h2>
+              <div>
+                <h2 className="text-lg font-semibold">{viewing.test_name}</h2>
+                {viewing.scenario && (
+                  <span className={`text-xs font-medium px-2 py-0.5 rounded-full mt-1 inline-block ${(SCENARIO_STYLES[viewing.scenario as ScenarioName] || SCENARIO_STYLES['Пессимистичный']).badge}`}>
+                    {viewing.scenario}
+                  </span>
+                )}
+              </div>
               <button onClick={() => setViewing(null)}><X className="w-5 h-5 text-gray-400" /></button>
             </div>
             <div className="flex-1 overflow-y-auto p-6 space-y-5">
@@ -316,62 +388,86 @@ export default function LiquidityPage() {
           </div>
         </div>
       )}
+
+      {/* Form Modal */}
       {showModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50">
           <div className="bg-white rounded-2xl shadow-2xl w-full max-w-3xl max-h-[95vh] flex flex-col">
             <div className="flex items-center justify-between p-5 border-b border-gray-100">
               <div>
                 <h2 className="text-base font-semibold">Стресс-тест ликвидности</h2>
-                <p className="text-xs text-gray-500 mt-0.5">Пессимистический сценарий · T+1 / T+7 / T+30</p>
+                <p className="text-xs text-gray-500 mt-0.5">T+1 / T+7 / T+30</p>
               </div>
               <button onClick={() => setShowModal(false)} className="text-gray-400 hover:text-gray-600"><X className="w-5 h-5" /></button>
             </div>
             <div className="flex-1 overflow-y-auto p-5 space-y-5">
               {error && <div className="flex items-center gap-2 p-3 bg-red-50 border border-red-100 rounded-lg"><span className="text-sm text-red-600">{error}</span></div>}
+
+              {/* ✅ Выбор сценария */}
+              <div>
+                <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">Сценарий</p>
+                <div className="grid grid-cols-3 gap-2">
+                  {(Object.keys(ALL_SCENARIOS) as ScenarioName[]).map(sc => {
+                    const style = SCENARIO_STYLES[sc]
+                    const active = scenario === sc
+                    return (
+                      <button key={sc} onClick={() => setScenario(sc)}
+                        className={`px-3 py-2.5 rounded-xl border-2 text-xs font-semibold transition-all ${active ? `${style.bg} ${style.border} ${style.text}` : 'bg-white border-gray-200 text-gray-500 hover:border-gray-300'}`}>
+                        {sc === 'Оптимистичный' ? '📈' : sc === 'Пессимистичный' ? '📉' : '⚠️'} {sc}
+                      </button>
+                    )
+                  })}
+                </div>
+              </div>
+
               <div className="grid grid-cols-3 gap-3">
                 <HorizonCard h="T+1" data={computed.t1} />
                 <HorizonCard h="T+7" data={computed.t7} />
                 <HorizonCard h="T+30" data={computed.t30} />
               </div>
+
               <div className="grid grid-cols-2 gap-3">
                 <div><label className={lbl}>Название теста *</label><input type="text" value={form.test_name} onChange={e => setF('test_name', e.target.value)} placeholder="Стресс-тест Март 2026" className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#1B8A4C] bg-white" /></div>
                 <div><label className={lbl}>Аналитик</label><input type="text" value={form.analyst_name} onChange={e => setF('analyst_name', e.target.value)} placeholder="ФИО" className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#1B8A4C] bg-white" /></div>
               </div>
+
               <div>
                 <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-3">Обязательства (TJS)</p>
                 <div className="grid grid-cols-2 gap-3">
                   {[
-                    { key: 'due_to_banks', label: 'Межбанковские обязательства', rates: '100% / 100% / 100%' },
-                    { key: 'current_accounts', label: 'Текущие счета клиентов', rates: '20% / 35% / 50%' },
-                    { key: 'electronic_wallet', label: 'Электронный кошелёк', rates: '10% / 15% / 20%' },
-                    { key: 'savings', label: 'Накопительные счета', rates: '3% / 7% / 10%' },
-                    { key: 'term_deposits', label: 'Срочные депозиты', rates: '5% / 20% / 35%' },
-                    { key: 'borrowings', label: 'Заимствования', rates: '0% / 0% / 0%' },
-                    { key: 'other_liabilities', label: 'Прочие обязательства', rates: '0% / 0% / 0%' },
+                    { key: 'due_to_banks',     label: 'Межбанковские обязательства', r: rates.due_to_banks },
+                    { key: 'current_accounts', label: 'Текущие счета клиентов',       r: rates.current_accounts },
+                    { key: 'electronic_wallet',label: 'Электронный кошелёк',          r: rates.electronic_wallet },
+                    { key: 'savings',          label: 'Накопительные счета',          r: rates.savings },
+                    { key: 'term_deposits',    label: 'Срочные депозиты',             r: rates.term_deposits },
+                    { key: 'borrowings',       label: 'Заимствования',                r: rates.borrowings },
+                    { key: 'other_liabilities',label: 'Прочие обязательства',         r: rates.other_liabilities },
                   ].map(f => (
                     <div key={f.key}>
                       <label className={lbl}>{f.label}</label>
                       <input type="text" inputMode="numeric" value={form[f.key]} onChange={e => setNum(f.key, e.target.value)} placeholder="0" className={inp} />
-                      <p className="text-xs text-gray-400 mt-0.5">Стресс: {f.rates}</p>
+                      <p className="text-xs text-gray-400 mt-0.5">Стресс: {fmtRate(f.r)}</p>
                     </div>
                   ))}
                 </div>
               </div>
+
               <div>
                 <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-3">Кредитные линии (TJS)</p>
                 <div className="grid grid-cols-2 gap-3">
                   {[
-                    { key: 'credit_line_salom', label: 'Кредитная линия Salom', rates: '5% / 7% / 10%' },
-                    { key: 'credit_line_sme', label: 'Кредитная линия SME', rates: '0% / 0% / 0%' },
+                    { key: 'credit_line_salom', label: 'Кредитная линия Salom', r: rates.credit_line_salom },
+                    { key: 'credit_line_sme',   label: 'Кредитная линия SME',   r: rates.credit_line_sme },
                   ].map(f => (
                     <div key={f.key}>
                       <label className={lbl}>{f.label}</label>
                       <input type="text" inputMode="numeric" value={form[f.key]} onChange={e => setNum(f.key, e.target.value)} placeholder="0" className={inp} />
-                      <p className="text-xs text-gray-400 mt-0.5">Стресс: {f.rates}</p>
+                      <p className="text-xs text-gray-400 mt-0.5">Стресс: {fmtRate(f.r)}</p>
                     </div>
                   ))}
                 </div>
               </div>
+
               <div>
                 <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-3">Буфер ликвидности (TJS)</p>
                 <div className="grid grid-cols-2 gap-3">
@@ -388,6 +484,7 @@ export default function LiquidityPage() {
                 </div>
               </div>
             </div>
+
             <div className="flex items-center justify-end gap-3 p-5 border-t border-gray-100">
               <button onClick={() => setShowModal(false)} className="px-4 py-2 border border-gray-200 rounded-lg text-sm text-gray-600 hover:bg-gray-50">Отмена</button>
               <button onClick={handleSave} disabled={saving}
