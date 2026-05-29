@@ -121,6 +121,7 @@ export default function LiquidityPage() {
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [viewing, setViewing] = useState<StressTest | null>(null)
+  const [viewScenario, setViewScenario] = useState<ScenarioName>('Пессимистичный')
   const [filterYear, setFilterYear] = useState('')
   const [filterMonth, setFilterMonth] = useState('')
 
@@ -328,7 +329,7 @@ export default function LiquidityPage() {
                       <td className="px-4 py-3 text-gray-600 text-xs">{t.analyst_name || '—'}</td>
                       <td className="px-4 py-3">
                         <div className="flex items-center gap-1">
-                          <button onClick={() => setViewing(t)} className="p-1.5 text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg"><Eye className="w-3.5 h-3.5" /></button>
+                          <button onClick={() => { setViewing(t); setViewScenario((t.scenario as ScenarioName) || 'Пессимистичный') }} className="p-1.5 text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg"><Eye className="w-3.5 h-3.5" /></button>
                           <button onClick={() => downloadWord(t)} className="p-1.5 text-gray-400 hover:text-[#1B8A4C] hover:bg-green-50 rounded-lg"><Download className="w-3.5 h-3.5" /></button>
                           <button onClick={() => handleDelete(t.id)} className="p-1.5 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg"><Trash2 className="w-3.5 h-3.5" /></button>
                         </div>
@@ -357,11 +358,40 @@ export default function LiquidityPage() {
               <button onClick={() => setViewing(null)}><X className="w-5 h-5 text-gray-400" /></button>
             </div>
             <div className="flex-1 overflow-y-auto p-6 space-y-5">
-              <div className="grid grid-cols-3 gap-3">
-                <HorizonCard h="T+1 (1 день)" data={{ liab: viewing.outflow_t1, draw: viewing.drawdown_t1, need: viewing.need_t1, cov_cash: viewing.coverage_cash_t1, cov_only: viewing.coverage_only_t1, risk: viewing.risk_t1 }} />
-                <HorizonCard h="T+7 (7 дней)" data={{ liab: viewing.outflow_t7, draw: viewing.drawdown_t7, need: viewing.need_t7, cov_cash: viewing.coverage_cash_t7, cov_only: viewing.coverage_only_t7, risk: viewing.risk_t7 }} />
-                <HorizonCard h="T+30 (30 дней)" data={{ liab: viewing.outflow_t30, draw: viewing.drawdown_t30, need: viewing.need_t30, cov_cash: viewing.coverage_cash_t30, cov_only: viewing.coverage_only_t30, risk: viewing.risk_t30 }} />
+              {/* ✅ Переключатель сценария */}
+              <div className="grid grid-cols-3 gap-2">
+                {(Object.keys(ALL_SCENARIOS) as ScenarioName[]).map(sc => {
+                  const style = SCENARIO_STYLES[sc]
+                  const active = viewScenario === sc
+                  const isSaved = (viewing.scenario || 'Пессимистичный') === sc
+                  return (
+                    <button key={sc} onClick={() => setViewScenario(sc)}
+                      className={`px-3 py-2.5 rounded-xl border-2 text-xs font-semibold transition-all ${active ? `${style.bg} ${style.border} ${style.text}` : 'bg-white border-gray-200 text-gray-500 hover:border-gray-300'}`}>
+                      {sc === 'Оптимистичный' ? '📈' : sc === 'Пессимистичный' ? '📉' : '⚠️'} {sc}
+                      {isSaved && <span className="ml-1 text-[10px] opacity-70">(сохранён)</span>}
+                    </button>
+                  )
+                })}
               </div>
+              {/* ✅ Карточки пересчитанные по выбранному сценарию */}
+              {(() => {
+                const viewInputs = {
+                  due_to_banks: viewing.due_to_banks, current_accounts: viewing.current_accounts,
+                  electronic_wallet: viewing.electronic_wallet, savings: viewing.savings,
+                  term_deposits: viewing.term_deposits, borrowings: viewing.borrowings,
+                  other_liabilities: viewing.other_liabilities,
+                  credit_line_salom: viewing.credit_line_salom, credit_line_sme: viewing.credit_line_sme,
+                  cash_equivalents: viewing.cash_equivalents, cash_only: viewing.cash_only,
+                }
+                const res = calcStress(viewInputs, viewScenario)
+                return (
+                  <div className="grid grid-cols-3 gap-3">
+                    <HorizonCard h="T+1 (1 день)" data={res.t1} />
+                    <HorizonCard h="T+7 (7 дней)" data={res.t7} />
+                    <HorizonCard h="T+30 (30 дней)" data={res.t30} />
+                  </div>
+                )
+              })()}
               <div className="bg-gray-50 rounded-xl p-4">
                 <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-3">Входные данные</p>
                 <div className="grid grid-cols-2 gap-2 text-xs">
