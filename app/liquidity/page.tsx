@@ -140,14 +140,19 @@ export default function LiquidityPage() {
   const setF = (k: string, v: string) => setForm(p => ({ ...p, [k]: v }))
   const setNum = (k: string, v: string) => setForm(p => ({ ...p, [k]: formatNum(v) }))
 
-  const computed = calcStress({
+  const inputs = {
     due_to_banks: n('due_to_banks'), current_accounts: n('current_accounts'),
     electronic_wallet: n('electronic_wallet'), savings: n('savings'), term_deposits: n('term_deposits'),
     borrowings: n('borrowings'), other_liabilities: n('other_liabilities'),
     credit_line_salom: n('credit_line_salom'), credit_line_sme: n('credit_line_sme'),
     cash_equivalents: n('cash_equivalents'), cash_only: n('cash_only'),
-  }, scenario)
-
+  }
+  const computed = calcStress(inputs, scenario)
+  const allComputed = {
+    'Оптимистичный':    calcStress(inputs, 'Оптимистичный'),
+    'Пессимистичный':   calcStress(inputs, 'Пессимистичный'),
+    'Катастрофический': calcStress(inputs, 'Катастрофический'),
+  }
   const rates = ALL_SCENARIOS[scenario]
 
   const riskColor = (r: string) => r === 'High' ? 'text-red-600 bg-red-50' : r === 'Elevated' ? 'text-yellow-600 bg-yellow-50' : 'text-green-600 bg-green-50'
@@ -396,16 +401,16 @@ export default function LiquidityPage() {
             <div className="flex items-center justify-between p-5 border-b border-gray-100">
               <div>
                 <h2 className="text-base font-semibold">Стресс-тест ликвидности</h2>
-                <p className="text-xs text-gray-500 mt-0.5">T+1 / T+7 / T+30</p>
+                <p className="text-xs text-gray-500 mt-0.5">3 сценария · T+1 / T+7 / T+30</p>
               </div>
               <button onClick={() => setShowModal(false)} className="text-gray-400 hover:text-gray-600"><X className="w-5 h-5" /></button>
             </div>
             <div className="flex-1 overflow-y-auto p-5 space-y-5">
               {error && <div className="flex items-center gap-2 p-3 bg-red-50 border border-red-100 rounded-lg"><span className="text-sm text-red-600">{error}</span></div>}
 
-              {/* ✅ Выбор сценария */}
+              {/* ✅ Выбор сценария для сохранения */}
               <div>
-                <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">Сценарий</p>
+                <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">Сохранить как сценарий</p>
                 <div className="grid grid-cols-3 gap-2">
                   {(Object.keys(ALL_SCENARIOS) as ScenarioName[]).map(sc => {
                     const style = SCENARIO_STYLES[sc]
@@ -420,10 +425,28 @@ export default function LiquidityPage() {
                 </div>
               </div>
 
-              <div className="grid grid-cols-3 gap-3">
-                <HorizonCard h="T+1" data={computed.t1} />
-                <HorizonCard h="T+7" data={computed.t7} />
-                <HorizonCard h="T+30" data={computed.t30} />
+              {/* ✅ Все 3 сценария × 3 горизонта */}
+              <div className="space-y-3">
+                {(Object.keys(allComputed) as ScenarioName[]).map(sc => {
+                  const style = SCENARIO_STYLES[sc]
+                  const res = allComputed[sc]
+                  const isSaved = scenario === sc
+                  return (
+                    <div key={sc} className={`rounded-xl border-2 overflow-hidden ${isSaved ? style.border : 'border-gray-200'}`}>
+                      <div className={`px-4 py-2 flex items-center justify-between ${isSaved ? style.bg : 'bg-gray-50'}`}>
+                        <span className={`text-xs font-bold ${isSaved ? style.text : 'text-gray-500'}`}>
+                          {sc === 'Оптимистичный' ? '📈' : sc === 'Пессимистичный' ? '📉' : '⚠️'} {sc}
+                        </span>
+                        {isSaved && <span className={`text-xs px-2 py-0.5 rounded-full ${style.badge}`}>будет сохранён</span>}
+                      </div>
+                      <div className="grid grid-cols-3 gap-0 divide-x divide-gray-100 p-3 gap-3">
+                        <HorizonCard h="T+1" data={res.t1} />
+                        <HorizonCard h="T+7" data={res.t7} />
+                        <HorizonCard h="T+30" data={res.t30} />
+                      </div>
+                    </div>
+                  )
+                })}
               </div>
 
               <div className="grid grid-cols-2 gap-3">
