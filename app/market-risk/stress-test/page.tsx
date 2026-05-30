@@ -16,29 +16,18 @@ function normalRandom(mean: number, stdDev: number): number {
 
 function runMonteCarlo(mean: number, stdDev: number, iterations = 10000): {
   results: number[]
-  probabilities: { threshold: number; prob: number }[]
+  probabilities: { threshold: number; type: 'deval' | 'apprec'; prob: number }[]
 } {
   const results: number[] = []
   for (let i = 0; i < iterations; i++) {
     results.push(normalRandom(mean, stdDev))
   }
-
-  // Devaluation thresholds (TJS weakens = positive change)
   const devalThresholds = [1, 3, 5, 6, 10, 12, 15, 20]
-  // Appreciation thresholds (TJS strengthens = negative change)
   const appreciateThresholds = [1, 2, 3, 5, 6, 10, 15]
-
   const probabilities: { threshold: number; type: 'deval' | 'apprec'; prob: number }[] = [
-    ...devalThresholds.map(t => ({
-      threshold: t, type: 'deval' as const,
-      prob: results.filter(r => r > t).length / iterations * 100,
-    })),
-    ...appreciateThresholds.map(t => ({
-      threshold: t,
-    type: 'apprec' as const,
-    prob: results.filter(r => r < -t).length / iterations * 100
-  })))
-
+    ...devalThresholds.map(t => ({ threshold: t, type: 'deval' as const, prob: results.filter(r => r > t).length / iterations * 100 })),
+    ...appreciateThresholds.map(t => ({ threshold: t, type: 'apprec' as const, prob: results.filter(r => r < -t).length / iterations * 100 })),
+  ]
   return { results, probabilities }
 }
 
