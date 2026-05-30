@@ -1,158 +1,189 @@
 'use client'
 import { useState, useEffect, useCallback } from 'react'
 import { supabase } from '@/supabase/client'
-import { TrendingDown, TrendingUp, AlertTriangle, Activity, RefreshCw } from 'lucide-react'
+import { RefreshCw, Download, Printer, TrendingDown, Activity, BarChart3 } from 'lucide-react'
+import {
+  BarChart, Bar, LineChart, Line, XAxis, YAxis, CartesianGrid,
+  Tooltip, Legend, ResponsiveContainer
+} from 'recharts'
 
-const MONTHS = ['Январь','Февраль','Март','Апрель','Май','Июнь','Июль','Август','Сентябрь','Октябрь','Ноябрь','Декабрь']
+const fmt  = (n: number) => n ? new Intl.NumberFormat('ru-RU').format(Math.round(n)) : '—'
+const fmtN = (v: string) => { const n = v.replace(/\D/g,''); return n ? new Intl.NumberFormat('ru-RU').format(Number(n)) : '' }
+const parseN = (v: string) => Number(v.replace(/\D/g,'')) || 0
+const MONTHS_RU = ['Янв','Фев','Мар','Апр','Май','Июн','Июл','Авг','Сен','Окт','Ноя','Дек']
 
-const fmt = (n: number) => new Intl.NumberFormat('ru-RU').format(Math.round(n))
-const fmtN = (v: string) => { const n = v.replace(/\D/g, ''); return n ? new Intl.NumberFormat('ru-RU').format(Number(n)) : '' }
-const parseN = (v: string) => Number(v.replace(/\D/g, '')) || 0
-
-// Коэффициенты сценариев
-const SCENARIO_COEFF = {
-  pessimistic:    { incidents: 1.5, loss: 2.0, recovery: 0.7  },
-  catastrophic:   { incidents: 2.5, loss: 5.0, recovery: 0.5  },
+const COEFF = {
+  pessimistic:   { incidents: 1.5, loss: 2.0, recovery: 0.7 },
+  catastrophic:  { incidents: 2.5, loss: 5.0, recovery: 0.5 },
 }
 
-// Фиксированные строки ущерба для матрицы
-const LOSS_ROWS = [400000, 800000, 1000000, 1400000, 1600000, 2000000, 2500000, 3000000, 3200000, 3500000, 4000000, 4500000, 5000000]
-// Столбцы возвратности
-const RECOVERY_COLS = [0.10, 0.20, 0.25, 0.30, 0.40, 0.50, 0.60, 0.70, 0.80, 0.90]
+const LOSS_ROWS    = [400000,800000,1000000,1400000,1600000,2000000,2500000,3000000,3500000,4000000,4500000,5000000]
+const RECOVERY_COLS = [0.10,0.20,0.25,0.30,0.40,0.50,0.60,0.70,0.80,0.90]
 
-interface HistoricalData {
+interface HistData {
   totalIncidents: number
   totalLoss: number
   totalRecovery: number
   recoveryRate: number
-  avgLossPerIncident: number
+  months: number
   avgIncidentsPerMonth: number
+  avgLossPerMonth: number
 }
 
 export default function OpStressTest() {
-  const [year, setYear] = useState(new Date().getFullYear())
-  const [month, setMonth] = useState('')
-  const [historical, setHistorical] = useState<HistoricalData | null>(null)
+  // ── Период истории ───────────────────────────────
+  const [dateFrom, setDateFrom] = useState(() => {
+    const d = new Date(); d.setMonth(d.getMonth() - 6); return d.toISOString().split('T')[0]
+  })
+  const [dateTo, setDateTo] = useState(() => new Date().toISOString().split('T')[0])
+  // ── Горизонт прогноза ────────────────────────────
+  const [forecastMonths, setForecastMonths] = useState(6)
+  // ── Данные ───────────────────────────────────────
+  const [hist, setHist] = useState<HistData | null>(null)
   const [loading, setLoading] = useState(false)
-
-  // Бюджетный сценарий — ввод вручную
-  const [budgetIncidents, setBudgetIncidents] = useState('')
-  const [budgetLoss, setBudgetLoss] = useState('')
-  const [budgetRecovery, setBudgetRecovery] = useState('')
-
-  // Базовая прибыль для What-If
+  // ── Бюджетный ввод ───────────────────────────────
+  const [bInc, setBInc] = useState('')
+  const [bLoss, setBLoss] = useState('')
+  const [bRec, setBRec] = useState('')
+  // ── Базовая прибыль ──────────────────────────────
   const [baseProfit, setBaseProfit] = useState('')
+  // ── Активная вкладка ─────────────────────────────
+  const [tab, setTab] = useState<1|2>(1)
 
-  const fetchHistorical = useCallback(async () => {
+  const fetchHist = useCallback(async () => {
     setLoading(true)
-    let query = supabase
+    const { data } = await supabase
       .from('operational_incidents')
       .select('loss_amount_tjs, recovery_amount, discovery_date')
-      .gte('discovery_date', `${year}-01-01`)
-      .lte('discovery_date', `${year}-12-31`)
-    if (month) {
-      query = query
-        .gte('discovery_date', `${year}-${month.padStart(2,'0')}-01`)
-        .lte('discovery_date', `${year}-${month.padStart(2,'0')}-31`)
-    }
-    const { data } = await query
+      .gte('discovery_date', dateFrom)
+      .lte('discovery_date', dateTo)
     if (data && data.length > 0) {
-      const totalLoss = data.reduce((s, i) => s + (i.loss_amount_tjs || 0), 0)
-      const totalRecovery = data.reduce((s, i) => s + (i.recovery_amount || 0), 0)
-      const months = month ? 1 : 12
-      setHistorical({
-        totalIncidents: data.length,
-        totalLoss,
-        totalRecovery,
+      const totalLoss     = data.reduce((s,i) => s + (i.loss_amount_tjs||0), 0)
+      const totalRecovery = data.reduce((s,i) => s + (i.recovery_amount||0), 0)
+      const d1 = new Date(dateFrom), d2 = new Date(dateTo)
+      const months = Math.max(1, Math.round((d2.getTime() - d1.getTime()) / (1000*60*60*24*30)))
+      setHist({
+        totalIncidents: data.length, totalLoss, totalRecovery,
         recoveryRate: totalLoss > 0 ? totalRecovery / totalLoss : 0,
-        avgLossPerIncident: data.length > 0 ? totalLoss / data.length : 0,
+        months,
         avgIncidentsPerMonth: data.length / months,
+        avgLossPerMonth:      totalLoss / months,
       })
-    } else {
-      setHistorical(null)
-    }
+    } else { setHist(null) }
     setLoading(false)
-  }, [year, month])
+  }, [dateFrom, dateTo])
 
-  useEffect(() => { fetchHistorical() }, [fetchHistorical])
+  useEffect(() => { fetchHist() }, [fetchHist])
 
-  // Сценарии
-  const budgetScenario = {
-    incidents: parseN(budgetIncidents) || historical?.totalIncidents || 0,
-    loss:      parseN(budgetLoss)      || historical?.totalLoss || 0,
-    recovery:  (parseN(budgetRecovery) / 100) || historical?.recoveryRate || 0,
+  // ── Сценарии ─────────────────────────────────────
+  const budget = {
+    incPerMonth: bInc  ? parseN(bInc) / forecastMonths : hist?.avgIncidentsPerMonth || 0,
+    lossPerMonth: bLoss ? parseN(bLoss) / forecastMonths : hist?.avgLossPerMonth || 0,
+    recovery:    bRec  ? parseN(bRec) / 100             : hist?.recoveryRate || 0,
+  }
+  const pess = hist ? {
+    incPerMonth:  hist.avgIncidentsPerMonth * COEFF.pessimistic.incidents,
+    lossPerMonth: hist.avgLossPerMonth      * COEFF.pessimistic.loss,
+    recovery:     hist.recoveryRate         * COEFF.pessimistic.recovery,
+  } : null
+  const cat = hist ? {
+    incPerMonth:  hist.avgIncidentsPerMonth * COEFF.catastrophic.incidents,
+    lossPerMonth: hist.avgLossPerMonth      * COEFF.catastrophic.loss,
+    recovery:     hist.recoveryRate         * COEFF.catastrophic.recovery,
+  } : null
+
+  const totalFor = (sc: typeof budget) => ({
+    incidents: Math.round(sc.incPerMonth  * forecastMonths),
+    loss:      sc.lossPerMonth * forecastMonths,
+    netLoss:   sc.lossPerMonth * forecastMonths * (1 - sc.recovery),
+    recovery:  sc.recovery,
+  })
+
+  // ── График по месяцам ────────────────────────────
+  const chartData = Array.from({ length: forecastMonths }, (_, i) => {
+    const d = new Date(dateTo); d.setMonth(d.getMonth() + i + 1)
+    return {
+      name: MONTHS_RU[d.getMonth()],
+      'Бюджетный (ущерб)':         Math.round(budget.lossPerMonth),
+      'Пессимистичный (ущерб)':    pess ? Math.round(pess.lossPerMonth) : 0,
+      'Катастрофический (ущерб)':  cat  ? Math.round(cat.lossPerMonth)  : 0,
+      'Бюджетный (инц.)':          Math.round(budget.incPerMonth),
+      'Пессимистичный (инц.)':     pess ? Math.round(pess.incPerMonth)  : 0,
+      'Катастрофический (инц.)':   cat  ? Math.round(cat.incPerMonth)   : 0,
+    }
+  })
+
+  // ── What-If ──────────────────────────────────────
+  const bp = parseN(baseProfit)
+  const adjProfit = (loss: number, rec: number) => bp - loss * (1 - rec)
+
+  // ── Excel экспорт ────────────────────────────────
+  function exportExcel() {
+    const rows: string[][] = []
+    rows.push(['СТРЕСС-ТЕСТ ОПЕРАЦИОННОГО РИСКА'])
+    rows.push([`Исторический период: ${dateFrom} — ${dateTo}`])
+    rows.push([`Горизонт прогноза: ${forecastMonths} мес.`])
+    rows.push([])
+    rows.push(['МОДЕЛЬ 1 — СЦЕНАРНЫЙ ПРОГНОЗ'])
+    rows.push(['Сценарий','Инциденты (шт.)','Ущерб (TJS)','Возвратность (%)','Чистый ущерб (TJS)','Эффект на П&У (TJS)'])
+    const scns = [
+      { name: 'Бюджетный',       sc: totalFor(budget) },
+      ...(pess ? [{ name: 'Пессимистичный', sc: totalFor(pess) }] : []),
+      ...(cat  ? [{ name: 'Катастрофический',sc: totalFor(cat)  }] : []),
+    ]
+    scns.forEach(({ name, sc }) => {
+      const eff = bp > 0 ? -(sc.netLoss) : 0
+      rows.push([name, String(sc.incidents), String(Math.round(sc.loss)), `${(sc.recovery*100).toFixed(0)}%`, String(Math.round(sc.netLoss)), bp > 0 ? String(Math.round(eff)) : '—'])
+    })
+    if (bp > 0) {
+      rows.push([])
+      rows.push(['МОДЕЛЬ 2 — WHAT-IF МАТРИЦА'])
+      rows.push(['Базовая прибыль:', String(bp)])
+      rows.push(['Ущерб ↓ / Возвратность →', ...RECOVERY_COLS.map(r => `${(r*100).toFixed(0)}%`)])
+      LOSS_ROWS.forEach(loss => {
+        rows.push([fmt(loss), ...RECOVERY_COLS.map(r => String(Math.round(adjProfit(loss, r))))])
+      })
+    }
+    const csv = rows.map(r => r.map(c => `"${String(c).replace(/"/g,'""')}"`).join(',')).join('\n')
+    const blob = new Blob(['\uFEFF'+csv], { type: 'text/csv;charset=utf-8;' })
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a'); a.href = url
+    a.download = `Стресс-тест_ОР_${dateFrom}_${dateTo}.csv`; a.click()
+    URL.revokeObjectURL(url)
   }
 
-  const pessimistic = historical ? {
-    incidents: Math.round(historical.totalIncidents * SCENARIO_COEFF.pessimistic.incidents),
-    loss:      Math.round(historical.totalLoss      * SCENARIO_COEFF.pessimistic.loss),
-    recovery:  historical.recoveryRate              * SCENARIO_COEFF.pessimistic.recovery,
-  } : null
+  const inp  = "w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#1B8A4C] bg-white text-right"
+  const lbl  = "block text-xs font-medium text-gray-600 mb-1"
+  const card = "bg-white rounded-xl border border-gray-100 shadow-sm p-5"
 
-  const catastrophic = historical ? {
-    incidents: Math.round(historical.totalIncidents * SCENARIO_COEFF.catastrophic.incidents),
-    loss:      Math.round(historical.totalLoss      * SCENARIO_COEFF.catastrophic.loss),
-    recovery:  historical.recoveryRate              * SCENARIO_COEFF.catastrophic.recovery,
-  } : null
-
-  const netLoss = (loss: number, rec: number) => loss * (1 - rec)
-  const effectPnL = (loss: number, rec: number) => -netLoss(loss, rec)
-  const adjProfit = (loss: number, rec: number) => parseN(baseProfit) + effectPnL(loss, rec)
-
-  const inp = "w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#1B8A4C] bg-white text-right"
-  const lbl = "block text-xs font-medium text-gray-600 mb-1"
-
-  const ScenarioCard = ({
-    title, icon, color, bg, border,
-    incidents, loss, recovery, baseProfitVal,
-  }: {
+  const ScenCard = ({ title, icon, color, bg, border, sc }: {
     title: string; icon: string; color: string; bg: string; border: string
-    incidents: number; loss: number; recovery: number; baseProfitVal: number
+    sc: ReturnType<typeof totalFor>
   }) => {
-    const nl = netLoss(loss, recovery)
-    const eff = effectPnL(loss, recovery)
-    const adj = baseProfitVal > 0 ? baseProfitVal + eff : null
+    const eff = bp > 0 ? -(sc.netLoss) : null
+    const adj = bp > 0 ? bp + (eff!) : null
     return (
       <div className={`rounded-xl border-2 ${border} ${bg} p-4`}>
-        <div className="flex items-center gap-2 mb-3">
-          <span className="text-lg">{icon}</span>
-          <p className={`text-sm font-bold ${color}`}>{title}</p>
-        </div>
+        <p className={`text-sm font-bold ${color} mb-3`}>{icon} {title}</p>
         <div className="space-y-2 text-xs">
-          <div className="flex justify-between">
-            <span className="text-gray-500">Кол-во инцидентов:</span>
-            <span className="font-semibold">{fmt(incidents)} шт.</span>
-          </div>
-          <div className="flex justify-between">
-            <span className="text-gray-500">Сумма ущерба:</span>
-            <span className="font-semibold text-red-600">{fmt(loss)} TJS</span>
-          </div>
-          <div className="flex justify-between">
-            <span className="text-gray-500">Возвратность:</span>
-            <span className="font-semibold text-green-600">{(recovery * 100).toFixed(0)}%</span>
-          </div>
-          <div className="flex justify-between">
-            <span className="text-gray-500">Сумма возмещения:</span>
-            <span className="font-semibold text-green-600">{fmt(loss * recovery)} TJS</span>
-          </div>
+          <div className="flex justify-between"><span className="text-gray-500">Инцидентов:</span><span className="font-semibold">{sc.incidents} шт.</span></div>
+          <div className="flex justify-between"><span className="text-gray-500">Ущерб:</span><span className="font-semibold text-red-600">{fmt(sc.loss)} TJS</span></div>
+          <div className="flex justify-between"><span className="text-gray-500">Возвратность:</span><span className="font-semibold text-green-600">{(sc.recovery*100).toFixed(0)}%</span></div>
+          <div className="flex justify-between"><span className="text-gray-500">Возмещено:</span><span className="font-semibold text-green-600">{fmt(sc.loss * sc.recovery)} TJS</span></div>
           <div className="flex justify-between border-t border-gray-200 pt-2 mt-2">
-            <span className="font-semibold text-gray-700">Чистый ущерб (нетто):</span>
-            <span className="font-bold text-red-700">{fmt(nl)} TJS</span>
+            <span className="font-semibold text-gray-700">Чистый ущерб:</span>
+            <span className="font-bold text-red-700">{fmt(sc.netLoss)} TJS</span>
           </div>
-          {adj !== null && (
+          {eff !== null && (
             <div className="flex justify-between">
               <span className="font-semibold text-gray-700">Эффект на П&У:</span>
-              <span className={`font-bold ${eff < 0 ? 'text-red-700' : 'text-green-700'}`}>
-                {eff < 0 ? '-' : '+'}{fmt(Math.abs(eff))} TJS
-              </span>
+              <span className="font-bold text-red-700">{fmt(eff)} TJS</span>
             </div>
           )}
           {adj !== null && (
-            <div className={`flex justify-between rounded-lg p-2 ${adj >= 0 ? 'bg-green-50' : 'bg-red-50'}`}>
+            <div className={`flex justify-between rounded-lg p-2 mt-1 ${adj >= 0 ? 'bg-green-50' : 'bg-red-50'}`}>
               <span className="font-bold text-gray-700">Скорр. прибыль:</span>
-              <span className={`font-bold text-base ${adj >= 0 ? 'text-green-700' : 'text-red-700'}`}>
-                {fmt(adj)} TJS
-              </span>
+              <span className={`font-bold text-sm ${adj >= 0 ? 'text-green-700' : 'text-red-700'}`}>{fmt(adj)} TJS</span>
             </div>
           )}
         </div>
@@ -160,51 +191,79 @@ export default function OpStressTest() {
     )
   }
 
-  const bp = parseN(baseProfit)
-
   return (
-    <div className="max-w-7xl mx-auto space-y-6">
-      <div>
-        <h1 className="text-xl font-semibold text-gray-900">Операционный риск — Стресс-тест</h1>
-        <p className="text-sm text-gray-500 mt-0.5">Сценарный анализ и What-If модель влияния на прибыль и убыток</p>
+    <div className="max-w-7xl mx-auto space-y-5 print:space-y-3">
+
+      {/* Заголовок */}
+      <div className="flex items-center justify-between flex-wrap gap-3">
+        <div>
+          <h1 className="text-xl font-semibold text-gray-900">Операционный риск — Стресс-тест</h1>
+          <p className="text-sm text-gray-500 mt-0.5">Сценарный прогноз и What-If анализ влияния на прибыль и убыток</p>
+        </div>
+        <div className="flex items-center gap-2 print:hidden">
+          <button onClick={exportExcel}
+            className="flex items-center gap-1.5 px-3 py-2 border border-gray-200 rounded-lg text-sm text-gray-600 hover:bg-gray-50">
+            <Download className="w-4 h-4" /> Excel
+          </button>
+          <button onClick={() => window.print()}
+            className="flex items-center gap-1.5 px-3 py-2 border border-gray-200 rounded-lg text-sm text-gray-600 hover:bg-gray-50">
+            <Printer className="w-4 h-4" /> PDF
+          </button>
+        </div>
       </div>
 
-      {/* Выбор периода */}
-      <div className="bg-white rounded-xl border border-gray-100 p-4 shadow-sm flex items-center gap-3 flex-wrap">
-        <Activity className="w-4 h-4 text-gray-400" />
-        <span className="text-xs font-medium text-gray-500 uppercase tracking-wide">Период анализа:</span>
-        <select value={year} onChange={e => setYear(Number(e.target.value))}
-          className="px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#1B8A4C] bg-white">
-          {[2026,2025,2024,2023].map(y => <option key={y} value={y}>{y}</option>)}
-        </select>
-        <select value={month} onChange={e => setMonth(e.target.value)}
-          className="px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#1B8A4C] bg-white">
-          <option value="">Весь год</option>
-          {MONTHS.map((m,i) => <option key={i} value={String(i+1)}>{m}</option>)}
-        </select>
-        <button onClick={fetchHistorical}
-          className="flex items-center gap-1.5 px-3 py-2 bg-[#1B8A4C] text-white rounded-lg text-xs font-medium hover:bg-[#177040]">
-          <RefreshCw className={`w-3.5 h-3.5 ${loading ? 'animate-spin' : ''}`} /> Обновить
-        </button>
+      {/* Параметры */}
+      <div className={`${card} print:hidden`}>
+        <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-3">Параметры стресс-теста</p>
+        <div className="grid grid-cols-2 lg:grid-cols-5 gap-3 items-end">
+          <div>
+            <label className={lbl}>Период истории — от</label>
+            <input type="date" value={dateFrom} onChange={e => setDateFrom(e.target.value)}
+              className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#1B8A4C] bg-white" />
+          </div>
+          <div>
+            <label className={lbl}>Период истории — до</label>
+            <input type="date" value={dateTo} onChange={e => setDateTo(e.target.value)}
+              className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#1B8A4C] bg-white" />
+          </div>
+          <div>
+            <label className={lbl}>Горизонт прогноза (мес.)</label>
+            <select value={forecastMonths} onChange={e => setForecastMonths(Number(e.target.value))}
+              className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#1B8A4C] bg-white">
+              {[3,6,9,12].map(m => <option key={m} value={m}>{m} мес.</option>)}
+            </select>
+          </div>
+          <div>
+            <label className={lbl}>Базовая прибыль (TJS)</label>
+            <input type="text" inputMode="numeric" value={baseProfit}
+              onChange={e => setBaseProfit(fmtN(e.target.value))}
+              placeholder="119 884 299" className={inp} />
+          </div>
+          <button onClick={fetchHist} disabled={loading}
+            className="flex items-center justify-center gap-1.5 px-4 py-2 bg-[#1B8A4C] text-white rounded-lg text-sm font-medium hover:bg-[#177040] disabled:opacity-50">
+            <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />
+            Загрузить
+          </button>
+        </div>
       </div>
 
       {/* Исторические данные */}
-      {historical ? (
-        <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-5">
-          <p className="text-sm font-semibold text-gray-700 mb-4">
-            📊 Исторические данные за {month ? `${MONTHS[parseInt(month)-1]} ${year}` : `${year} год`}
+      {hist ? (
+        <div className={card}>
+          <p className="text-sm font-semibold text-gray-700 mb-3">
+            📊 История: {dateFrom} — {dateTo} ({hist.months} мес.)
           </p>
           <div className="grid grid-cols-2 lg:grid-cols-5 gap-3">
             {[
-              { label: 'Инцидентов', value: `${historical.totalIncidents} шт.`, c: 'text-gray-900' },
-              { label: 'Общий ущерб', value: `${fmt(historical.totalLoss)} TJS`, c: 'text-red-600' },
-              { label: 'Возмещено', value: `${fmt(historical.totalRecovery)} TJS`, c: 'text-green-600' },
-              { label: 'Возвратность', value: `${(historical.recoveryRate * 100).toFixed(1)}%`, c: 'text-blue-600' },
-              { label: 'Чистый ущерб', value: `${fmt(historical.totalLoss * (1 - historical.recoveryRate))} TJS`, c: 'text-orange-600' },
+              { l: 'Инцидентов',     v: `${hist.totalIncidents} шт.`,                       c: 'text-gray-900' },
+              { l: 'Общий ущерб',    v: `${fmt(hist.totalLoss)} TJS`,                        c: 'text-red-600'  },
+              { l: 'Возмещено',      v: `${fmt(hist.totalRecovery)} TJS`,                    c: 'text-green-600'},
+              { l: 'Возвратность',   v: `${(hist.recoveryRate*100).toFixed(1)}%`,             c: 'text-blue-600' },
+              { l: 'В среднем / мес',v: `${Math.round(hist.avgIncidentsPerMonth)} инц. · ${fmt(hist.avgLossPerMonth)} TJS`, c: 'text-gray-700' },
             ].map(s => (
-              <div key={s.label} className="bg-gray-50 rounded-lg p-3">
-                <p className="text-xs text-gray-400 mb-0.5">{s.label}</p>
-                <p className={`text-sm font-bold ${s.c}`}>{s.value}</p>
+              <div key={s.l} className="bg-gray-50 rounded-lg p-3">
+                <p className="text-xs text-gray-400 mb-0.5">{s.l}</p>
+                <p className={`text-sm font-bold ${s.c}`}>{s.v}</p>
               </div>
             ))}
           </div>
@@ -215,185 +274,172 @@ export default function OpStressTest() {
         </div>
       )}
 
-      {/* ═══════════════════════════════════════════
-          МОДЕЛЬ 1 — СЦЕНАРИИ
-      ═══════════════════════════════════════════ */}
-      <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-5">
-        <div className="flex items-center gap-2 mb-1">
-          <h2 className="text-base font-semibold text-gray-900">Модель 1 — Сценарный прогноз</h2>
-        </div>
-        <p className="text-xs text-gray-500 mb-5">Прогноз количества инцидентов, ущерба и возмещения по трём сценариям</p>
+      {/* Вкладки */}
+      <div className="flex border-b border-gray-200 print:hidden">
+        {([1,2] as const).map(t => (
+          <button key={t} onClick={() => setTab(t)}
+            className={`px-5 py-3 text-sm font-semibold border-b-2 transition-colors ${tab===t ? 'border-[#1B8A4C] text-[#1B8A4C]' : 'border-transparent text-gray-500 hover:text-gray-700'}`}>
+            {t===1 ? '📈 Модель 1 — Сценарный прогноз' : '🔢 Модель 2 — What-If матрица'}
+          </button>
+        ))}
+      </div>
 
-        {/* Базовая прибыль */}
-        <div className="mb-5 p-4 bg-blue-50 border border-blue-100 rounded-xl">
-          <div className="flex items-center gap-4 flex-wrap">
-            <div className="flex-1 min-w-48">
-              <label className={lbl}>Базовая прибыль банка (TJS) *</label>
-              <input type="text" inputMode="numeric" value={baseProfit}
-                onChange={e => setBaseProfit(fmtN(e.target.value))}
-                placeholder="119 884 299" className={inp} />
-              <p className="text-xs text-gray-400 mt-0.5">Прибыль до учёта операционных потерь</p>
-            </div>
-            {bp > 0 && (
-              <div className="bg-white rounded-lg p-3 text-xs">
-                <p className="text-gray-400">Текущая прибыль с учётом истории</p>
-                {historical && (
-                  <p className="font-bold text-gray-900 text-sm mt-0.5">
-                    {fmt(bp - historical.totalLoss * (1 - historical.recoveryRate))} TJS
-                  </p>
-                )}
+      {/* ═══ МОДЕЛЬ 1 ═══ */}
+      {(tab === 1) && (
+        <div className="space-y-5">
+          {/* Бюджетный ввод */}
+          <div className="p-4 border-2 border-green-200 bg-green-50 rounded-xl print:hidden">
+            <p className="text-xs font-bold text-green-700 mb-3">📈 Бюджетный сценарий — ввод вручную (итого за {forecastMonths} мес.)</p>
+            <div className="grid grid-cols-3 gap-3">
+              <div>
+                <label className={lbl}>Кол-во инцидентов</label>
+                <input type="text" inputMode="numeric" value={bInc}
+                  onChange={e => setBInc(e.target.value.replace(/\D/g,''))}
+                  placeholder={hist ? String(Math.round(hist.avgIncidentsPerMonth * forecastMonths)) : '0'} className={inp} />
               </div>
-            )}
+              <div>
+                <label className={lbl}>Сумма ущерба (TJS)</label>
+                <input type="text" inputMode="numeric" value={bLoss}
+                  onChange={e => setBLoss(fmtN(e.target.value))}
+                  placeholder={hist ? fmt(hist.avgLossPerMonth * forecastMonths) : '0'} className={inp} />
+              </div>
+              <div>
+                <label className={lbl}>Возвратность (%)</label>
+                <input type="text" inputMode="numeric" value={bRec}
+                  onChange={e => setBRec(e.target.value.replace(/\D/g,''))}
+                  placeholder={hist ? `${(hist.recoveryRate*100).toFixed(0)}` : '0'} className={inp} />
+              </div>
+            </div>
+            <p className="text-xs text-gray-500 mt-2">💡 Оставьте пустым — подставятся исторические данные автоматически</p>
+          </div>
+
+          {/* 3 карточки */}
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+            <ScenCard title="Бюджетный" icon="📈" color="text-green-700" bg="bg-green-50" border="border-green-200" sc={totalFor(budget)} />
+            {pess
+              ? <ScenCard title="Пессимистичный" icon="📉" color="text-yellow-700" bg="bg-yellow-50" border="border-yellow-200" sc={totalFor(pess)} />
+              : <div className="rounded-xl border-2 border-dashed border-yellow-200 bg-yellow-50 p-6 flex items-center justify-center"><p className="text-xs text-yellow-600 text-center">Загрузите исторические данные</p></div>}
+            {cat
+              ? <ScenCard title="Катастрофический" icon="⚠️" color="text-red-700" bg="bg-red-50" border="border-red-200" sc={totalFor(cat)} />
+              : <div className="rounded-xl border-2 border-dashed border-red-200 bg-red-50 p-6 flex items-center justify-center"><p className="text-xs text-red-600 text-center">Загрузите исторические данные</p></div>}
+          </div>
+
+          {/* График ущерб */}
+          <div className={card}>
+            <p className="text-sm font-semibold text-gray-700 mb-4">
+              Прогноз ущерба по месяцам — следующие {forecastMonths} мес.
+            </p>
+            <ResponsiveContainer width="100%" height={240}>
+              <BarChart data={chartData}>
+                <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
+                <XAxis dataKey="name" tick={{ fontSize: 11 }} />
+                <YAxis tick={{ fontSize: 11 }} tickFormatter={v => fmt(v)} />
+                <Tooltip formatter={(v: number) => fmt(v)} />
+                <Legend />
+                <Bar dataKey="Бюджетный (ущерб)"        fill="#1B8A4C" radius={[3,3,0,0]} />
+                <Bar dataKey="Пессимистичный (ущерб)"   fill="#F59E0B" radius={[3,3,0,0]} />
+                <Bar dataKey="Катастрофический (ущерб)" fill="#EF4444" radius={[3,3,0,0]} />
+              </BarChart>
+            </ResponsiveContainer>
+          </div>
+
+          {/* График инциденты */}
+          <div className={card}>
+            <p className="text-sm font-semibold text-gray-700 mb-4">
+              Прогноз количества инцидентов по месяцам
+            </p>
+            <ResponsiveContainer width="100%" height={200}>
+              <LineChart data={chartData}>
+                <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
+                <XAxis dataKey="name" tick={{ fontSize: 11 }} />
+                <YAxis tick={{ fontSize: 11 }} />
+                <Tooltip />
+                <Legend />
+                <Line dataKey="Бюджетный (инц.)"        stroke="#1B8A4C" strokeWidth={2} dot={{ r: 4 }} />
+                <Line dataKey="Пессимистичный (инц.)"   stroke="#F59E0B" strokeWidth={2} dot={{ r: 4 }} />
+                <Line dataKey="Катастрофический (инц.)" stroke="#EF4444" strokeWidth={2} dot={{ r: 4 }} />
+              </LineChart>
+            </ResponsiveContainer>
+          </div>
+
+          <div className="p-3 bg-gray-50 rounded-lg">
+            <p className="text-xs text-gray-500">
+              <span className="font-semibold">Логика:</span> Пессимистичный = история × (инциденты: 1.5×, ущерб: 2.0×, возвратность: 0.7×) ·
+              Катастрофический = история × (инциденты: 2.5×, ущерб: 5.0×, возвратность: 0.5×)
+            </p>
           </div>
         </div>
+      )}
 
-        {/* Бюджетный сценарий — ввод */}
-        <div className="mb-5 p-4 border-2 border-green-200 bg-green-50 rounded-xl">
-          <p className="text-xs font-bold text-green-700 mb-3">📈 БЮДЖЕТНЫЙ СЦЕНАРИЙ — ввод вручную</p>
-          <div className="grid grid-cols-3 gap-3">
-            <div>
-              <label className={lbl}>Кол-во инцидентов</label>
-              <input type="text" inputMode="numeric" value={budgetIncidents}
-                onChange={e => setBudgetIncidents(e.target.value.replace(/\D/g,''))}
-                placeholder={historical ? String(historical.totalIncidents) : '0'} className={inp} />
-            </div>
-            <div>
-              <label className={lbl}>Сумма ущерба (TJS)</label>
-              <input type="text" inputMode="numeric" value={budgetLoss}
-                onChange={e => setBudgetLoss(fmtN(e.target.value))}
-                placeholder={historical ? fmt(historical.totalLoss) : '0'} className={inp} />
-            </div>
-            <div>
-              <label className={lbl}>Возвратность (%)</label>
-              <input type="text" inputMode="numeric" value={budgetRecovery}
-                onChange={e => setBudgetRecovery(e.target.value.replace(/\D/g,''))}
-                placeholder={historical ? `${(historical.recoveryRate * 100).toFixed(0)}` : '0'} className={inp} />
-            </div>
-          </div>
-        </div>
-
-        {/* Три карточки сценариев */}
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
-          <ScenarioCard
-            title="Бюджетный" icon="📈"
-            color="text-green-700" bg="bg-green-50" border="border-green-200"
-            incidents={budgetScenario.incidents}
-            loss={budgetScenario.loss}
-            recovery={budgetScenario.recovery}
-            baseProfitVal={bp}
-          />
-          {pessimistic ? (
-            <ScenarioCard
-              title="Пессимистичный" icon="📉"
-              color="text-yellow-700" bg="bg-yellow-50" border="border-yellow-200"
-              incidents={pessimistic.incidents}
-              loss={pessimistic.loss}
-              recovery={pessimistic.recovery}
-              baseProfitVal={bp}
-            />
-          ) : (
-            <div className="rounded-xl border-2 border-dashed border-yellow-200 bg-yellow-50 p-4 flex items-center justify-center">
-              <p className="text-xs text-yellow-600 text-center">Загрузите исторические данные для автоматического расчёта</p>
-            </div>
-          )}
-          {catastrophic ? (
-            <ScenarioCard
-              title="Катастрофический" icon="⚠️"
-              color="text-red-700" bg="bg-red-50" border="border-red-200"
-              incidents={catastrophic.incidents}
-              loss={catastrophic.loss}
-              recovery={catastrophic.recovery}
-              baseProfitVal={bp}
-            />
-          ) : (
-            <div className="rounded-xl border-2 border-dashed border-red-200 bg-red-50 p-4 flex items-center justify-center">
-              <p className="text-xs text-red-600 text-center">Загрузите исторические данные для автоматического расчёта</p>
-            </div>
-          )}
-        </div>
-
-        {/* Пояснение логики */}
-        <div className="mt-4 p-3 bg-gray-50 rounded-lg">
-          <p className="text-xs text-gray-500">
-            <span className="font-semibold">Логика расчёта:</span>{' '}
-            Пессимистичный = история × (инциденты: 1.5×, ущерб: 2.0×, возвратность: 0.7×) ·{' '}
-            Катастрофический = история × (инциденты: 2.5×, ущерб: 5.0×, возвратность: 0.5×)
+      {/* ═══ МОДЕЛЬ 2 ═══ */}
+      {(tab === 2) && (
+        <div className={card}>
+          <p className="text-base font-semibold text-gray-900 mb-1">What-If матрица</p>
+          <p className="text-xs text-gray-500 mb-4">
+            Скорректированная прибыль при различных комбинациях ущерба и возвратности
+            {bp > 0 && <span className="font-medium text-gray-700"> · Базовая прибыль: {fmt(bp)} TJS</span>}
           </p>
-        </div>
-      </div>
-
-      {/* ═══════════════════════════════════════════
-          МОДЕЛЬ 2 — WHAT-IF МАТРИЦА
-      ═══════════════════════════════════════════ */}
-      <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-5">
-        <h2 className="text-base font-semibold text-gray-900 mb-1">Модель 2 — What-If матрица</h2>
-        <p className="text-xs text-gray-500 mb-4">
-          Влияние на прибыль и убыток банка при различных комбинациях ущерба и возвратности
-          {bp > 0 && <span className="font-medium text-gray-700"> · Базовая прибыль: {fmt(bp)} TJS</span>}
-        </p>
-
-        {bp === 0 ? (
-          <div className="p-6 bg-blue-50 rounded-xl text-center">
-            <p className="text-sm text-blue-700">Введите базовую прибыль выше для отображения матрицы</p>
-          </div>
-        ) : (
-          <div className="overflow-x-auto">
-            <table className="w-full text-xs border-collapse">
-              <thead>
-                <tr>
-                  <th className="bg-gray-800 text-white px-3 py-2 text-left whitespace-nowrap rounded-tl-lg">
-                    Ущерб (TJS) ↓ / Возвратность →
-                  </th>
-                  {RECOVERY_COLS.map(r => (
-                    <th key={r} className="bg-gray-800 text-white px-2 py-2 text-center whitespace-nowrap">
-                      {(r * 100).toFixed(0)}%
-                    </th>
-                  ))}
-                </tr>
-              </thead>
-              <tbody>
-                {LOSS_ROWS.map((loss, li) => {
-                  // Highlight rows matching scenarios
-                  const isPess = pessimistic && Math.abs(loss - pessimistic.loss) < 200000
-                  const isCat  = catastrophic && Math.abs(loss - catastrophic.loss) < 200000
-                  const isBudget = Math.abs(loss - budgetScenario.loss) < 200000
-                  const rowBg = isCat ? 'bg-red-50' : isPess ? 'bg-yellow-50' : isBudget ? 'bg-green-50' : li % 2 === 0 ? 'bg-white' : 'bg-gray-50'
-                  return (
-                    <tr key={loss} className={rowBg}>
-                      <td className="px-3 py-1.5 font-semibold text-gray-700 whitespace-nowrap border-r border-gray-200">
-                        {fmt(loss)}
-                        {isCat  && <span className="ml-1 text-[10px] text-red-500 font-normal">⚠️ кат.</span>}
-                        {isPess && !isCat && <span className="ml-1 text-[10px] text-yellow-500 font-normal">📉 песс.</span>}
-                        {isBudget && !isPess && !isCat && <span className="ml-1 text-[10px] text-green-500 font-normal">📈 бюдж.</span>}
-                      </td>
-                      {RECOVERY_COLS.map(rec => {
-                        const adj = adjProfit(loss, rec)
-                        const eff = effectPnL(loss, rec)
-                        const isNeg = adj < 0
-                        const isLow = adj > 0 && adj < bp * 0.9
-                        return (
-                          <td key={rec} className={`px-2 py-1.5 text-center font-medium whitespace-nowrap ${isNeg ? 'text-red-700 bg-red-100' : isLow ? 'text-yellow-700' : 'text-green-700'}`}>
-                            {fmt(adj)}
-                          </td>
-                        )
-                      })}
+          {bp === 0 ? (
+            <div className="p-8 bg-blue-50 rounded-xl text-center">
+              <p className="text-sm text-blue-700">Введите базовую прибыль в параметрах выше</p>
+            </div>
+          ) : (
+            <>
+              <div className="overflow-x-auto">
+                <table className="w-full text-xs border-collapse">
+                  <thead>
+                    <tr>
+                      <th className="bg-gray-800 text-white px-3 py-2 text-left whitespace-nowrap sticky left-0">
+                        Ущерб (TJS) / Возвратность →
+                      </th>
+                      {RECOVERY_COLS.map(r => (
+                        <th key={r} className="bg-gray-800 text-white px-3 py-2 text-center whitespace-nowrap">
+                          {(r*100).toFixed(0)}%
+                        </th>
+                      ))}
                     </tr>
-                  )
-                })}
-              </tbody>
-            </table>
-          </div>
-        )}
-
-        {/* Легенда */}
-        {bp > 0 && (
-          <div className="mt-3 flex items-center gap-4 flex-wrap text-xs text-gray-500">
-            <span className="flex items-center gap-1"><span className="w-3 h-3 bg-green-100 rounded inline-block"/> &gt;90% базовой прибыли</span>
-            <span className="flex items-center gap-1"><span className="w-3 h-3 bg-yellow-100 rounded inline-block"/> 0–90% базовой прибыли</span>
-            <span className="flex items-center gap-1"><span className="w-3 h-3 bg-red-100 rounded inline-block"/> Убыток</span>
-          </div>
-        )}
-      </div>
+                  </thead>
+                  <tbody>
+                    {LOSS_ROWS.map((loss, li) => {
+                      const isPess = pess && Math.abs(loss - totalFor(pess).loss) < 300000
+                      const isCat  = cat  && Math.abs(loss - totalFor(cat).loss)  < 300000
+                      const isBudg = Math.abs(loss - totalFor(budget).loss) < 300000
+                      const rowBg  = isCat ? 'bg-red-50' : isPess ? 'bg-yellow-50' : isBudg ? 'bg-green-50' : li%2===0 ? 'bg-white' : 'bg-gray-50'
+                      return (
+                        <tr key={loss} className={rowBg}>
+                          <td className="px-3 py-1.5 font-semibold text-gray-700 whitespace-nowrap border-r border-gray-200 sticky left-0 bg-inherit">
+                            {fmt(loss)}
+                            {isCat  && <span className="ml-1 text-[10px] text-red-500">⚠️</span>}
+                            {isPess && !isCat  && <span className="ml-1 text-[10px] text-yellow-500">📉</span>}
+                            {isBudg && !isPess && !isCat && <span className="ml-1 text-[10px] text-green-500">📈</span>}
+                          </td>
+                          {RECOVERY_COLS.map(rec => {
+                            const adj = adjProfit(loss, rec)
+                            const pct = adj / bp
+                            return (
+                              <td key={rec} className={`px-2 py-1.5 text-center font-medium whitespace-nowrap
+                                ${adj < 0       ? 'text-red-700 bg-red-100'    :
+                                  pct < 0.9     ? 'text-yellow-700 bg-yellow-50' :
+                                                  'text-green-700'}`}>
+                                {fmt(adj)}
+                              </td>
+                            )
+                          })}
+                        </tr>
+                      )
+                    })}
+                  </tbody>
+                </table>
+              </div>
+              <div className="mt-3 flex items-center gap-4 flex-wrap text-xs text-gray-500">
+                <span className="flex items-center gap-1"><span className="w-3 h-3 bg-green-100 rounded inline-block"/> &gt;90% базовой прибыли</span>
+                <span className="flex items-center gap-1"><span className="w-3 h-3 bg-yellow-100 rounded inline-block"/> 0–90% базовой прибыли</span>
+                <span className="flex items-center gap-1"><span className="w-3 h-3 bg-red-100 rounded inline-block"/> Убыток</span>
+              </div>
+            </>
+          )}
+        </div>
+      )}
     </div>
   )
 }
