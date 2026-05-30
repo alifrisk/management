@@ -41,6 +41,7 @@ interface Task {
   sort_order: number
   week_number: number | null
   task_year: number | null
+  strategic_task_id: string | null
   created_at: string
 }
 
@@ -49,7 +50,7 @@ const statusColor = (s: Status) => s==='Новая'?'bg-gray-50 border-gray-200'
 const priorityColor=(p: Priority)=>p==='Срочный'?'text-red-600 bg-red-50':p==='Высокий'?'text-orange-600 bg-orange-50':p==='Средний'?'text-blue-600 bg-blue-50':'text-gray-500 bg-gray-50'
 const priorityIcon =(p: Priority)=>p==='Срочный'?<AlertCircle className="w-3 h-3"/>:<Flag className="w-3 h-3"/>
 
-const EMPTY_FORM = { title:'', description:'', category:'Бэклог', status:'Новая' as Status, priority:'Средний' as Priority, assignee:'', deadline:'', week_number:'', task_year: String(new Date().getFullYear()) }
+const EMPTY_FORM = { title:'', description:'', category:'Бэклог', status:'Новая' as Status, priority:'Средний' as Priority, assignee:'', deadline:'', week_number:'', task_year: String(new Date().getFullYear()), strategic_task_id:'' }
 
 
 function getCurrentWeek() {
@@ -98,8 +99,9 @@ export default function TasksPage() {
       assignee:    form.assignee || null,
       deadline:    form.deadline || null,
       parent_id:   parentFor || null,
-      week_number: form.category === 'Еженедельные' && form.week_number ? parseInt(form.week_number) : null,
-      task_year:   form.task_year ? parseInt(form.task_year) : new Date().getFullYear(),
+      week_number:        form.category === 'Еженедельные' && form.week_number ? parseInt(form.week_number) : null,
+      task_year:          form.task_year ? parseInt(form.task_year) : new Date().getFullYear(),
+      strategic_task_id:  form.strategic_task_id || null,
       updated_at:  new Date().toISOString(),
     }
     if (editId) {
@@ -123,7 +125,7 @@ export default function TasksPage() {
   }
 
   function openEdit(t: Task) {
-    setForm({ title: t.title, description: t.description||'', category: t.category, status: t.status, priority: t.priority, assignee: t.assignee||'', deadline: t.deadline||'', week_number: t.week_number ? String(t.week_number) : '', task_year: t.task_year ? String(t.task_year) : String(new Date().getFullYear()) })
+    setForm({ title: t.title, description: t.description||'', category: t.category, status: t.status, priority: t.priority, assignee: t.assignee||'', deadline: t.deadline||'', week_number: t.week_number ? String(t.week_number) : '', task_year: t.task_year ? String(t.task_year) : String(new Date().getFullYear()), strategic_task_id: t.strategic_task_id||'' })
     setEditId(t.id); setParentFor(null); setShowForm(true)
   }
 
@@ -199,7 +201,17 @@ export default function TasksPage() {
               {task.assignee && <span className="inline-flex items-center gap-1 text-[10px] text-gray-500"><User className="w-2.5 h-2.5"/>{task.assignee.split('.')[0]}</span>}
               {task.deadline && <span className="inline-flex items-center gap-1 text-[10px] text-gray-500"><Calendar className="w-2.5 h-2.5"/>{new Date(task.deadline).toLocaleDateString('ru-RU',{day:'2-digit',month:'short'})}</span>}
               {subs.length > 0 && <span className="text-[10px] text-gray-400">{subsDone}/{subs.length} подзадач</span>}
+              {(() => {
+                const linked = tasks.filter(t => t.strategic_task_id === task.id)
+                const linkedDone = linked.filter(t => t.status === 'Готово').length
+                return linked.length > 0 ? <span className="text-[10px] text-blue-500">📅 {linkedDone}/{linked.length} нед. задач</span> : null
+              })()}
               {task.category === 'Еженедельные' && task.week_number && <span className="text-[10px] text-purple-500 font-medium">Нед. {task.week_number}, {task.task_year || new Date().getFullYear()}</span>}
+              {task.strategic_task_id && (() => {
+                const st = tasks.find(t => t.id === task.strategic_task_id)
+                const cat = st ? STRATEGIC_CATEGORIES.find(c => c.id === st.category) : null
+                return st ? <span className="text-[10px] text-blue-500 font-medium">{cat?.icon} {st.category} → {st.title}</span> : null
+              })()}
             </div>
           </div>
         </div>
@@ -536,6 +548,18 @@ export default function TasksPage() {
                       </select>
                     </div>
                   </>
+                )}
+                {form.category === 'Еженедельные' && (
+                  <div className="col-span-2">
+                    <label className={lbl}>Связана со стратегической задачей</label>
+                    <select value={form.strategic_task_id} onChange={e => setF('strategic_task_id', e.target.value)} className={inp}>
+                      <option value="">— Не привязана —</option>
+                      {tasks.filter(t => STRATEGIC_CATEGORIES.some(c => c.id === t.category) && !t.parent_id).map(t => {
+                        const cat = STRATEGIC_CATEGORIES.find(c => c.id === t.category)
+                        return <option key={t.id} value={t.id}>{cat?.icon} {t.category} → {t.title}</option>
+                      })}
+                    </select>
+                  </div>
                 )}
               </div>
             </div>
