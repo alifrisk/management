@@ -21,6 +21,7 @@ export default function CreditStressTest() {
   const [budgetPar, setBudgetPar] = useState('')
   const [budgetCov, setBudgetCov] = useState('')
 
+  const [reportDate, setReportDate] = useState(() => new Date().toISOString().split('T')[0])
   const [tab, setTab] = useState<1|2>(1)
 
   const P  = parseN(portfolio)
@@ -47,6 +48,7 @@ export default function CreditStressTest() {
   function exportExcel() {
     const rows: string[][] = []
     rows.push(['СТРЕСС-ТЕСТ КРЕДИТНОГО РИСКА'])
+    rows.push([`Дата отчётности: ${new Date(reportDate).toLocaleDateString('ru-RU')}`])
     rows.push([`Портфель: ${fmt(P)} TJS`])
     rows.push([`Текущий PAR30: ${CP}%  |  Coverage Rate: ${CC}%`])
     rows.push([`Базовая прибыль: ${fmt(BP)} TJS`])
@@ -72,7 +74,7 @@ export default function CreditStressTest() {
     const blob = new Blob(['\uFEFF'+csv], { type: 'text/csv;charset=utf-8;' })
     const url = URL.createObjectURL(blob)
     const a = document.createElement('a'); a.href = url
-    a.download = `Стресс-тест_КР_${new Date().toISOString().split('T')[0]}.csv`; a.click()
+    a.download = `Стресс-тест_КР_${reportDate}.csv`; a.click()
     URL.revokeObjectURL(url)
   }
 
@@ -119,7 +121,7 @@ export default function CreditStressTest() {
       <div className="flex items-center justify-between flex-wrap gap-3">
         <div>
           <h1 className="text-xl font-semibold text-gray-900">Кредитный риск — Стресс-тест</h1>
-          <p className="text-sm text-gray-500 mt-0.5">Сценарный анализ PAR30 и What-If влияния на прибыль и убыток</p>
+          <p className="text-sm text-gray-500 mt-0.5">Сценарный анализ PAR30 и What-If влияния на прибыль и убыток{reportDate && ` · ${new Date(reportDate).toLocaleDateString('ru-RU', {month:'long',year:'numeric'})}`}</p>
         </div>
         <div className="flex items-center gap-2 print:hidden">
           <button onClick={exportExcel}
@@ -136,7 +138,14 @@ export default function CreditStressTest() {
       {/* Входные данные */}
       <div className={card}>
         <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-3">Входные данные</p>
-        <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+        <div className="grid grid-cols-2 lg:grid-cols-5 gap-4">
+          <div>
+            <label className={lbl}>Дата отчётности</label>
+            <input type="date" value={reportDate}
+              max={new Date().toISOString().split('T')[0]}
+              onChange={e => setReportDate(e.target.value)}
+              className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#1B8A4C] bg-white" />
+          </div>
           <div>
             <label className={lbl}>Кредитный портфель (TJS)</label>
             <input type="text" inputMode="numeric" value={portfolio}
@@ -350,7 +359,7 @@ export default function CreditStressTest() {
                               <td key={cov} className={`px-2 py-1.5 text-center font-medium whitespace-nowrap
                                 ${isCov80 ? 'border-x border-green-200' : ''}
                                 ${isNeg ? 'text-red-700 bg-red-100' : isLow ? 'text-yellow-700' : 'text-green-700'}`}>
-                                {fmt(Math.abs(val))}{isNeg ? ' 📉' : ''}
+                                {isNeg ? `(${fmt(Math.abs(val))})` : fmt(val)}
                               </td>
                             )
                           })}
