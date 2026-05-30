@@ -84,12 +84,12 @@ export default function OpStressTest() {
   const pess = hist ? {
     incPerMonth:  hist.avgIncidentsPerMonth * COEFF.pessimistic.incidents,
     lossPerMonth: hist.avgLossPerMonth      * COEFF.pessimistic.loss,
-    recovery:     COEFF.pessimistic.recovery_fixed,
+    recovery:     COEFF.pessimistic.recovery,
   } : null
   const cat = hist ? {
     incPerMonth:  hist.avgIncidentsPerMonth * COEFF.catastrophic.incidents,
     lossPerMonth: hist.avgLossPerMonth      * COEFF.catastrophic.loss,
-    recovery:     COEFF.catastrophic.recovery_fixed,
+    recovery:     COEFF.catastrophic.recovery,
   } : null
 
   const totalFor = (sc: typeof budget) => ({
