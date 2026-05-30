@@ -1,7 +1,7 @@
 'use client'
 import { useState, useEffect, useCallback } from 'react'
 import { supabase } from '@/supabase/client'
-import { RefreshCw, Download, Printer, TrendingDown, Activity, BarChart3 } from 'lucide-react'
+import { RefreshCw, Download, Printer } from 'lucide-react'
 import {
   BarChart, Bar, LineChart, Line, XAxis, YAxis, CartesianGrid,
   Tooltip, Legend, ResponsiveContainer
@@ -218,12 +218,17 @@ export default function OpStressTest() {
         <div className="grid grid-cols-2 lg:grid-cols-5 gap-3 items-end">
           <div>
             <label className={lbl}>Период истории — от</label>
-            <input type="date" value={dateFrom} onChange={e => setDateFrom(e.target.value)}
+            <input type="date" value={dateFrom}
+              max={dateTo}
+              onChange={e => setDateFrom(e.target.value)}
               className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#1B8A4C] bg-white" />
           </div>
           <div>
             <label className={lbl}>Период истории — до</label>
-            <input type="date" value={dateTo} onChange={e => setDateTo(e.target.value)}
+            <input type="date" value={dateTo}
+              min={dateFrom}
+              max={new Date().toISOString().split('T')[0]}
+              onChange={e => setDateTo(e.target.value)}
               className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#1B8A4C] bg-white" />
           </div>
           <div>
@@ -239,11 +244,14 @@ export default function OpStressTest() {
               onChange={e => setBaseProfit(fmtN(e.target.value))}
               placeholder="119 884 299" className={inp} />
           </div>
-          <button onClick={fetchHist} disabled={loading}
-            className="flex items-center justify-center gap-1.5 px-4 py-2 bg-[#1B8A4C] text-white rounded-lg text-sm font-medium hover:bg-[#177040] disabled:opacity-50">
-            <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />
-            Загрузить
-          </button>
+          <div className="flex items-center gap-2">
+            {loading
+              ? <div className="flex items-center gap-2 px-3 py-2 bg-blue-50 rounded-lg text-xs text-blue-600"><RefreshCw className="w-3.5 h-3.5 animate-spin" /> Загрузка...</div>
+              : hist
+                ? <div className="flex items-center gap-2 px-3 py-2 bg-green-50 rounded-lg text-xs text-green-700">✅ Данные загружены ({hist.totalIncidents} инц.)</div>
+                : <div className="flex items-center gap-2 px-3 py-2 bg-yellow-50 rounded-lg text-xs text-yellow-700">⚠️ Нет данных за период</div>
+            }
+          </div>
         </div>
       </div>
 
@@ -260,12 +268,20 @@ export default function OpStressTest() {
               { l: 'Возмещено',      v: `${fmt(hist.totalRecovery)} TJS`,                    c: 'text-green-600'},
               { l: 'Возвратность',   v: `${(hist.recoveryRate*100).toFixed(1)}%`,             c: 'text-blue-600' },
               { l: 'В среднем / мес',v: `${Math.round(hist.avgIncidentsPerMonth)} инц. · ${fmt(hist.avgLossPerMonth)} TJS`, c: 'text-gray-700' },
+            { l: 'Период (мес.)',     v: `${hist.months} мес.`,                                              c: 'text-gray-500' },
             ].map(s => (
               <div key={s.l} className="bg-gray-50 rounded-lg p-3">
                 <p className="text-xs text-gray-400 mb-0.5">{s.l}</p>
                 <p className={`text-sm font-bold ${s.c}`}>{s.v}</p>
               </div>
             ))}
+          </div>
+          <div className="mt-3 p-3 bg-blue-50 rounded-lg">
+            <p className="text-xs text-blue-700">
+              <span className="font-semibold">Как работает:</span> Система берёт среднее по месяцу из выбранного периода и умножает на горизонт прогноза.
+              Пессимистичный = среднее × (инциденты: 1.5×, ущерб: 2.0×, возвратность: ×0.7).
+              Катастрофический = среднее × (инциденты: 2.5×, ущерб: 5.0×, возвратность: ×0.5).
+            </p>
           </div>
         </div>
       ) : (
@@ -431,10 +447,51 @@ export default function OpStressTest() {
                   </tbody>
                 </table>
               </div>
+              {/* Сценарии в матрице */}
+              {(pess || cat) && (
+                <div className="mt-4 grid grid-cols-1 lg:grid-cols-2 gap-3">
+                  {pess && (() => {
+                    const pessLoss = totalFor(pess).loss
+                    const pessRec  = totalFor(pess).recovery
+                    const pessAdj  = adjProfit(pessLoss, pessRec)
+                    const pessEff  = pessAdj - bp
+                    return (
+                      <div className="p-3 bg-yellow-50 border-2 border-yellow-300 rounded-xl">
+                        <p className="text-xs font-bold text-yellow-700 mb-2">📉 Пессимистичный сценарий в матрице</p>
+                        <div className="space-y-1 text-xs">
+                          <div className="flex justify-between"><span className="text-gray-500">Ущерб:</span><span className="font-medium">{fmt(pessLoss)} TJS</span></div>
+                          <div className="flex justify-between"><span className="text-gray-500">Возвратность:</span><span className="font-medium">{(pessRec*100).toFixed(0)}%</span></div>
+                          <div className="flex justify-between"><span className="text-gray-500">Скорр. прибыль:</span><span className={`font-bold ${pessAdj >= 0 ? 'text-yellow-700' : 'text-red-700'}`}>{fmt(pessAdj)} TJS</span></div>
+                          <div className="flex justify-between border-t border-yellow-200 pt-1 mt-1"><span className="font-semibold text-gray-700">Эффект на П&У:</span><span className={`font-bold ${pessEff >= 0 ? 'text-green-700' : 'text-red-700'}`}>{pessEff >= 0 ? '+' : ''}{fmt(pessEff)} TJS</span></div>
+                        </div>
+                      </div>
+                    )
+                  })()}
+                  {cat && (() => {
+                    const catLoss = totalFor(cat).loss
+                    const catRec  = totalFor(cat).recovery
+                    const catAdj  = adjProfit(catLoss, catRec)
+                    const catEff  = catAdj - bp
+                    return (
+                      <div className="p-3 bg-red-50 border-2 border-red-300 rounded-xl">
+                        <p className="text-xs font-bold text-red-700 mb-2">⚠️ Катастрофический сценарий в матрице</p>
+                        <div className="space-y-1 text-xs">
+                          <div className="flex justify-between"><span className="text-gray-500">Ущерб:</span><span className="font-medium">{fmt(catLoss)} TJS</span></div>
+                          <div className="flex justify-between"><span className="text-gray-500">Возвратность:</span><span className="font-medium">{(catRec*100).toFixed(0)}%</span></div>
+                          <div className="flex justify-between"><span className="text-gray-500">Скорр. прибыль:</span><span className={`font-bold ${catAdj >= 0 ? 'text-orange-700' : 'text-red-700'}`}>{fmt(catAdj)} TJS</span></div>
+                          <div className="flex justify-between border-t border-red-200 pt-1 mt-1"><span className="font-semibold text-gray-700">Эффект на П&У:</span><span className={`font-bold ${catEff >= 0 ? 'text-green-700' : 'text-red-700'}`}>{catEff >= 0 ? '+' : ''}{fmt(catEff)} TJS</span></div>
+                        </div>
+                      </div>
+                    )
+                  })()}
+                </div>
+              )}
               <div className="mt-3 flex items-center gap-4 flex-wrap text-xs text-gray-500">
                 <span className="flex items-center gap-1"><span className="w-3 h-3 bg-green-100 rounded inline-block"/> &gt;90% базовой прибыли</span>
                 <span className="flex items-center gap-1"><span className="w-3 h-3 bg-yellow-100 rounded inline-block"/> 0–90% базовой прибыли</span>
                 <span className="flex items-center gap-1"><span className="w-3 h-3 bg-red-100 rounded inline-block"/> Убыток</span>
+                <span className="flex items-center gap-1"><span className="text-yellow-500">📉</span> Пессимистичный</span>
+                <span className="flex items-center gap-1"><span className="text-red-500">⚠️</span> Катастрофический</span>
               </div>
             </>
           )}
