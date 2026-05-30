@@ -17,7 +17,7 @@ const NAV_ITEMS = [
       { title: 'Реестр инцидентов', href: '/operational-risk/registry', icon: <ClipboardList className="w-3.5 h-3.5" /> },
       { title: 'Дашборд аналитика', href: '/operational-risk/dashboard', icon: <BarChart3 className="w-3.5 h-3.5" /> },
       { title: 'Картирование рисков', href: '/operational-risk/mapping', icon: <Map className="w-3.5 h-3.5" /> },
-      { title: 'Стресс-тест', href: '/operational-risk/stress-test', icon: <Activity className="w-3.5 h-3.5" />, wip: true },
+      { title: 'Стресс-тест', href: '/operational-risk/stress-test', icon: <Activity className="w-3.5 h-3.5" /> },
     ],
   },
   {
@@ -25,7 +25,7 @@ const NAV_ITEMS = [
     children: [
       { title: 'Заключения SME', href: '/credit-risk', icon: <FileText className="w-3.5 h-3.5" /> },
       { title: 'Реестр заёмщиков', href: '/borrowers', icon: <BookUser className="w-3.5 h-3.5" /> },
-      { title: 'Стресс-тест', href: '/credit-risk/stress-test', icon: <Activity className="w-3.5 h-3.5" />, wip: true },
+      { title: 'Стресс-тест', href: '/credit-risk/stress-test', icon: <Activity className="w-3.5 h-3.5" /> },
     ],
   },
   {
@@ -34,20 +34,13 @@ const NAV_ITEMS = [
       { title: 'Фин. анализ контрагента', href: '/market-risk/financial-analysis', icon: <BarChart3 className="w-3.5 h-3.5" /> },
       { title: 'Оценка контрагентов', href: '/market-risk', icon: <TrendingUp className="w-3.5 h-3.5" /> },
       { title: 'Реестр контрагентов', href: '/counterparties', icon: <Building2 className="w-3.5 h-3.5" /> },
-      { title: 'Стресс-тест', href: '/market-risk/stress-test', icon: <Activity className="w-3.5 h-3.5" />, wip: true },
+      { title: 'Стресс-тест', href: '/market-risk/stress-test', icon: <Activity className="w-3.5 h-3.5" /> },
     ],
   },
   { title: 'Ликвидность', href: '/liquidity', icon: <Droplets className="w-4 h-4" />, adminOnly: true, children: [{ title: 'Стресс-тест', href: '/liquidity', icon: <BarChart3 className="w-3.5 h-3.5" /> }] },
   { title: 'ВНД СУР', href: '/vnd', icon: <FolderOpen className="w-4 h-4" />, adminOnly: false, children: [{ title: 'Документы', href: '/vnd', icon: <FolderOpen className="w-3.5 h-3.5" /> }] },
   { title: 'Реестр рекомендаций', href: '/recommendations', icon: <ClipboardCheck className="w-4 h-4" />, adminOnly: false, children: [{ title: 'Рекомендации', href: '/recommendations', icon: <ClipboardList className="w-3.5 h-3.5" /> }] },
-  {
-    title: 'Задачи СУР', href: '/tasks', icon: <ListTodo className="w-4 h-4" />, adminOnly: true, wip: true,
-    children: [
-      { title: 'Стратегические', href: '/tasks', icon: <BarChart3 className="w-3.5 h-3.5" />, wip: true },
-      { title: 'Еженедельные', href: '/tasks', icon: <ClipboardList className="w-3.5 h-3.5" />, wip: true },
-      { title: 'Бэклог', href: '/tasks', icon: <ClipboardList className="w-3.5 h-3.5" />, wip: true },
-    ],
-  },
+  { title: 'Задачи СУР', href: '/tasks', icon: <ListTodo className="w-4 h-4" />, adminOnly: true },
 ]
 
 export default function Sidebar({ user }: SidebarProps) {
