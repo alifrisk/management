@@ -4,7 +4,7 @@ import { supabase } from '@/supabase/client'
 import { RefreshCw, Download, Printer } from 'lucide-react'
 import {
   BarChart, Bar, LineChart, Line, XAxis, YAxis, CartesianGrid,
-  Tooltip, Legend, ResponsiveContainer
+  Tooltip, Legend, ResponsiveContainer, LabelList
 } from 'recharts'
 
 const fmt  = (n: number) => n ? new Intl.NumberFormat('ru-RU').format(Math.round(n)) : '—'
@@ -13,8 +13,8 @@ const parseN = (v: string) => Number(v.replace(/\D/g,'')) || 0
 const MONTHS_RU = ['Янв','Фев','Мар','Апр','Май','Июн','Июл','Авг','Сен','Окт','Ноя','Дек']
 
 const COEFF = {
-  pessimistic:   { incidents: 1.5, loss: 2.0, recovery: 0.7 },
-  catastrophic:  { incidents: 2.5, loss: 5.0, recovery: 0.5 },
+  pessimistic:   { incidents: 1.5, loss: 2.0, recovery: 0.10 },
+  catastrophic:  { incidents: 2.5, loss: 5.0, recovery: 0.05 },
 }
 
 const LOSS_ROWS    = [400000,800000,1000000,1400000,1600000,2000000,2500000,3000000,3500000,4000000,4500000,5000000]
@@ -84,12 +84,12 @@ export default function OpStressTest() {
   const pess = hist ? {
     incPerMonth:  hist.avgIncidentsPerMonth * COEFF.pessimistic.incidents,
     lossPerMonth: hist.avgLossPerMonth      * COEFF.pessimistic.loss,
-    recovery:     hist.recoveryRate         * COEFF.pessimistic.recovery,
+    recovery:     COEFF.pessimistic.recovery_fixed,
   } : null
   const cat = hist ? {
     incPerMonth:  hist.avgIncidentsPerMonth * COEFF.catastrophic.incidents,
     lossPerMonth: hist.avgLossPerMonth      * COEFF.catastrophic.loss,
-    recovery:     hist.recoveryRate         * COEFF.catastrophic.recovery,
+    recovery:     COEFF.catastrophic.recovery_fixed,
   } : null
 
   const totalFor = (sc: typeof budget) => ({
@@ -279,8 +279,8 @@ export default function OpStressTest() {
           <div className="mt-3 p-3 bg-blue-50 rounded-lg">
             <p className="text-xs text-blue-700">
               <span className="font-semibold">Как работает:</span> Система берёт среднее по месяцу из выбранного периода и умножает на горизонт прогноза.
-              Пессимистичный = среднее × (инциденты: 1.5×, ущерб: 2.0×, возвратность: ×0.7).
-              Катастрофический = среднее × (инциденты: 2.5×, ущерб: 5.0×, возвратность: ×0.5).
+              Пессимистичный = среднее × (инциденты: 1.5×, ущерб: 2.0×, возвратность фиксирована: 10%).
+              Катастрофический = среднее × (инциденты: 2.5×, ущерб: 5.0×, возвратность фиксирована: 5%).
             </p>
           </div>
         </div>
@@ -352,9 +352,15 @@ export default function OpStressTest() {
                 <YAxis tick={{ fontSize: 11 }} tickFormatter={v => fmt(v)} />
                 <Tooltip formatter={(v: number) => fmt(v)} />
                 <Legend />
-                <Bar dataKey="Бюджетный (ущерб)"        fill="#1B8A4C" radius={[3,3,0,0]} />
-                <Bar dataKey="Пессимистичный (ущерб)"   fill="#F59E0B" radius={[3,3,0,0]} />
-                <Bar dataKey="Катастрофический (ущерб)" fill="#EF4444" radius={[3,3,0,0]} />
+                <Bar dataKey="Бюджетный (ущерб)"        fill="#1B8A4C" radius={[3,3,0,0]}>
+                  <LabelList dataKey="Бюджетный (ущерб)"        position="top" style={{ fontSize: 9, fill: '#1B8A4C' }} formatter={(v: number) => v > 0 ? fmt(v) : ''} />
+                </Bar>
+                <Bar dataKey="Пессимистичный (ущерб)"   fill="#F59E0B" radius={[3,3,0,0]}>
+                  <LabelList dataKey="Пессимистичный (ущерб)"   position="top" style={{ fontSize: 9, fill: '#BF8F00' }} formatter={(v: number) => v > 0 ? fmt(v) : ''} />
+                </Bar>
+                <Bar dataKey="Катастрофический (ущерб)" fill="#EF4444" radius={[3,3,0,0]}>
+                  <LabelList dataKey="Катастрофический (ущерб)" position="top" style={{ fontSize: 9, fill: '#C00000' }} formatter={(v: number) => v > 0 ? fmt(v) : ''} />
+                </Bar>
               </BarChart>
             </ResponsiveContainer>
           </div>
@@ -392,7 +398,8 @@ export default function OpStressTest() {
         <div className={card}>
           <p className="text-base font-semibold text-gray-900 mb-1">What-If матрица</p>
           <p className="text-xs text-gray-500 mb-4">
-            Скорректированная прибыль при различных комбинациях ущерба и возвратности
+            Скорректированная прибыль при различных комбинациях ущерба и возвратности.
+            Строки 📉 и ⚠️ — автоматически из рассчитанных сценариев.
             {bp > 0 && <span className="font-medium text-gray-700"> · Базовая прибыль: {fmt(bp)} TJS</span>}
           </p>
           {bp === 0 ? (
@@ -457,7 +464,7 @@ export default function OpStressTest() {
                     const pessEff  = pessAdj - bp
                     return (
                       <div className="p-3 bg-yellow-50 border-2 border-yellow-300 rounded-xl">
-                        <p className="text-xs font-bold text-yellow-700 mb-2">📉 Пессимистичный сценарий в матрице</p>
+                        <p className="text-xs font-bold text-yellow-700 mb-2">📉 Пессимистичный (ущерб: {fmt(pessLoss)} · возвратность: {(pessRec*100).toFixed(0)}%)</p>
                         <div className="space-y-1 text-xs">
                           <div className="flex justify-between"><span className="text-gray-500">Ущерб:</span><span className="font-medium">{fmt(pessLoss)} TJS</span></div>
                           <div className="flex justify-between"><span className="text-gray-500">Возвратность:</span><span className="font-medium">{(pessRec*100).toFixed(0)}%</span></div>
@@ -474,7 +481,7 @@ export default function OpStressTest() {
                     const catEff  = catAdj - bp
                     return (
                       <div className="p-3 bg-red-50 border-2 border-red-300 rounded-xl">
-                        <p className="text-xs font-bold text-red-700 mb-2">⚠️ Катастрофический сценарий в матрице</p>
+                        <p className="text-xs font-bold text-red-700 mb-2">⚠️ Катастрофический (ущерб: {fmt(catLoss)} · возвратность: {(catRec*100).toFixed(0)}%)</p>
                         <div className="space-y-1 text-xs">
                           <div className="flex justify-between"><span className="text-gray-500">Ущерб:</span><span className="font-medium">{fmt(catLoss)} TJS</span></div>
                           <div className="flex justify-between"><span className="text-gray-500">Возвратность:</span><span className="font-medium">{(catRec*100).toFixed(0)}%</span></div>
