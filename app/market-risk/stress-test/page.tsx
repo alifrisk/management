@@ -28,12 +28,13 @@ function runMonteCarlo(mean: number, stdDev: number, iterations = 10000): {
   // Appreciation thresholds (TJS strengthens = negative change)
   const appreciateThresholds = [1, 2, 3, 5, 6, 10, 15]
 
-  const probabilities = devalThresholds.map(t => ({
-    threshold: t,
-    type: 'deval' as const,
-    prob: results.filter(r => r > t).length / iterations * 100
-  })).concat(appreciateThresholds.map(t => ({
-    threshold: t,
+  const probabilities: { threshold: number; type: 'deval' | 'apprec'; prob: number }[] = [
+    ...devalThresholds.map(t => ({
+      threshold: t, type: 'deval' as const,
+      prob: results.filter(r => r > t).length / iterations * 100,
+    })),
+    ...appreciateThresholds.map(t => ({
+      threshold: t,
     type: 'apprec' as const,
     prob: results.filter(r => r < -t).length / iterations * 100
   })))
