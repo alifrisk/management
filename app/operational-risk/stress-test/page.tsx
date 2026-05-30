@@ -402,6 +402,51 @@ export default function OpStressTest() {
             Строки 📉 и ⚠️ — автоматически из рассчитанных сценариев.
             {bp > 0 && <span className="font-medium text-gray-700"> · Базовая прибыль: {fmt(bp)} TJS</span>}
           </p>
+          {/* ✅ Сводная таблица сценариев */}
+          {pess && cat && (
+            <div className="mb-5 overflow-x-auto">
+              <table className="w-full text-sm border-collapse rounded-xl overflow-hidden">
+                <thead>
+                  <tr className="bg-gray-800 text-white">
+                    <th className="px-4 py-2.5 text-left text-xs font-medium uppercase tracking-wide">Сценарий</th>
+                    <th className="px-4 py-2.5 text-center text-xs font-medium uppercase tracking-wide">Сумма ущерба (TJS)</th>
+                    <th className="px-4 py-2.5 text-center text-xs font-medium uppercase tracking-wide">Возвратность</th>
+                    <th className="px-4 py-2.5 text-center text-xs font-medium uppercase tracking-wide">Чистый ущерб (TJS)</th>
+                    <th className="px-4 py-2.5 text-center text-xs font-medium uppercase tracking-wide">Эффект на чистую прибыль</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {(() => {
+                    const pessTotal = totalFor(pess)
+                    const catTotal  = totalFor(cat)
+                    const pessRec = 0.10
+                    const catRec  = 0.05
+                    const pessNet = pessTotal.loss * (1 - pessRec)
+                    const catNet  = catTotal.loss  * (1 - catRec)
+                    return (
+                      <>
+                        <tr className="bg-yellow-50 border-b-2 border-yellow-200">
+                          <td className="px-4 py-3 font-semibold text-yellow-800 text-sm">📉 Пессимистичный сценарий</td>
+                          <td className="px-4 py-3 text-center text-sm">{fmt(pessTotal.loss)}</td>
+                          <td className="px-4 py-3 text-center text-sm font-medium text-green-700">{(pessRec*100).toFixed(0)}%</td>
+                          <td className="px-4 py-3 text-center text-sm font-medium text-red-600">{fmt(pessNet)}</td>
+                          <td className="px-4 py-3 text-center font-bold text-red-700 text-base">({fmt(Math.round(pessNet))})</td>
+                        </tr>
+                        <tr className="bg-red-50">
+                          <td className="px-4 py-3 font-semibold text-red-800 text-sm">⚠️ Катастрофический сценарий</td>
+                          <td className="px-4 py-3 text-center text-sm">{fmt(catTotal.loss)}</td>
+                          <td className="px-4 py-3 text-center text-sm font-medium text-green-700">{(catRec*100).toFixed(0)}%</td>
+                          <td className="px-4 py-3 text-center text-sm font-medium text-red-600">{fmt(catNet)}</td>
+                          <td className="px-4 py-3 text-center font-bold text-red-700 text-base">({fmt(Math.round(catNet))})</td>
+                        </tr>
+                      </>
+                    )
+                  })()}
+                </tbody>
+              </table>
+            </div>
+          )}
+
           {bp === 0 ? (
             <div className="p-8 bg-blue-50 rounded-xl text-center">
               <p className="text-sm text-blue-700">Введите базовую прибыль в параметрах выше</p>
