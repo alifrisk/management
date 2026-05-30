@@ -52,25 +52,10 @@ const priorityIcon =(p: Priority)=>p==='Срочный'?<AlertCircle className="
 const EMPTY_FORM = { title:'', description:'', category:'Бэклог', status:'Новая' as Status, priority:'Средний' as Priority, assignee:'', deadline:'', week_number:'', task_year: String(new Date().getFullYear()) }
 
 
-// Get week date range label
-function getWeekLabel(week: number, year: number) {
-  const jan4 = new Date(year, 0, 4)
-  const startOfWeek1 = new Date(jan4)
-  startOfWeek1.setDate(jan4.getDate() - (jan4.getDay() || 7) + 1)
-  const weekStart = new Date(startOfWeek1)
-  weekStart.setDate(startOfWeek1.getDate() + (week - 1) * 7)
-  const weekEnd = new Date(weekStart)
-  weekEnd.setDate(weekStart.getDate() + 6)
-  const opts: Intl.DateTimeFormatOptions = { day: 'numeric', month: 'short' }
-  return `${weekStart.toLocaleDateString('ru-RU', opts)} – ${weekEnd.toLocaleDateString('ru-RU', opts)}`
-}
-
 function getCurrentWeek() {
   const now = new Date()
-  const jan4 = new Date(now.getFullYear(), 0, 4)
-  const startOfWeek1 = new Date(jan4)
-  startOfWeek1.setDate(jan4.getDate() - (jan4.getDay() || 7) + 1)
-  return Math.ceil((now.getTime() - startOfWeek1.getTime()) / (7 * 24 * 60 * 60 * 1000)) + 1
+  const start = new Date(now.getFullYear(), 0, 1)
+  return Math.ceil(((now.getTime() - start.getTime()) / 86400000 + start.getDay() + 1) / 7)
 }
 
 export default function TasksPage() {
@@ -88,6 +73,7 @@ export default function TasksPage() {
   const [parentFor, setParentFor] = useState<string|null>(null)
   const [filterWeek, setFilterWeek] = useState<number>(getCurrentWeek())
   const [filterYear, setFilterYear] = useState<number>(new Date().getFullYear())
+  const [filterStratYear, setFilterStratYear] = useState<number>(new Date().getFullYear())
 
   const fetch_ = useCallback(async () => {
     setLoading(true)
@@ -142,7 +128,7 @@ export default function TasksPage() {
   }
 
   function openAdd(category: string, parentId?: string) {
-    setForm({ ...EMPTY_FORM, category })
+    setForm({ ...EMPTY_FORM, category, task_year: String(STRATEGIC_CATEGORIES.some(c => c.id === category) ? filterStratYear : new Date().getFullYear()) })
     setEditId(null); setParentFor(parentId||null); setShowForm(true)
   }
 
@@ -162,6 +148,9 @@ export default function TasksPage() {
     if (t.category !== category) return false
     if (category === 'Еженедельные') {
       return (t.week_number === filterWeek || !t.week_number) && (t.task_year === filterYear || !t.task_year)
+    }
+    if (STRATEGIC_CATEGORIES.some(c => c.id === category)) {
+      return !t.task_year || t.task_year === filterStratYear
     }
     return true
   })
@@ -210,7 +199,7 @@ export default function TasksPage() {
               {task.assignee && <span className="inline-flex items-center gap-1 text-[10px] text-gray-500"><User className="w-2.5 h-2.5"/>{task.assignee.split('.')[0]}</span>}
               {task.deadline && <span className="inline-flex items-center gap-1 text-[10px] text-gray-500"><Calendar className="w-2.5 h-2.5"/>{new Date(task.deadline).toLocaleDateString('ru-RU',{day:'2-digit',month:'short'})}</span>}
               {subs.length > 0 && <span className="text-[10px] text-gray-400">{subsDone}/{subs.length} подзадач</span>}
-              {task.category === 'Еженедельные' && task.week_number && <span className="text-[10px] text-purple-500 font-medium">Нед. {task.week_number} · {getWeekLabel(task.week_number, task.task_year || new Date().getFullYear())}</span>}
+              {task.category === 'Еженедельные' && task.week_number && <span className="text-[10px] text-purple-500 font-medium">Нед. {task.week_number}, {task.task_year || new Date().getFullYear()}</span>}
             </div>
           </div>
         </div>
@@ -397,10 +386,10 @@ export default function TasksPage() {
           <select value={filterWeek} onChange={e => setFilterWeek(Number(e.target.value))}
             className="px-3 py-1.5 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#1B8A4C] bg-white">
             {Array.from({length: 52}, (_, i) => i+1).map(w => (
-              <option key={w} value={w}>Неделя {w} · {getWeekLabel(w, filterYear)}</option>
+              <option key={w} value={w}>Неделя {w}</option>
             ))}
           </select>
-          <span className="text-xs text-gray-400">{getWeekLabel(filterWeek, filterYear)} {filterYear}</span>
+          <span className="text-xs text-gray-400">{filterYear} · Неделя {filterWeek}</span>
         </div>
       )}
 
@@ -412,7 +401,13 @@ export default function TasksPage() {
           <span className="text-sm font-medium text-gray-900">
             {STRATEGIC_CATEGORIES.find(c=>c.id===stratCat)?.icon} {stratCat}
           </span>
-          <div className="ml-auto flex items-center gap-2">
+          <div className="ml-auto flex items-center gap-3">
+            <select value={filterStratYear} onChange={e => setFilterStratYear(Number(e.target.value))}
+              className="px-3 py-1.5 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#1B8A4C] bg-white">
+              {[new Date().getFullYear(), new Date().getFullYear()-1, new Date().getFullYear()-2].map(y =>
+                <option key={y} value={y}>{y}</option>
+              )}
+            </select>
             <span className="text-xs text-gray-500">{progress(stratCat)}% выполнено</span>
             <div className="w-24 bg-gray-200 rounded-full h-1.5">
               <div className="bg-[#1B8A4C] rounded-full h-1.5 transition-all" style={{ width: `${progress(stratCat)}%` }}/>
@@ -536,7 +531,7 @@ export default function TasksPage() {
                       <select value={form.week_number} onChange={e => setF('week_number', e.target.value)} className={inp}>
                         <option value="">— Выберите неделю —</option>
                         {Array.from({length: 52}, (_, i) => i+1).map(w => (
-                          <option key={w} value={w}>Неделя {w} · {getWeekLabel(w, parseInt(form.task_year) || new Date().getFullYear())}</option>
+                          <option key={w} value={w}>Неделя {w}</option>
                         ))}
                       </select>
                     </div>
