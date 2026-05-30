@@ -96,9 +96,6 @@ export default function Sidebar({ user }: SidebarProps) {
                   )}>
                   <span className="flex-shrink-0 text-green-200">{item.icon}</span>
                   <span className="flex-1 text-left font-medium">{item.title}</span>
-                  {'wip' in item && item.wip && (
-                    <span className="text-[9px] bg-yellow-400/20 text-yellow-200 px-1.5 py-0.5 rounded-full mr-1">скоро</span>
-                  )}
                   {openMenu === item.href ? <ChevronDown className="w-3.5 h-3.5 text-green-200" /> : <ChevronRight className="w-3.5 h-3.5 text-green-200" />}
                 </button>
                 {openMenu === item.href && (
@@ -110,9 +107,6 @@ export default function Sidebar({ user }: SidebarProps) {
                         )}>
                         <span className="text-green-200 flex-shrink-0">{child.icon}</span>
                         <span className="flex-1">{child.title}</span>
-                        {'wip' in child && child.wip && (
-                          <span className="text-[9px] bg-yellow-400/20 text-yellow-200 px-1.5 py-0.5 rounded-full">скоро</span>
-                        )}
                       </Link>
                     ))}
                   </div>
