@@ -137,7 +137,7 @@ export default function TasksPage() {
   }
 
   function openEdit(t: Task) {
-    setForm({ title: t.title, description: t.description||'', category: t.category, status: t.status, priority: t.priority, assignee: t.assignee||'', deadline: t.deadline||'' })
+    setForm({ title: t.title, description: t.description||'', category: t.category, status: t.status, priority: t.priority, assignee: t.assignee||'', deadline: t.deadline||'', week_number: t.week_number ? String(t.week_number) : '', task_year: t.task_year ? String(t.task_year) : String(new Date().getFullYear()) })
     setEditId(t.id); setParentFor(null); setShowForm(true)
   }
 
