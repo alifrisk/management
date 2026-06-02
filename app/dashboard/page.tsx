@@ -1,10 +1,6 @@
 import { Shield, FileText, TrendingUp, Droplets, ArrowRight, FolderOpen, ClipboardCheck, BookUser, Building2, BarChart3, ListTodo } from 'lucide-react'
 import Link from 'next/link'
 
-const WIP = () => (
-  <span className="text-[9px] bg-yellow-100 text-yellow-700 border border-yellow-200 px-1.5 py-0.5 rounded-full font-medium">скоро</span>
-)
-
 export default function DashboardPage() {
   return (
     <div className="max-w-6xl mx-auto space-y-6">
@@ -12,7 +8,6 @@ export default function DashboardPage() {
         <h1 className="text-2xl font-semibold text-gray-900">Добрый день 👋</h1>
         <p className="text-gray-500 text-sm mt-1">Risk Management System · ОАО «Алиф Банк»</p>
       </div>
-
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
 
         {/* Операционный риск */}
@@ -27,9 +22,9 @@ export default function DashboardPage() {
           <p className="text-xs text-gray-400 mb-3">Реестр инцидентов, дашборд, картирование</p>
           <div className="flex flex-wrap gap-1.5">
             <span className="text-xs bg-blue-50 text-blue-700 px-2 py-0.5 rounded-full">Реестр инцидентов</span>
+            <span className="text-xs bg-blue-50 text-blue-700 px-2 py-0.5 rounded-full">Внешние инциденты</span>
             <span className="text-xs bg-blue-50 text-blue-700 px-2 py-0.5 rounded-full">Дашборд</span>
-            <span className="text-xs bg-blue-50 text-blue-700 px-2 py-0.5 rounded-full">Картирование</span>
-            <span className="text-xs bg-gray-50 text-gray-400 px-2 py-0.5 rounded-full flex items-center gap-1">Стресс-тест <WIP /></span>
+            <span className="text-xs bg-blue-50 text-blue-700 px-2 py-0.5 rounded-full">Стресс-тест</span>
           </div>
         </Link>
 
@@ -46,7 +41,7 @@ export default function DashboardPage() {
           <div className="flex flex-wrap gap-1.5">
             <span className="text-xs bg-green-50 text-green-700 px-2 py-0.5 rounded-full">Заключения SME</span>
             <span className="text-xs bg-green-50 text-green-700 px-2 py-0.5 rounded-full flex items-center gap-1"><BookUser className="w-3 h-3" /> Реестр заёмщиков</span>
-            <span className="text-xs bg-gray-50 text-gray-400 px-2 py-0.5 rounded-full flex items-center gap-1">Стресс-тест <WIP /></span>
+            <span className="text-xs bg-green-50 text-green-700 px-2 py-0.5 rounded-full">Стресс-тест</span>
           </div>
         </Link>
 
@@ -64,7 +59,7 @@ export default function DashboardPage() {
             <span className="text-xs bg-purple-50 text-purple-700 px-2 py-0.5 rounded-full flex items-center gap-1"><BarChart3 className="w-3 h-3" /> Фин. анализ</span>
             <span className="text-xs bg-purple-50 text-purple-700 px-2 py-0.5 rounded-full">Оценка матрица</span>
             <span className="text-xs bg-purple-50 text-purple-700 px-2 py-0.5 rounded-full flex items-center gap-1"><Building2 className="w-3 h-3" /> Реестр контрагентов</span>
-            <span className="text-xs bg-gray-50 text-gray-400 px-2 py-0.5 rounded-full flex items-center gap-1">Стресс-тест <WIP /></span>
+            <span className="text-xs bg-purple-50 text-purple-700 px-2 py-0.5 rounded-full">Стресс-тест</span>
           </div>
         </Link>
 
@@ -79,6 +74,7 @@ export default function DashboardPage() {
           <h3 className="font-semibold text-gray-900 mb-1">Риск ликвидности</h3>
           <p className="text-xs text-gray-400 mb-3">Стресс-тест T+1, T+7, T+30</p>
           <div className="flex flex-wrap gap-1.5">
+            <span className="text-xs bg-cyan-50 text-cyan-700 px-2 py-0.5 rounded-full">3 сценария</span>
             <span className="text-xs bg-cyan-50 text-cyan-700 px-2 py-0.5 rounded-full">Стресс-тест</span>
           </div>
         </Link>
@@ -115,22 +111,22 @@ export default function DashboardPage() {
           </div>
         </Link>
 
-        {/* Управление задачами СУР — WIP */}
-        <div className="block bg-white rounded-xl border border-dashed border-gray-200 p-6 opacity-70">
+        {/* ✅ Задачи СУР — активная карточка */}
+        <Link href="/tasks" className="group block bg-gradient-to-br from-[#1B8A4C] to-[#145c32] rounded-xl p-6 shadow-sm hover:shadow-lg transition-all col-span-1 sm:col-span-2">
           <div className="flex items-start justify-between mb-3">
-            <div className="w-10 h-10 bg-gray-50 rounded-xl flex items-center justify-center">
-              <ListTodo className="w-5 h-5 text-gray-400" />
+            <div className="w-10 h-10 bg-white/20 rounded-xl flex items-center justify-center">
+              <ListTodo className="w-5 h-5 text-white" />
             </div>
-            <WIP />
+            <ArrowRight className="w-4 h-4 text-white/50 group-hover:text-white transition-colors" />
           </div>
-          <h3 className="font-semibold text-gray-500 mb-1">Управление задачами СУР</h3>
-          <p className="text-xs text-gray-400 mb-3">Стратегические задачи, еженедельные, бэклог</p>
-          <div className="flex flex-wrap gap-1.5">
-            <span className="text-xs bg-gray-50 text-gray-400 px-2 py-0.5 rounded-full">Стратегия</span>
-            <span className="text-xs bg-gray-50 text-gray-400 px-2 py-0.5 rounded-full">Еженедельные</span>
-            <span className="text-xs bg-gray-50 text-gray-400 px-2 py-0.5 rounded-full">Бэклог</span>
+          <h3 className="font-semibold text-white mb-1">Управление задачами СУР</h3>
+          <p className="text-xs text-green-100/70 mb-4">Стратегические задачи по 5 направлениям · Еженедельные · Бэклог</p>
+          <div className="flex flex-wrap gap-2">
+            {['🏢 Корпоративная культура','✅ Соответствие','⚙️ Автоматизация','🛡️ ERM','📚 Обучение'].map(t => (
+              <span key={t} className="text-xs bg-white/15 text-white px-2.5 py-1 rounded-full">{t}</span>
+            ))}
           </div>
-        </div>
+        </Link>
 
       </div>
     </div>
