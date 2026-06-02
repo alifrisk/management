@@ -5,7 +5,7 @@ import { usePathname } from 'next/navigation'
 import { supabase } from '@/supabase/client'
 import { UserProfile } from '@/types'
 import { cn } from '@/lib/utils'
-import { Shield, FileText, TrendingUp, Droplets, LayoutDashboard, ChevronDown, ChevronRight, LogOut, Settings, Users, Menu, X, ClipboardList, BarChart3, Map, FolderOpen, ClipboardCheck, BookUser, Activity, Building2, ListTodo, Newspaper } from 'lucide-react'
+import { Shield, FileText, TrendingUp, Droplets, LayoutDashboard, ChevronDown, ChevronRight, LogOut, Settings, Users, Menu, X, ClipboardList, BarChart3, Map, FolderOpen, ClipboardCheck, BookUser, Activity, Building2, ListTodo, Newspaper, Bot } from 'lucide-react'
 
 interface SidebarProps { user: UserProfile }
 
@@ -42,6 +42,7 @@ const NAV_ITEMS = [
   { title: 'ВНД СУР', href: '/vnd', icon: <FolderOpen className="w-4 h-4" />, adminOnly: false, children: [{ title: 'Документы', href: '/vnd', icon: <FolderOpen className="w-3.5 h-3.5" /> }] },
   { title: 'Реестр рекомендаций', href: '/recommendations', icon: <ClipboardCheck className="w-4 h-4" />, adminOnly: false, children: [{ title: 'Рекомендации', href: '/recommendations', icon: <ClipboardList className="w-3.5 h-3.5" /> }] },
   { title: 'Задачи СУР', href: '/tasks', icon: <ListTodo className="w-4 h-4" />, adminOnly: true },
+  { title: 'Рисковик AI', href: '/ai-agent', icon: <Bot className="w-4 h-4" />, adminOnly: false },
 ]
 
 export default function Sidebar({ user }: SidebarProps) {
