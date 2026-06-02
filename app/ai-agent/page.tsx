@@ -112,7 +112,8 @@ export default function RiskovikPage() {
 
   return (
     // full-width layout — sidebar stays but content takes max space
-    <div className="flex flex-col max-w-4xl mx-auto" style={{ height: "calc(100vh - 8rem)" }}>
+    <div className="flex flex-col max-w-4xl mx-auto -mt-6 lg:-mt-8 -mb-6 lg:-mb-8" style={{ height: "100vh" }}>
+      <div className="pt-6 lg:pt-8 flex flex-col flex-1 min-h-0">
 
       {/* Header */}
       <div className="flex items-center justify-between pb-3 flex-shrink-0">
