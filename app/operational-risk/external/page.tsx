@@ -29,7 +29,9 @@ const EMPTY = {
   source_url: '', relevance: 'Средняя', lesson: '', analyst_name: ''
 }
 
-const fmt = (n: number) => new Intl.NumberFormat('ru-RU').format(Math.round(n))
+const fmt   = (n: number) => new Intl.NumberFormat('ru-RU').format(Math.round(n))
+const fmtN  = (v: string) => { const n = v.replace(/\D/g,''); return n ? new Intl.NumberFormat('ru-RU').format(Number(n)) : '' }
+const parseN = (v: string) => Number(v.replace(/\D/g,'')) || 0
 
 const relColor = (r: string) =>
   r === 'Высокая' ? 'bg-red-50 text-red-700 border-red-200' :
@@ -78,7 +80,7 @@ export default function ExternalIncidentsPage() {
       country:        form.country || null,
       risk_type:      form.risk_type || null,
       description:    form.description || null,
-      loss_amount:    form.loss_amount ? parseFloat(form.loss_amount.replace(/\D/g,'')) : null,
+      loss_amount:    form.loss_amount ? parseN(form.loss_amount) : null,
       loss_currency:  form.loss_currency,
       source_url:     form.source_url || null,
       relevance:      form.relevance,
@@ -334,7 +336,7 @@ export default function ExternalIncidentsPage() {
                 <div>
                   <label className={lbl}>Сумма потерь</label>
                   <input type="text" inputMode="numeric" value={form.loss_amount}
-                    onChange={e => setF('loss_amount', e.target.value)} placeholder="0" className={inp} />
+                    onChange={e => setF('loss_amount', fmtN(e.target.value))} placeholder="0" className={`${inp} text-right`} />
                 </div>
                 <div>
                   <label className={lbl}>Валюта</label>
