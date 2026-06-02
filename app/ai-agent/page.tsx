@@ -88,7 +88,7 @@ export default function RiskovikPage() {
   }
 
   return (
-    <div className="flex flex-col max-w-4xl mx-auto" style={{ height: 'calc(100vh - 6rem)' }}>
+    <div className="flex flex-col max-w-4xl mx-auto">
 
       <div className="flex items-center justify-between pb-3 flex-shrink-0">
         <div className="flex items-center gap-3">
@@ -128,7 +128,7 @@ export default function RiskovikPage() {
         </div>
       )}
 
-      <div className="flex-1 overflow-y-auto space-y-4 pb-3 min-h-0">
+      <div className="overflow-y-auto space-y-4 pb-3" style={{ maxHeight: 'calc(100vh - 18rem)', minHeight: '300px' }}>
         {messages.length === 0 && (
           <div className="text-center pt-4 pb-6">
             <div className="w-16 h-16 bg-gradient-to-br from-[#1B8A4C] to-[#145c32] rounded-2xl flex items-center justify-center mx-auto mb-4 shadow-lg">
