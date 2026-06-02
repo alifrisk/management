@@ -111,9 +111,7 @@ export default function RiskovikPage() {
   }
 
   return (
-    // full-width layout — sidebar stays but content takes max space
-    <div className="flex flex-col max-w-4xl mx-auto -mt-6 lg:-mt-8 -mb-6 lg:-mb-8" style={{ height: "100vh" }}>
-      <div className="pt-6 lg:pt-8 flex flex-col flex-1 min-h-0">
+    <div className="flex flex-col max-w-4xl mx-auto -mt-6 lg:-mt-8 -mb-6 lg:-mb-8 pt-6 lg:pt-8" style={{ height: "100vh" }}>
 
       {/* Header */}
       <div className="flex items-center justify-between pb-3 flex-shrink-0">
@@ -260,7 +258,6 @@ export default function RiskovikPage() {
         <p className="text-[10px] text-gray-400 mt-1.5 px-1">
           📎 Загрузи документ (TXT/PDF) — Рисковик его прочитает и ответит на вопросы по нему
         </p>
-      </div>
     </div>
   )
 }
