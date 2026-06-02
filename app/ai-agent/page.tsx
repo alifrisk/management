@@ -3,16 +3,9 @@ import { useState, useRef, useEffect } from 'react'
 import { Send, Bot, User, Loader2, Trash2, Copy, Check, Paperclip, X, FileText } from 'lucide-react'
 
 interface Message {
-  id: string
-  role: 'user' | 'assistant'
-  content: string
-  timestamp: Date
+  id: string; role: 'user' | 'assistant'; content: string; timestamp: Date
 }
-
-interface DocFile {
-  name: string
-  content: string
-}
+interface DocFile { name: string; content: string }
 
 const SUGGESTED = [
   'Какой норматив достаточности капитала требует НБТ?',
@@ -28,59 +21,49 @@ const SUGGESTED = [
 const CONTEXTS = [
   { value: '', label: '💬 Общий вопрос' },
   { value: 'Пользователь работает в модуле Операционный риск.', label: '🛡️ Операционный риск' },
-  { value: 'Пользователь работает в модуле Кредитный риск — PAR30, Coverage Rate, стресс-тест.', label: '📄 Кредитный риск' },
-  { value: 'Пользователь работает в модуле Рыночный риск — Монте Карло, анализ контрагентов.', label: '📈 Рыночный риск' },
-  { value: 'Пользователь работает в модуле Риск ликвидности — стресс-тест T+1/T+7/T+30.', label: '💧 Ликвидность' },
+  { value: 'Пользователь работает в модуле Кредитный риск.', label: '📄 Кредитный риск' },
+  { value: 'Пользователь работает в модуле Рыночный риск.', label: '📈 Рыночный риск' },
+  { value: 'Пользователь работает в модуле Риск ликвидности.', label: '💧 Ликвидность' },
   { value: 'Пользователь работает со стратегическими задачами ERM.', label: '🎯 ERM / Стратегия' },
 ]
 
-function fmt(text: string) {
+function fmtText(text: string) {
   return text
     .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
-    .replace(/\*(.*?)\*/g, '<em>$1</em>')
     .replace(/`(.*?)`/g, '<code class="bg-gray-100 px-1 py-0.5 rounded text-xs font-mono">$1</code>')
-    .replace(/^#{1,3} (.+)$/gm, '<p class="font-semibold text-gray-900 mt-2 mb-1">$1</p>')
-    .replace(/^• (.+)$/gm, '<li class="ml-3 list-disc">$1</li>')
     .replace(/\n/g, '<br/>')
 }
 
 export default function RiskovikPage() {
-  const [messages,  setMessages]  = useState<Message[]>([])
-  const [input,     setInput]     = useState('')
-  const [loading,   setLoading]   = useState(false)
-  const [context,   setContext]   = useState('')
-  const [docs,      setDocs]      = useState<DocFile[]>([])
-  const [copied,    setCopied]    = useState<string | null>(null)
-  const bottomRef   = useRef<HTMLDivElement>(null)
-  const fileRef     = useRef<HTMLInputElement>(null)
+  const [messages, setMessages] = useState<Message[]>([])
+  const [input,    setInput]    = useState('')
+  const [loading,  setLoading]  = useState(false)
+  const [context,  setContext]  = useState('')
+  const [docs,     setDocs]     = useState<DocFile[]>([])
+  const [copied,   setCopied]   = useState<string | null>(null)
+  const bottomRef  = useRef<HTMLDivElement>(null)
+  const fileRef    = useRef<HTMLInputElement>(null)
 
   useEffect(() => { bottomRef.current?.scrollIntoView({ behavior: 'smooth' }) }, [messages, loading])
 
-  // Read uploaded file
   async function handleFile(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0]
     if (!file) return
     const text = await file.text()
-    // Truncate to ~8000 chars to fit context
-    const truncated = text.slice(0, 8000) + (text.length > 8000 ? '\n...[документ обрезан]' : '')
+    const truncated = text.slice(0, 8000) + (text.length > 8000 ? '\n...[обрезан]' : '')
     setDocs(prev => [...prev, { name: file.name, content: truncated }])
     if (fileRef.current) fileRef.current.value = ''
   }
 
-  const docContext = docs.length > 0
-    ? docs.map(d => `=== ${d.name} ===\n${d.content}`).join('\n\n')
-    : undefined
-
   async function send(text?: string) {
     const content = (text || input).trim()
     if (!content || loading) return
-
     const userMsg: Message = { id: Date.now().toString(), role: 'user', content, timestamp: new Date() }
     setMessages(prev => [...prev, userMsg])
     setInput('')
     setLoading(true)
-
     try {
+      const docContext = docs.length > 0 ? docs.map(d => `=== ${d.name} ===\n${d.content}`).join('\n\n') : undefined
       const res = await fetch('/api/ai-agent', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -92,15 +75,9 @@ export default function RiskovikPage() {
       })
       const data = await res.json()
       if (data.error) throw new Error(data.error)
-      setMessages(prev => [...prev, {
-        id: Date.now() + '_a', role: 'assistant', content: data.reply, timestamp: new Date(),
-      }])
+      setMessages(prev => [...prev, { id: Date.now() + '_a', role: 'assistant', content: data.reply, timestamp: new Date() }])
     } catch (e: unknown) {
-      setMessages(prev => [...prev, {
-        id: Date.now() + '_e', role: 'assistant',
-        content: '⚠️ ' + (e instanceof Error ? e.message : String(e)),
-        timestamp: new Date(),
-      }])
+      setMessages(prev => [...prev, { id: Date.now() + '_e', role: 'assistant', content: '⚠️ ' + (e instanceof Error ? e.message : String(e)), timestamp: new Date() }])
     }
     setLoading(false)
   }
@@ -111,9 +88,8 @@ export default function RiskovikPage() {
   }
 
   return (
-    <div className="flex flex-col max-w-4xl mx-auto -mt-6 lg:-mt-8 -mb-6 lg:-mb-8 pt-6 lg:pt-8" style={{ height: "100vh" }}>
+    <div className="flex flex-col max-w-4xl mx-auto" style={{ height: 'calc(100vh - 6rem)' }}>
 
-      {/* Header */}
       <div className="flex items-center justify-between pb-3 flex-shrink-0">
         <div className="flex items-center gap-3">
           <div className="w-10 h-10 bg-gradient-to-br from-[#1B8A4C] to-[#145c32] rounded-xl flex items-center justify-center shadow-sm">
@@ -138,15 +114,13 @@ export default function RiskovikPage() {
         </div>
       </div>
 
-      {/* Uploaded docs */}
       {docs.length > 0 && (
         <div className="flex items-center gap-2 flex-wrap mb-2 flex-shrink-0">
           {docs.map((d, i) => (
             <div key={i} className="flex items-center gap-1.5 bg-blue-50 border border-blue-200 rounded-lg px-2.5 py-1 text-xs text-blue-700">
               <FileText className="w-3 h-3" />
               <span className="max-w-32 truncate">{d.name}</span>
-              <button onClick={() => setDocs(prev => prev.filter((_, j) => j !== i))}
-                className="hover:text-red-500 transition-colors ml-0.5">
+              <button onClick={() => setDocs(prev => prev.filter((_, j) => j !== i))} className="hover:text-red-500 ml-0.5">
                 <X className="w-3 h-3" />
               </button>
             </div>
@@ -154,19 +128,14 @@ export default function RiskovikPage() {
         </div>
       )}
 
-      {/* Messages */}
-      <div className="flex-1 overflow-y-auto space-y-4 pb-3">
-
-        {/* Welcome screen */}
+      <div className="flex-1 overflow-y-auto space-y-4 pb-3 min-h-0">
         {messages.length === 0 && (
           <div className="text-center pt-4 pb-6">
             <div className="w-16 h-16 bg-gradient-to-br from-[#1B8A4C] to-[#145c32] rounded-2xl flex items-center justify-center mx-auto mb-4 shadow-lg">
               <Bot className="w-8 h-8 text-white" />
             </div>
             <h2 className="text-lg font-semibold text-gray-900 mb-1">Привет, я Рисковик!</h2>
-            <p className="text-sm text-gray-500 max-w-sm mx-auto mb-6">
-              Знаю Базель III, нормативы НБТ, ISO 31000 и все модули платформы. Могу анализировать загруженные документы.
-            </p>
+            <p className="text-sm text-gray-500 max-w-sm mx-auto mb-5">Знаю Базель III, нормативы НБТ, ISO 31000 и все модули платформы.</p>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-left">
               {SUGGESTED.map((q, i) => (
                 <button key={i} onClick={() => send(q)}
@@ -178,7 +147,6 @@ export default function RiskovikPage() {
           </div>
         )}
 
-        {/* Messages */}
         {messages.map(msg => (
           <div key={msg.id} className={`flex gap-3 ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}>
             {msg.role === 'assistant' && (
@@ -187,13 +155,9 @@ export default function RiskovikPage() {
               </div>
             )}
             <div className={`max-w-[82%] group flex flex-col ${msg.role === 'user' ? 'items-end' : 'items-start'}`}>
-              <div className={`px-4 py-3 rounded-2xl text-sm leading-relaxed ${
-                msg.role === 'user'
-                  ? 'bg-[#1B8A4C] text-white rounded-tr-sm'
-                  : 'bg-white border border-gray-200 text-gray-800 rounded-tl-sm shadow-sm'
-              }`}>
+              <div className={`px-4 py-3 rounded-2xl text-sm leading-relaxed ${msg.role === 'user' ? 'bg-[#1B8A4C] text-white rounded-tr-sm' : 'bg-white border border-gray-200 text-gray-800 rounded-tl-sm shadow-sm'}`}>
                 {msg.role === 'assistant'
-                  ? <div dangerouslySetInnerHTML={{ __html: fmt(msg.content) }} />
+                  ? <div dangerouslySetInnerHTML={{ __html: fmtText(msg.content) }} />
                   : msg.content}
               </div>
               <div className="flex items-center gap-2 mt-1 opacity-0 group-hover:opacity-100 transition-opacity">
@@ -201,8 +165,7 @@ export default function RiskovikPage() {
                   {msg.timestamp.toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' })}
                 </span>
                 {msg.role === 'assistant' && (
-                  <button onClick={() => copyMsg(msg.id, msg.content)}
-                    className="text-[10px] text-gray-400 hover:text-gray-600 flex items-center gap-1">
+                  <button onClick={() => copyMsg(msg.id, msg.content)} className="text-[10px] text-gray-400 hover:text-gray-600 flex items-center gap-1">
                     {copied === msg.id ? <Check className="w-3 h-3 text-green-500" /> : <Copy className="w-3 h-3" />}
                     {copied === msg.id ? 'Скопировано' : 'Копировать'}
                   </button>
@@ -217,7 +180,6 @@ export default function RiskovikPage() {
           </div>
         ))}
 
-        {/* Typing indicator */}
         {loading && (
           <div className="flex gap-3 justify-start">
             <div className="w-8 h-8 bg-gradient-to-br from-[#1B8A4C] to-[#145c32] rounded-lg flex items-center justify-center flex-shrink-0 shadow-sm">
@@ -225,8 +187,8 @@ export default function RiskovikPage() {
             </div>
             <div className="bg-white border border-gray-200 rounded-2xl rounded-tl-sm px-4 py-3 shadow-sm">
               <div className="flex items-center gap-1.5">
-                {[0,150,300].map(d => (
-                  <div key={d} className="w-2 h-2 bg-[#1B8A4C] rounded-full animate-bounce" style={{ animationDelay: `${d}ms` }} />
+                {[0, 150, 300].map(d => (
+                  <div key={d} className="w-2 h-2 bg-[#1B8A4C] rounded-full animate-bounce" style={{ animationDelay: d + 'ms' }} />
                 ))}
               </div>
             </div>
@@ -235,19 +197,16 @@ export default function RiskovikPage() {
         <div ref={bottomRef} />
       </div>
 
-      {/* Input area */}
       <div className="flex-shrink-0 bg-white border border-gray-200 rounded-2xl shadow-sm p-3">
         <div className="flex gap-2 items-end">
-          {/* File upload */}
           <input ref={fileRef} type="file" accept=".txt,.pdf,.md,.csv" onChange={handleFile} className="hidden" />
           <button onClick={() => fileRef.current?.click()}
-            title="Загрузить документ (.txt, .pdf, .md)"
             className="flex-shrink-0 w-9 h-9 text-gray-400 hover:text-[#1B8A4C] hover:bg-green-50 rounded-xl flex items-center justify-center transition-colors border border-gray-200">
             <Paperclip className="w-4 h-4" />
           </button>
           <textarea value={input} onChange={e => setInput(e.target.value)}
             onKeyDown={e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); send() } }}
-            placeholder="Задайте вопрос... (Enter — отправить, Shift+Enter — новая строка)"
+            placeholder="Задайте вопрос... (Enter — отправить)"
             rows={2}
             className="flex-1 resize-none border-0 outline-none text-sm text-gray-900 placeholder-gray-400 bg-transparent leading-relaxed" />
           <button onClick={() => send()} disabled={!input.trim() || loading}
@@ -255,9 +214,9 @@ export default function RiskovikPage() {
             {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />}
           </button>
         </div>
-        <p className="text-[10px] text-gray-400 mt-1.5 px-1">
-          📎 Загрузи документ (TXT/PDF) — Рисковик его прочитает и ответит на вопросы по нему
-        </p>
+        <p className="text-[10px] text-gray-400 mt-1.5 px-1">📎 Загрузи документ — Рисковик прочитает и ответит на вопросы</p>
+      </div>
+
     </div>
   )
 }
