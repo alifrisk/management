@@ -1,6 +1,6 @@
 'use client'
 import { useState, useRef, useEffect } from 'react'
-import { Send, Bot, User, Loader2, Trash2, Copy, Check, Paperclip, X, FileText } from 'lucide-react'
+import { Send, Bot, User, Loader2, Trash2, Copy, Check, Paperclip, X, FileText, Plus } from 'lucide-react'
 
 interface Message {
   id: string; role: 'user' | 'assistant'; content: string; timestamp: Date
@@ -9,13 +9,13 @@ interface DocFile { name: string; content: string }
 
 const SUGGESTED = [
   'Какой норматив достаточности капитала требует НБТ?',
-  'Как рассчитывается LCR и какой минимум по Базель III?',
+  'LCR и NSFR — что это и минимальные значения?',
   'Объясни PAR30 и Coverage Rate простыми словами',
-  'Как провести стресс-тест ликвидности T+1/T+7/T+30?',
+  'Стресс-тест ликвидности T+1/T+7/T+30 — методология',
   'Что такое ERM и три линии защиты?',
+  'Базель II vs Базель III — ключевые отличия',
   'Как оценить операционный риск по методу BIA?',
-  'Какие инструкции НБТ регулируют кредитные риски?',
-  'Объясни ICAAP и зачем он нужен Алиф Банку',
+  'Объясни ICAAP и зачем он нужен банку',
 ]
 
 const CONTEXTS = [
@@ -41,10 +41,15 @@ export default function RiskovikPage() {
   const [context,  setContext]  = useState('')
   const [docs,     setDocs]     = useState<DocFile[]>([])
   const [copied,   setCopied]   = useState<string | null>(null)
+  const [chatKey,  setChatKey]  = useState(0)
   const bottomRef  = useRef<HTMLDivElement>(null)
   const fileRef    = useRef<HTMLInputElement>(null)
 
   useEffect(() => { bottomRef.current?.scrollIntoView({ behavior: 'smooth' }) }, [messages, loading])
+
+  function newChat() {
+    setMessages([]); setDocs([]); setInput(''); setContext(''); setChatKey(k => k + 1)
+  }
 
   async function handleFile(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0]
@@ -69,8 +74,7 @@ export default function RiskovikPage() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           messages: [...messages, userMsg].map(m => ({ role: m.role, content: m.content })),
-          context,
-          document_context: docContext,
+          context, document_context: docContext,
         }),
       })
       const data = await res.json()
@@ -88,7 +92,7 @@ export default function RiskovikPage() {
   }
 
   return (
-    <div className="flex flex-col max-w-4xl mx-auto">
+    <div key={chatKey} className="flex flex-col flex-1 min-h-0 max-w-4xl mx-auto w-full">
 
       <div className="flex items-center justify-between pb-3 flex-shrink-0">
         <div className="flex items-center gap-3">
@@ -97,7 +101,7 @@ export default function RiskovikPage() {
           </div>
           <div>
             <h1 className="text-lg font-semibold text-gray-900 leading-tight">Рисковик</h1>
-            <p className="text-xs text-gray-500">AI-ассистент · Базель III · НБТ · ISO 31000</p>
+            <p className="text-xs text-gray-500">AI-ассистент · Базель II/III · НБТ · ISO 31000</p>
           </div>
         </div>
         <div className="flex items-center gap-2">
@@ -105,12 +109,10 @@ export default function RiskovikPage() {
             className="px-3 py-1.5 border border-gray-200 rounded-lg text-xs focus:outline-none focus:ring-2 focus:ring-[#1B8A4C] bg-white text-gray-600">
             {CONTEXTS.map(c => <option key={c.value} value={c.value}>{c.label}</option>)}
           </select>
-          {messages.length > 0 && (
-            <button onClick={() => { if (confirm('Очистить чат?')) { setMessages([]); setDocs([]) } }}
-              className="p-1.5 text-gray-400 hover:text-red-500 hover:bg-red-50 rounded-lg transition-colors">
-              <Trash2 className="w-4 h-4" />
-            </button>
-          )}
+          <button onClick={newChat} title="Новый чат"
+            className="flex items-center gap-1.5 px-3 py-1.5 bg-[#1B8A4C] text-white rounded-lg text-xs font-medium hover:bg-[#177040] transition-colors">
+            <Plus className="w-3.5 h-3.5" /> Новый чат
+          </button>
         </div>
       </div>
 
@@ -128,14 +130,14 @@ export default function RiskovikPage() {
         </div>
       )}
 
-      <div className="overflow-y-auto space-y-4 pb-3" style={{ maxHeight: 'calc(100vh - 18rem)', minHeight: '300px' }}>
+      <div className="flex-1 overflow-y-auto space-y-4 pb-3 min-h-0">
         {messages.length === 0 && (
-          <div className="text-center pt-4 pb-6">
+          <div className="text-center pt-6 pb-6">
             <div className="w-16 h-16 bg-gradient-to-br from-[#1B8A4C] to-[#145c32] rounded-2xl flex items-center justify-center mx-auto mb-4 shadow-lg">
               <Bot className="w-8 h-8 text-white" />
             </div>
             <h2 className="text-lg font-semibold text-gray-900 mb-1">Привет, я Рисковик!</h2>
-            <p className="text-sm text-gray-500 max-w-sm mx-auto mb-5">Знаю Базель III, нормативы НБТ, ISO 31000 и все модули платформы.</p>
+            <p className="text-sm text-gray-500 max-w-sm mx-auto mb-5">Знаю Базель II/III, нормативы НБТ, ISO 31000 и все модули платформы.</p>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-left">
               {SUGGESTED.map((q, i) => (
                 <button key={i} onClick={() => send(q)}
@@ -197,16 +199,17 @@ export default function RiskovikPage() {
         <div ref={bottomRef} />
       </div>
 
-      <div className="flex-shrink-0 bg-white border border-gray-200 rounded-2xl shadow-sm p-3">
+      <div className="flex-shrink-0 bg-white border border-gray-200 rounded-2xl shadow-sm p-3 mt-2">
         <div className="flex gap-2 items-end">
           <input ref={fileRef} type="file" accept=".txt,.pdf,.md,.csv" onChange={handleFile} className="hidden" />
           <button onClick={() => fileRef.current?.click()}
+            title="Загрузить документ"
             className="flex-shrink-0 w-9 h-9 text-gray-400 hover:text-[#1B8A4C] hover:bg-green-50 rounded-xl flex items-center justify-center transition-colors border border-gray-200">
             <Paperclip className="w-4 h-4" />
           </button>
           <textarea value={input} onChange={e => setInput(e.target.value)}
             onKeyDown={e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); send() } }}
-            placeholder="Задайте вопрос... (Enter — отправить)"
+            placeholder="Задайте вопрос... (Enter — отправить, Shift+Enter — новая строка)"
             rows={2}
             className="flex-1 resize-none border-0 outline-none text-sm text-gray-900 placeholder-gray-400 bg-transparent leading-relaxed" />
           <button onClick={() => send()} disabled={!input.trim() || loading}
@@ -214,7 +217,7 @@ export default function RiskovikPage() {
             {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />}
           </button>
         </div>
-        <p className="text-[10px] text-gray-400 mt-1.5 px-1">📎 Загрузи документ — Рисковик прочитает и ответит на вопросы</p>
+        <p className="text-[10px] text-gray-400 mt-1.5 px-1">📎 TXT/PDF/MD — Рисковик прочитает документ и ответит на вопросы по нему</p>
       </div>
 
     </div>
