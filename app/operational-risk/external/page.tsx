@@ -5,7 +5,7 @@ import { Plus, X, Trash2, Eye, Download, Filter, Globe, AlertTriangle, CheckCirc
 
 const RISK_TYPES = ['Внутреннее мошенничество','Внешнее мошенничество','Технологический сбой','Операционная ошибка','Юридический риск','Киберинцидент','Другое']
 const RELEVANCE  = ['Высокая','Средняя','Низкая']
-const COUNTRIES  = ['Россия','Казахстан','Узбекистан','Кыргызстан','Азербайджан','Грузия','США','Германия','Великобритания','Китай','ОАЭ','Другое']
+const COUNTRIES  = ['Таджикистан','Россия','Казахстан','Узбекистан','Кыргызстан','Азербайджан','Грузия','США','Германия','Великобритания','Китай','ОАЭ','Другое']
 
 interface Incident {
   id: string
@@ -48,18 +48,22 @@ export default function ExternalIncidentsPage() {
   const [form,      setForm]        = useState<Record<string,string>>(EMPTY)
   const [saving,    setSaving]      = useState(false)
   const [viewing,   setViewing]     = useState<Incident | null>(null)
-  const [filterRel, setFilterRel]   = useState('')
-  const [filterType,setFilterType]  = useState('')
+  const [filterRel,  setFilterRel]  = useState('')
+  const [filterType, setFilterType] = useState('')
+  const [filterYear, setFilterYear] = useState('')
+  const [filterMonth,setFilterMonth]= useState('')
 
   const fetch_ = useCallback(async () => {
     setLoading(true)
     let q = supabase.from('external_incidents').select('*').order('incident_date', { ascending: false })
     if (filterRel)  q = q.eq('relevance', filterRel)
     if (filterType) q = q.eq('risk_type', filterType)
+    if (filterYear) q = q.gte('incident_date', `${filterYear}-01-01`).lte('incident_date', `${filterYear}-12-31`)
+    if (filterYear && filterMonth) q = q.gte('incident_date', `${filterYear}-${filterMonth.padStart(2,'0')}-01`).lte('incident_date', `${filterYear}-${filterMonth.padStart(2,'0')}-31`)
     const { data } = await q
     setIncidents(data || [])
     setLoading(false)
-  }, [filterRel, filterType])
+  }, [filterRel, filterType, filterYear, filterMonth])
 
   useEffect(() => { fetch_() }, [fetch_])
 
@@ -155,8 +159,20 @@ export default function ExternalIncidentsPage() {
           <option value="">Все типы риска</option>
           {RISK_TYPES.map(r => <option key={r}>{r}</option>)}
         </select>
-        {(filterRel || filterType) && (
-          <button onClick={() => { setFilterRel(''); setFilterType('') }}
+        <select value={filterYear} onChange={e => { setFilterYear(e.target.value); setFilterMonth('') }}
+          className="px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#1B8A4C] bg-white">
+          <option value="">Все годы</option>
+          {[2026,2025,2024,2023].map(y => <option key={y} value={y}>{y}</option>)}
+        </select>
+        <select value={filterMonth} onChange={e => setFilterMonth(e.target.value)}
+          className="px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#1B8A4C] bg-white">
+          <option value="">Все месяцы</option>
+          {['Январь','Февраль','Март','Апрель','Май','Июнь','Июль','Август','Сентябрь','Октябрь','Ноябрь','Декабрь'].map((m,i) =>
+            <option key={i} value={String(i+1)}>{m}</option>
+          )}
+        </select>
+        {(filterRel || filterType || filterYear || filterMonth) && (
+          <button onClick={() => { setFilterRel(''); setFilterType(''); setFilterYear(''); setFilterMonth('') }}
             className="text-xs text-gray-500 hover:text-gray-700 flex items-center gap-1">
             <X className="w-3.5 h-3.5" /> Сбросить
           </button>
