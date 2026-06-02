@@ -5,7 +5,7 @@ import { usePathname } from 'next/navigation'
 import { supabase } from '@/supabase/client'
 import { UserProfile } from '@/types'
 import { cn } from '@/lib/utils'
-import { Shield, FileText, TrendingUp, Droplets, LayoutDashboard, ChevronDown, ChevronRight, LogOut, Settings, Users, Menu, X, ClipboardList, BarChart3, Map, FolderOpen, ClipboardCheck, BookUser, Activity, Building2, ListTodo } from 'lucide-react'
+import { Shield, FileText, TrendingUp, Droplets, LayoutDashboard, ChevronDown, ChevronRight, LogOut, Settings, Users, Menu, X, ClipboardList, BarChart3, Map, FolderOpen, ClipboardCheck, BookUser, Activity, Building2, ListTodo, Newspaper } from 'lucide-react'
 
 interface SidebarProps { user: UserProfile }
 
@@ -15,6 +15,7 @@ const NAV_ITEMS = [
     title: 'Операционный риск', href: '/operational-risk', icon: <Shield className="w-4 h-4" />, adminOnly: false,
     children: [
       { title: 'Реестр инцидентов', href: '/operational-risk/registry', icon: <ClipboardList className="w-3.5 h-3.5" /> },
+      { title: 'Внешние инциденты', href: '/operational-risk/external', icon: <Newspaper className="w-3.5 h-3.5" /> },
       { title: 'Дашборд аналитика', href: '/operational-risk/dashboard', icon: <BarChart3 className="w-3.5 h-3.5" /> },
       { title: 'Картирование рисков', href: '/operational-risk/mapping', icon: <Map className="w-3.5 h-3.5" /> },
       { title: 'Стресс-тест', href: '/operational-risk/stress-test', icon: <Activity className="w-3.5 h-3.5" /> },
