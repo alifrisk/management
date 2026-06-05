@@ -139,7 +139,7 @@ const covCell = (v: number) => new TableCell({
 })
 
 // ✅ Таблица результатов для одного сценария
-function scenarioTable(name: string, res: ReturnType<typeof calcScenario>, borderColor: typeof bB) {
+function scenarioTable(name: string, res: ReturnType<typeof calcScenario>, borderColor: typeof bB, cashEq: number, cashOnly: number) {
   const headerBorders = { top: borderColor, bottom: borderColor, left: borderColor, right: b }
   const titleCell = (text: string, colSpan?: number) => new TableCell({
     borders: { top: borderColor, bottom: borderColor, left: borderColor, right: borderColor },
@@ -181,7 +181,15 @@ function scenarioTable(name: string, res: ReturnType<typeof calcScenario>, borde
       ]}),
       new TableRow({ children: [
         cell('Cash & Equivalents (буфер, TJS)', { gray: true }),
-        cell(''), cell(''), cell(''),
+        cell(fmt(cashEq), { center: true, bold: true, color: '1B8A4C' }),
+        cell(fmt(cashEq), { center: true, bold: true, color: '1B8A4C' }),
+        cell(fmt(cashEq), { center: true, bold: true, color: '1B8A4C' }),
+      ]}),
+      new TableRow({ children: [
+        cell('Cash Only (наличные)', { gray: true }),
+        cell(fmt(cashOnly), { center: true, bold: true, color: '1B8A4C' }),
+        cell(fmt(cashOnly), { center: true, bold: true, color: '1B8A4C' }),
+        cell(fmt(cashOnly), { center: true, bold: true, color: '1B8A4C' }),
       ]}),
       new TableRow({ children: [
         cell('Покрытие (Cash & Eq)', { gray: true }),
@@ -397,17 +405,17 @@ export async function POST(request: Request) {
 
           // 3. Оптимистичный
           sectionTitle('3. ОПТИМИСТИЧНЫЙ СЦЕНАРИЙ (Base Case)'),
-          scenarioTable('Оптимистичный', results['Оптимистичный'], bB),
+          scenarioTable('Оптимистичный', results['Оптимистичный'], bB, inputs.cash_equivalents, inputs.cash_only),
           para('', { after: 80 }),
 
           // 4. Пессимистичный
           sectionTitle('4. ПЕССИМИСТИЧНЫЙ СЦЕНАРИЙ (Stress)'),
-          scenarioTable('Пессимистичный', results['Пессимистичный'], bO),
+          scenarioTable('Пессимистичный', results['Пессимистичный'], bO, inputs.cash_equivalents, inputs.cash_only),
           para('', { after: 80 }),
 
           // 5. Катастрофический
           sectionTitle('5. КАТАСТРОФИЧЕСКИЙ СЦЕНАРИЙ (Severe)'),
-          scenarioTable('Катастрофический', results['Катастрофический'], bR),
+          scenarioTable('Катастрофический', results['Катастрофический'], bR, inputs.cash_equivalents, inputs.cash_only),
           para('', { after: 80 }),
 
           // 6. Сравнительная таблица
