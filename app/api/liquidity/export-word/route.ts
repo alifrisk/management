@@ -153,54 +153,47 @@ function scenarioTable(name: string, res: ReturnType<typeof calcScenario>, borde
   })
   return new Table({
     width: { size: 9354, type: WidthType.DXA },
-    columnWidths: [3000, 1588, 1588, 1589, 1589],
+    columnWidths: [3500, 1951, 1951, 1952],
     rows: [
       new TableRow({ children: [
         titleCell('Показатель'),
         titleCell('T+1 (1 день)'),
         titleCell('T+7 (7 дней)'),
         titleCell('T+30 (30 дней)'),
-        titleCell('Оценка T+30'),
       ]}),
       new TableRow({ children: [
         cell('Отток обязательств (TJS)', { gray: true }),
         cell(fmt(res.t1.liab), { center: true }),
         cell(fmt(res.t7.liab), { center: true }),
         cell(fmt(res.t30.liab), { center: true }),
-        cell(''),
       ]}),
       new TableRow({ children: [
         cell('Использование кредитных линий (TJS)', { gray: true }),
         cell(fmt(res.t1.draw), { center: true }),
         cell(fmt(res.t7.draw), { center: true }),
         cell(fmt(res.t30.draw), { center: true }),
-        cell(''),
       ]}),
       new TableRow({ children: [
         cell('Стресс-потребность (TJS)', { gray: true, bold: true }),
         cell(fmt(res.t1.need), { center: true, bold: true }),
         cell(fmt(res.t7.need), { center: true, bold: true }),
         cell(fmt(res.t30.need), { center: true, bold: true }),
-        cell(''),
       ]}),
       new TableRow({ children: [
         cell('Cash & Equivalents (буфер, TJS)', { gray: true }),
-        cell(''), cell(''), cell(''), cell(''),
+        cell(''), cell(''), cell(''),
       ]}),
       new TableRow({ children: [
         cell('Покрытие (Cash & Eq)', { gray: true }),
         covCell(res.t1.cov_cash), covCell(res.t7.cov_cash), covCell(res.t30.cov_cash),
-        cell(''),
       ]}),
       new TableRow({ children: [
         cell('Покрытие (Cash Only)', { gray: true }),
         covCell(res.t1.cov_only), covCell(res.t7.cov_only), covCell(res.t30.cov_only),
-        cell(''),
       ]}),
       new TableRow({ children: [
         cell('Уровень риска', { gray: true, bold: true }),
         riskCell(res.t1.risk), riskCell(res.t7.risk), riskCell(res.t30.risk),
-        riskCell(res.t30.risk),
       ]}),
     ]
   })
@@ -377,18 +370,27 @@ export async function POST(request: Request) {
           // 2. Входные данные
           sectionTitle('2. ВХОДНЫЕ ДАННЫЕ (TJS)'),
           new Table({
-            width: { size: 9354, type: WidthType.DXA }, columnWidths: [5000, 4354],
+            width: { size: 9354, type: WidthType.DXA }, columnWidths: [3500, 2500, 3354],
             rows: [
-              new TableRow({ children: [cell('Статья', { gray: true, bold: true }), cell('Сумма (TJS)', { gray: true, bold: true, center: true })] }),
-              new TableRow({ children: [cell('Межбанковские обязательства'), cell(fmt(inputs.due_to_banks), { center: true })] }),
-              new TableRow({ children: [cell('Текущие счета клиентов'), cell(fmt(inputs.current_accounts), { center: true })] }),
-              new TableRow({ children: [cell('Электронный кошелёк'), cell(fmt(inputs.electronic_wallet), { center: true })] }),
-              new TableRow({ children: [cell('Накопительные счета'), cell(fmt(inputs.savings), { center: true })] }),
-              new TableRow({ children: [cell('Срочные депозиты'), cell(fmt(inputs.term_deposits), { center: true })] }),
-              new TableRow({ children: [cell('Кредитная линия Salom'), cell(fmt(inputs.credit_line_salom), { center: true })] }),
-              new TableRow({ children: [cell('Кредитная линия SME'), cell(fmt(inputs.credit_line_sme), { center: true })] }),
-              new TableRow({ children: [cell('Cash & Cash Equivalents (буфер)', { bold: true }), cell(fmt(inputs.cash_equivalents), { center: true, bold: true })] }),
-              new TableRow({ children: [cell('Cash Only (наличные)', { bold: true }), cell(fmt(inputs.cash_only), { center: true, bold: true })] }),
+              new TableRow({ children: [cell('Статья', { gray: true, bold: true }), cell('Отток T+1/T+7/T+30', { gray: true, bold: true, center: true }), cell('Сумма (TJS)', { gray: true, bold: true, center: true })] }),
+              ...([
+                { label: 'Межбанковские обязательства', key: 'due_to_banks', val: inputs.due_to_banks },
+                { label: 'Текущие счета клиентов',      key: 'current_accounts', val: inputs.current_accounts },
+                { label: 'Электронный кошелёк',          key: 'electronic_wallet', val: inputs.electronic_wallet },
+                { label: 'Накопительные счета',          key: 'savings', val: inputs.savings },
+                { label: 'Срочные депозиты',             key: 'term_deposits', val: inputs.term_deposits },
+                { label: 'Заимствования',                key: 'borrowings', val: inputs.borrowings },
+                { label: 'Прочие обязательства',         key: 'other_liabilities', val: inputs.other_liabilities },
+                { label: 'Кредитная линия Salom',        key: 'credit_line_salom', val: inputs.credit_line_salom },
+                { label: 'Кредитная линия SME',          key: 'credit_line_sme', val: inputs.credit_line_sme },
+              ].map(row => {
+                const sc = ALL_SCENARIOS[savedScenario as keyof typeof ALL_SCENARIOS]
+                const r = sc[row.key as keyof typeof sc] as { t1: number; t7: number; t30: number }
+                const rateStr = r ? `${(r.t1*100).toFixed(0)}% / ${(r.t7*100).toFixed(0)}% / ${(r.t30*100).toFixed(0)}%` : '—'
+                return new TableRow({ children: [cell(row.label), cell(rateStr, { center: true, color: '1B8A4C' }), cell(fmt(row.val), { center: true })] })
+              })),
+              new TableRow({ children: [cell('Cash & Cash Equivalents (буфер)', { bold: true }), cell('—', { center: true }), cell(fmt(inputs.cash_equivalents), { center: true, bold: true })] }),
+              new TableRow({ children: [cell('Cash Only (наличные)', { bold: true }), cell('—', { center: true }), cell(fmt(inputs.cash_only), { center: true, bold: true })] }),
             ]
           }),
           para('', { after: 80 }),
