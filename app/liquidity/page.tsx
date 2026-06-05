@@ -393,26 +393,43 @@ export default function LiquidityPage() {
                 )
               })()}
               <div className="bg-gray-50 rounded-xl p-4">
-                <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-3">Входные данные</p>
-                <div className="grid grid-cols-2 gap-2 text-xs">
-                  {[
-                    ['Межбанковские обязательства', viewing.due_to_banks],
-                    ['Текущие счета', viewing.current_accounts],
-                    ['Электронный кошелёк', viewing.electronic_wallet],
-                    ['Накопительные счета', viewing.savings],
-                    ['Срочные депозиты', viewing.term_deposits],
-                    ['Заимствования', viewing.borrowings],
-                    ['Прочие обязательства', viewing.other_liabilities],
-                    ['Кредитная линия Salom', viewing.credit_line_salom],
-                    ['Кредитная линия SME', viewing.credit_line_sme],
-                    ['Буфер: Cash & Equivalents', viewing.cash_equivalents],
-                    ['Буфер: Cash Only', viewing.cash_only],
-                  ].map(([l, v]) => (
-                    <div key={l as string} className="flex justify-between p-1.5 bg-white rounded">
-                      <span className="text-gray-500">{l}</span>
-                      <span className="font-medium">{fmt(v as number)} TJS</span>
-                    </div>
-                  ))}
+                <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-3">
+                  Входные данные · <span className="text-[#1B8A4C]">% отток по сценарию: {viewScenario}</span>
+                </p>
+                <div className="grid grid-cols-1 gap-1.5 text-xs">
+                  {([
+                    { label: 'Межбанковские обязательства', val: viewing.due_to_banks,      key: 'due_to_banks' },
+                    { label: 'Текущие счета',               val: viewing.current_accounts,   key: 'current_accounts' },
+                    { label: 'Электронный кошелёк',         val: viewing.electronic_wallet,  key: 'electronic_wallet' },
+                    { label: 'Накопительные счета',         val: viewing.savings,            key: 'savings' },
+                    { label: 'Срочные депозиты',            val: viewing.term_deposits,      key: 'term_deposits' },
+                    { label: 'Заимствования',               val: viewing.borrowings,         key: 'borrowings' },
+                    { label: 'Прочие обязательства',        val: viewing.other_liabilities,  key: 'other_liabilities' },
+                    { label: 'Кредитная линия Salom',       val: viewing.credit_line_salom,  key: 'credit_line_salom' },
+                    { label: 'Кредитная линия SME',         val: viewing.credit_line_sme,    key: 'credit_line_sme' },
+                  ] as { label: string; val: number; key: string }[]).map(item => {
+                    const sc = ALL_SCENARIOS[viewScenario]
+                    const r = sc[item.key as keyof typeof sc] as { t1: number; t7: number; t30: number } | undefined
+                    const rateStr = r ? `${(r.t1*100).toFixed(0)}% / ${(r.t7*100).toFixed(0)}% / ${(r.t30*100).toFixed(0)}%` : null
+                    return (
+                      <div key={item.label} className="flex items-center justify-between p-1.5 bg-white rounded gap-2">
+                        <span className="text-gray-500 flex-1">{item.label}</span>
+                        {rateStr && <span className="text-[#1B8A4C] font-medium text-[10px] whitespace-nowrap">{rateStr}</span>}
+                        <span className="font-medium text-gray-900 whitespace-nowrap">{fmt(item.val)} TJS</span>
+                      </div>
+                    )
+                  })}
+                  <div className="border-t border-gray-200 mt-1 pt-1.5">
+                    {[
+                      { label: 'Буфер: Cash & Equivalents', val: viewing.cash_equivalents },
+                      { label: 'Буфер: Cash Only',          val: viewing.cash_only },
+                    ].map(item => (
+                      <div key={item.label} className="flex justify-between p-1.5 bg-white rounded mt-1">
+                        <span className="text-gray-500">{item.label}</span>
+                        <span className="font-bold text-gray-900">{fmt(item.val)} TJS</span>
+                      </div>
+                    ))}
+                  </div>
                 </div>
               </div>
             </div>
