@@ -34,10 +34,10 @@ export default function Layout({ children }: { children: React.ReactNode }) {
   if (loading) return <div className="min-h-screen flex items-center justify-center bg-[#F5F8F6]"><Loader2 className="w-8 h-8 text-[#1B8A4C] animate-spin" /></div>
   if (!user) return null
   return (
-    <div className="flex h-screen overflow-hidden bg-[#F5F8F6]">
+    <div className="flex min-h-screen bg-[#F5F8F6]">
       <Sidebar user={user} />
-      <main className="flex-1 min-w-0 overflow-auto flex flex-col">
-        <div className="p-6 lg:p-8 flex-1 flex flex-col">{children}</div>
+      <main className="flex-1 min-w-0 overflow-auto">
+        <div className="p-6 lg:p-8">{children}</div>
       </main>
     </div>
   )
