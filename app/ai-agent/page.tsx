@@ -1,7 +1,7 @@
 'use client'
 import { useState, useRef, useEffect, useCallback } from 'react'
 import { supabase } from '@/supabase/client'
-import { Send, Bot, User, Loader2, Copy, Check, Paperclip, X, FileText, Plus, History, ChevronDown } from 'lucide-react'
+import { Send, Bot, User, Loader2, Copy, Check, Paperclip, X, FileText, Plus, History, ChevronDown, Edit2 } from 'lucide-react'
 
 interface Message { id: string; role: 'user' | 'assistant'; content: string }
 interface Chat { id: string; title: string; created_at: string }
@@ -44,6 +44,8 @@ export default function RiskovikPage() {
   const [chatId,    setChatId]    = useState<string | null>(null)
   const [chats,     setChats]     = useState<Chat[]>([])
   const [showHist,  setShowHist]  = useState(false)
+  const [editId,    setEditId]    = useState<string | null>(null)
+  const [editText,  setEditText]  = useState('')
   const bottomRef = useRef<HTMLDivElement>(null)
   const fileRef   = useRef<HTMLInputElement>(null)
 
@@ -84,6 +86,42 @@ export default function RiskovikPage() {
       setShowHist(false)
       loadChats()
     }
+  }
+
+  async function saveEdit(msgId: string) {
+    if (!editText.trim() || !chatId) return
+    // Update message in DB
+    await supabase.from('ai_messages').update({ content: editText }).eq('id', msgId)
+    // Remove all messages after this one and regenerate
+    const idx = messages.findIndex(m => m.id === msgId)
+    const msgsAfter = messages.slice(idx + 1)
+    for (const m of msgsAfter) {
+      await supabase.from('ai_messages').delete().eq('id', m.id)
+    }
+    const updatedMsgs = messages.slice(0, idx).concat([{ id: msgId, role: 'user', content: editText }])
+    setMessages(updatedMsgs)
+    setEditId(null)
+    setEditText('')
+    // Regenerate AI response
+    setLoading(true)
+    try {
+      const res = await fetch('/api/ai-agent', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          messages: updatedMsgs.map(m => ({ role: m.role, content: m.content })),
+          context,
+        }),
+      })
+      const data = await res.json()
+      if (data.error) throw new Error(data.error)
+      const aiMsg: Message = { id: Date.now() + '_a', role: 'assistant', content: data.reply }
+      setMessages(prev => [...prev, aiMsg])
+      await supabase.from('ai_messages').insert({ chat_id: chatId, role: 'assistant', content: data.reply })
+    } catch (e: unknown) {
+      setMessages(prev => [...prev, { id: Date.now() + '_e', role: 'assistant', content: '⚠️ ' + (e instanceof Error ? e.message : String(e)) }])
+    }
+    setLoading(false)
   }
 
   async function send(text?: string) {
@@ -146,7 +184,7 @@ export default function RiskovikPage() {
     <div className="flex flex-col flex-1 min-h-0 max-w-4xl mx-auto w-full">
 
       {/* Header */}
-      <div className="flex items-center justify-between pb-3 flex-shrink-0">
+      <div className="flex items-center justify-between pb-3 flex-shrink-0 sticky top-0 bg-[#F5F8F6] z-10 pt-1">
         <div className="flex items-center gap-3">
           <div className="w-10 h-10 bg-gradient-to-br from-[#1B8A4C] to-[#145c32] rounded-xl flex items-center justify-center shadow-sm">
             <Bot className="w-5 h-5 text-white" />
@@ -238,15 +276,39 @@ export default function RiskovikPage() {
               </div>
             )}
             <div className={`max-w-[82%] group flex flex-col ${msg.role === 'user' ? 'items-end' : 'items-start'}`}>
-              <div className={`px-4 py-3 rounded-2xl text-sm leading-relaxed ${msg.role === 'user' ? 'bg-[#1B8A4C] text-white rounded-tr-sm' : 'bg-white border border-gray-200 text-gray-800 rounded-tl-sm shadow-sm'}`}>
-                {msg.role === 'assistant'
-                  ? <div dangerouslySetInnerHTML={{ __html: fmtText(msg.content) }} />
-                  : msg.content}
-              </div>
-              {msg.role === 'assistant' && (
-                <button onClick={() => copyMsg(msg.id, msg.content)} className="text-[10px] text-gray-400 hover:text-gray-600 flex items-center gap-1 mt-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                  {copied === msg.id ? <><Check className="w-3 h-3 text-green-500" /> Скопировано</> : <><Copy className="w-3 h-3" /> Копировать</>}
-                </button>
+              {editId === msg.id ? (
+                <div className="w-full">
+                  <textarea value={editText} onChange={e => setEditText(e.target.value)}
+                    rows={3} autoFocus
+                    className="w-full px-4 py-3 rounded-2xl text-sm bg-[#1B8A4C]/10 border-2 border-[#1B8A4C] text-gray-900 resize-none focus:outline-none" />
+                  <div className="flex justify-end gap-2 mt-1.5">
+                    <button onClick={() => { setEditId(null); setEditText('') }}
+                      className="px-3 py-1 text-xs border border-gray-200 rounded-lg text-gray-600 hover:bg-gray-50">Отмена</button>
+                    <button onClick={() => saveEdit(msg.id)}
+                      className="px-3 py-1 text-xs bg-[#1B8A4C] text-white rounded-lg hover:bg-[#177040]">Отправить</button>
+                  </div>
+                </div>
+              ) : (
+                <>
+                  <div className={`px-4 py-3 rounded-2xl text-sm leading-relaxed ${msg.role === 'user' ? 'bg-[#1B8A4C] text-white rounded-tr-sm' : 'bg-white border border-gray-200 text-gray-800 rounded-tl-sm shadow-sm'}`}>
+                    {msg.role === 'assistant'
+                      ? <div dangerouslySetInnerHTML={{ __html: fmtText(msg.content) }} />
+                      : msg.content}
+                  </div>
+                  <div className="flex items-center gap-2 mt-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                    {msg.role === 'assistant' && (
+                      <button onClick={() => copyMsg(msg.id, msg.content)} className="text-[10px] text-gray-400 hover:text-gray-600 flex items-center gap-1">
+                        {copied === msg.id ? <><Check className="w-3 h-3 text-green-500" /> Скопировано</> : <><Copy className="w-3 h-3" /> Копировать</>}
+                      </button>
+                    )}
+                    {msg.role === 'user' && (
+                      <button onClick={() => { setEditId(msg.id); setEditText(msg.content) }}
+                        className="text-[10px] text-gray-400 hover:text-gray-600 flex items-center gap-1">
+                        <Edit2 className="w-3 h-3" /> Изменить
+                      </button>
+                    )}
+                  </div>
+                </>
               )}
             </div>
             {msg.role === 'user' && (
