@@ -1,20 +1,20 @@
 'use client'
-import { useState, useRef, useEffect } from 'react'
-import { Send, Bot, User, Loader2, Trash2, Copy, Check, Paperclip, X, FileText, Plus } from 'lucide-react'
+import { useState, useRef, useEffect, useCallback } from 'react'
+import { supabase } from '@/supabase/client'
+import { Send, Bot, User, Loader2, Copy, Check, Paperclip, X, FileText, Plus, History, ChevronDown } from 'lucide-react'
 
-interface Message {
-  id: string; role: 'user' | 'assistant'; content: string; timestamp: Date
-}
+interface Message { id: string; role: 'user' | 'assistant'; content: string }
+interface Chat { id: string; title: string; created_at: string }
 interface DocFile { name: string; content: string }
 
 const SUGGESTED = [
   'Какой норматив достаточности капитала требует НБТ?',
   'LCR и NSFR — что это и минимальные значения?',
   'Объясни PAR30 и Coverage Rate простыми словами',
-  'Стресс-тест ликвидности T+1/T+7/T+30 — методология',
-  'Что такое ERM и три линии защиты?',
   'Базель II vs Базель III — ключевые отличия',
+  'Что такое ERM и три линии защиты?',
   'Как оценить операционный риск по методу BIA?',
+  'Стресс-тест ликвидности T+1/T+7/T+30 — методология',
   'Объясни ICAAP и зачем он нужен банку',
 ]
 
@@ -35,55 +35,106 @@ function fmtText(text: string) {
 }
 
 export default function RiskovikPage() {
-  const [messages, setMessages] = useState<Message[]>([])
-  const [input,    setInput]    = useState('')
-  const [loading,  setLoading]  = useState(false)
-  const [context,  setContext]  = useState('')
-  const [docs,     setDocs]     = useState<DocFile[]>([])
-  const [copied,   setCopied]   = useState<string | null>(null)
-  const [chatKey,  setChatKey]  = useState(0)
-  const bottomRef  = useRef<HTMLDivElement>(null)
-  const fileRef    = useRef<HTMLInputElement>(null)
+  const [messages,  setMessages]  = useState<Message[]>([])
+  const [input,     setInput]     = useState('')
+  const [loading,   setLoading]   = useState(false)
+  const [context,   setContext]   = useState('')
+  const [docs,      setDocs]      = useState<DocFile[]>([])
+  const [copied,    setCopied]    = useState<string | null>(null)
+  const [chatId,    setChatId]    = useState<string | null>(null)
+  const [chats,     setChats]     = useState<Chat[]>([])
+  const [showHist,  setShowHist]  = useState(false)
+  const bottomRef = useRef<HTMLDivElement>(null)
+  const fileRef   = useRef<HTMLInputElement>(null)
 
   useEffect(() => { bottomRef.current?.scrollIntoView({ behavior: 'smooth' }) }, [messages, loading])
 
-  function newChat() {
-    setMessages([]); setDocs([]); setInput(''); setContext(''); setChatKey(k => k + 1)
+  // Load chat list
+  const loadChats = useCallback(async () => {
+    const { data } = await supabase.from('ai_chats').select('id, title, created_at').order('updated_at', { ascending: false }).limit(20)
+    setChats(data || [])
+  }, [])
+
+  // Load most recent chat on mount
+  useEffect(() => {
+    async function init() {
+      await loadChats()
+      const { data: chatsData } = await supabase.from('ai_chats').select('id').order('updated_at', { ascending: false }).limit(1)
+      if (chatsData && chatsData.length > 0) {
+        await openChat(chatsData[0].id)
+      }
+    }
+    init()
+  }, [])
+
+  async function openChat(id: string) {
+    setChatId(id)
+    setShowHist(false)
+    const { data } = await supabase.from('ai_messages').select('id, role, content').eq('chat_id', id).order('created_at')
+    setMessages((data || []) as Message[])
+  }
+
+  async function newChat() {
+    const { data } = await supabase.from('ai_chats').insert({ title: 'Новый чат', context: '' }).select().single()
+    if (data) {
+      setChatId(data.id)
+      setMessages([])
+      setDocs([])
+      setInput('')
+      setShowHist(false)
+      loadChats()
+    }
+  }
+
+  async function send(text?: string) {
+    const content = (text || input).trim()
+    if (!content || loading) return
+
+    let activeChatId = chatId
+    if (!activeChatId) {
+      const { data } = await supabase.from('ai_chats').insert({ title: content.slice(0, 60), context }).select().single()
+      if (!data) return
+      activeChatId = data.id
+      setChatId(data.id)
+      loadChats()
+    }
+
+    const userMsg: Message = { id: Date.now().toString(), role: 'user', content }
+    setMessages(prev => [...prev, userMsg])
+    setInput('')
+    setLoading(true)
+
+    await supabase.from('ai_messages').insert({ chat_id: activeChatId, role: 'user', content })
+
+    try {
+      const docCtx = docs.length > 0 ? docs.map(d => `=== ${d.name} ===\n${d.content}`).join('\n\n') : undefined
+      const res = await fetch('/api/ai-agent', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          messages: [...messages, userMsg].map(m => ({ role: m.role, content: m.content })),
+          context, document_context: docCtx,
+        }),
+      })
+      const data = await res.json()
+      if (data.error) throw new Error(data.error)
+      const aiMsg: Message = { id: Date.now() + '_a', role: 'assistant', content: data.reply }
+      setMessages(prev => [...prev, aiMsg])
+      await supabase.from('ai_messages').insert({ chat_id: activeChatId, role: 'assistant', content: data.reply })
+      await supabase.from('ai_chats').update({ updated_at: new Date().toISOString() }).eq('id', activeChatId)
+      loadChats()
+    } catch (e: unknown) {
+      setMessages(prev => [...prev, { id: Date.now() + '_e', role: 'assistant', content: '⚠️ ' + (e instanceof Error ? e.message : String(e)) }])
+    }
+    setLoading(false)
   }
 
   async function handleFile(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0]
     if (!file) return
     const text = await file.text()
-    const truncated = text.slice(0, 8000) + (text.length > 8000 ? '\n...[обрезан]' : '')
-    setDocs(prev => [...prev, { name: file.name, content: truncated }])
+    setDocs(prev => [...prev, { name: file.name, content: text.slice(0, 8000) }])
     if (fileRef.current) fileRef.current.value = ''
-  }
-
-  async function send(text?: string) {
-    const content = (text || input).trim()
-    if (!content || loading) return
-    const userMsg: Message = { id: Date.now().toString(), role: 'user', content, timestamp: new Date() }
-    setMessages(prev => [...prev, userMsg])
-    setInput('')
-    setLoading(true)
-    try {
-      const docContext = docs.length > 0 ? docs.map(d => `=== ${d.name} ===\n${d.content}`).join('\n\n') : undefined
-      const res = await fetch('/api/ai-agent', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          messages: [...messages, userMsg].map(m => ({ role: m.role, content: m.content })),
-          context, document_context: docContext,
-        }),
-      })
-      const data = await res.json()
-      if (data.error) throw new Error(data.error)
-      setMessages(prev => [...prev, { id: Date.now() + '_a', role: 'assistant', content: data.reply, timestamp: new Date() }])
-    } catch (e: unknown) {
-      setMessages(prev => [...prev, { id: Date.now() + '_e', role: 'assistant', content: '⚠️ ' + (e instanceof Error ? e.message : String(e)), timestamp: new Date() }])
-    }
-    setLoading(false)
   }
 
   async function copyMsg(id: string, content: string) {
@@ -92,8 +143,9 @@ export default function RiskovikPage() {
   }
 
   return (
-    <div key={chatKey} className="flex flex-col flex-1 min-h-0 max-w-4xl mx-auto w-full">
+    <div className="flex flex-col flex-1 min-h-0 max-w-4xl mx-auto w-full">
 
+      {/* Header */}
       <div className="flex items-center justify-between pb-3 flex-shrink-0">
         <div className="flex items-center gap-3">
           <div className="w-10 h-10 bg-gradient-to-br from-[#1B8A4C] to-[#145c32] rounded-xl flex items-center justify-center shadow-sm">
@@ -109,13 +161,41 @@ export default function RiskovikPage() {
             className="px-3 py-1.5 border border-gray-200 rounded-lg text-xs focus:outline-none focus:ring-2 focus:ring-[#1B8A4C] bg-white text-gray-600">
             {CONTEXTS.map(c => <option key={c.value} value={c.value}>{c.label}</option>)}
           </select>
-          <button onClick={newChat} title="Новый чат"
-            className="flex items-center gap-1.5 px-3 py-1.5 bg-[#1B8A4C] text-white rounded-lg text-xs font-medium hover:bg-[#177040] transition-colors">
+          {/* История чатов */}
+          <div className="relative">
+            <button onClick={() => setShowHist(v => !v)}
+              className="flex items-center gap-1.5 px-3 py-1.5 border border-gray-200 rounded-lg text-xs text-gray-600 hover:bg-gray-50">
+              <History className="w-3.5 h-3.5" /> История <ChevronDown className="w-3 h-3" />
+            </button>
+            {showHist && (
+              <div className="absolute right-0 top-8 z-50 w-72 bg-white border border-gray-200 rounded-xl shadow-lg overflow-hidden">
+                <div className="p-2 border-b border-gray-100 flex items-center justify-between">
+                  <span className="text-xs font-medium text-gray-500">История чатов</span>
+                  <button onClick={() => setShowHist(false)}><X className="w-3.5 h-3.5 text-gray-400" /></button>
+                </div>
+                <div className="max-h-64 overflow-y-auto">
+                  {chats.length === 0
+                    ? <p className="text-xs text-gray-400 text-center py-4">Нет чатов</p>
+                    : chats.map(c => (
+                      <button key={c.id} onClick={() => openChat(c.id)}
+                        className={`w-full text-left px-3 py-2 hover:bg-gray-50 border-b border-gray-50 ${chatId === c.id ? 'bg-green-50' : ''}`}>
+                        <p className="text-xs font-medium text-gray-700 truncate">{c.title}</p>
+                        <p className="text-[10px] text-gray-400">{new Date(c.created_at).toLocaleDateString('ru-RU', { day:'2-digit', month:'short', year:'numeric' })}</p>
+                      </button>
+                    ))
+                  }
+                </div>
+              </div>
+            )}
+          </div>
+          <button onClick={newChat}
+            className="flex items-center gap-1.5 px-3 py-1.5 bg-[#1B8A4C] text-white rounded-lg text-xs font-medium hover:bg-[#177040]">
             <Plus className="w-3.5 h-3.5" /> Новый чат
           </button>
         </div>
       </div>
 
+      {/* Docs */}
       {docs.length > 0 && (
         <div className="flex items-center gap-2 flex-wrap mb-2 flex-shrink-0">
           {docs.map((d, i) => (
@@ -130,6 +210,7 @@ export default function RiskovikPage() {
         </div>
       )}
 
+      {/* Messages */}
       <div className="flex-1 overflow-y-auto space-y-4 pb-3 min-h-0">
         {messages.length === 0 && (
           <div className="text-center pt-6 pb-6">
@@ -137,7 +218,7 @@ export default function RiskovikPage() {
               <Bot className="w-8 h-8 text-white" />
             </div>
             <h2 className="text-lg font-semibold text-gray-900 mb-1">Привет, я Рисковик!</h2>
-            <p className="text-sm text-gray-500 max-w-sm mx-auto mb-5">Знаю Базель II/III, нормативы НБТ, ISO 31000 и все модули платформы.</p>
+            <p className="text-sm text-gray-500 max-w-sm mx-auto mb-5">Знаю Базель II/III, нормативы НБТ, ISO 31000. История чатов сохраняется.</p>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-left">
               {SUGGESTED.map((q, i) => (
                 <button key={i} onClick={() => send(q)}
@@ -162,17 +243,11 @@ export default function RiskovikPage() {
                   ? <div dangerouslySetInnerHTML={{ __html: fmtText(msg.content) }} />
                   : msg.content}
               </div>
-              <div className="flex items-center gap-2 mt-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                <span className="text-[10px] text-gray-400">
-                  {msg.timestamp.toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' })}
-                </span>
-                {msg.role === 'assistant' && (
-                  <button onClick={() => copyMsg(msg.id, msg.content)} className="text-[10px] text-gray-400 hover:text-gray-600 flex items-center gap-1">
-                    {copied === msg.id ? <Check className="w-3 h-3 text-green-500" /> : <Copy className="w-3 h-3" />}
-                    {copied === msg.id ? 'Скопировано' : 'Копировать'}
-                  </button>
-                )}
-              </div>
+              {msg.role === 'assistant' && (
+                <button onClick={() => copyMsg(msg.id, msg.content)} className="text-[10px] text-gray-400 hover:text-gray-600 flex items-center gap-1 mt-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                  {copied === msg.id ? <><Check className="w-3 h-3 text-green-500" /> Скопировано</> : <><Copy className="w-3 h-3" /> Копировать</>}
+                </button>
+              )}
             </div>
             {msg.role === 'user' && (
               <div className="w-8 h-8 bg-gray-100 rounded-lg flex items-center justify-center flex-shrink-0 mt-1">
@@ -199,11 +274,11 @@ export default function RiskovikPage() {
         <div ref={bottomRef} />
       </div>
 
+      {/* Input */}
       <div className="flex-shrink-0 bg-white border border-gray-200 rounded-2xl shadow-sm p-3 mt-2">
         <div className="flex gap-2 items-end">
           <input ref={fileRef} type="file" accept=".txt,.pdf,.md,.csv" onChange={handleFile} className="hidden" />
           <button onClick={() => fileRef.current?.click()}
-            title="Загрузить документ"
             className="flex-shrink-0 w-9 h-9 text-gray-400 hover:text-[#1B8A4C] hover:bg-green-50 rounded-xl flex items-center justify-center transition-colors border border-gray-200">
             <Paperclip className="w-4 h-4" />
           </button>
@@ -217,9 +292,8 @@ export default function RiskovikPage() {
             {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />}
           </button>
         </div>
-        <p className="text-[10px] text-gray-400 mt-1.5 px-1">📎 TXT/PDF/MD — Рисковик прочитает документ и ответит на вопросы по нему</p>
+        <p className="text-[10px] text-gray-400 mt-1.5 px-1">📎 TXT/PDF — Рисковик прочитает · История сохраняется автоматически</p>
       </div>
-
     </div>
   )
 }
