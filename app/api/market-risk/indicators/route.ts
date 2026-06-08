@@ -83,7 +83,7 @@ export async function GET() {
 
     // ── Macro (NBT static) ──────────────────────────────────────────────────
     const macro = [
-      { id:'nbt_key',    label:'Ключевая ставка НБТ',       rate:9.0, change:null, unit:'%', year:'2026' },
+      { id:'nbt_key',    label:'Ставка рефинансирования НБТ', rate:7.0, change:null, unit:'%', year:'с 02.02.2026' },
       { id:'nbt_ann',    label:'Годовая инфляция (апрель)', rate:3.6, change:null, unit:'%', year:'2026' },
       { id:'nbt_mon',    label:'Инфляция за апрель',        rate:0.6, change:null, unit:'%', year:'2026' },
       { id:'nbt_target', label:'Целевой показатель (±2%)',  rate:5.0, change:null, unit:'%', year:'2026' },
