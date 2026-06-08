@@ -157,8 +157,17 @@ export default function TasksPage() {
   const subTasks = (pid: string) => tasks.filter(t => t.parent_id === pid)
 
   const progress = (cat: string) => {
-    const ts = rootTasks(cat)
-    return ts.length ? Math.round(ts.filter(t => t.status === 'Готово').length / ts.length * 100) : 0
+    const stratTasks = rootTasks(cat)
+    // Also count weekly/backlog tasks linked to strategic tasks in this category
+    const linkedTasks = tasks.filter(t =>
+      !t.parent_id &&
+      t.strategic_task_id &&
+      stratTasks.some(s => s.id === t.strategic_task_id)
+    )
+    const allTasks = [...stratTasks, ...linkedTasks]
+    if (!allTasks.length) return 0
+    const done = allTasks.filter(t => t.status === 'Готово').length
+    return Math.round(done / allTasks.length * 100)
   }
 
   // ── Drag ──────────────────────────────────────────────────────────────────
@@ -410,7 +419,7 @@ export default function TasksPage() {
                 className="text-xs text-gray-700 bg-transparent border-0 focus:outline-none cursor-pointer" />
             </div>
             {/* Strategic link for weekly */}
-            {task.category === 'Еженедельные' && (
+            {(task.category === 'Еженедельные' || task.category === 'Бэклог') && !task.parent_id && (
               <div className="flex items-center gap-3 py-1.5 hover:bg-gray-50 rounded-lg px-2 -mx-2">
                 <span className="text-xs text-gray-400 w-24 flex-shrink-0 flex items-center gap-1"><Link2 className="w-3 h-3"/>Стратегия</span>
                 <select value={task.strategic_task_id || ''}
@@ -538,7 +547,16 @@ export default function TasksPage() {
                   className="text-left p-4 bg-white rounded-xl border border-gray-200 hover:border-gray-300 hover:shadow-sm transition-all">
                   <div className="text-2xl mb-2">{cat.icon}</div>
                   <p className="text-sm font-semibold text-gray-900 mb-0.5">{cat.id}</p>
-                  <p className="text-xs text-gray-400 mb-3">{done}/{ts.length} задач</p>
+                  {(() => {
+                    const linked = tasks.filter(t => !t.parent_id && t.strategic_task_id && ts.some(s => s.id === t.strategic_task_id))
+                    const linkedDone = linked.filter(t => t.status === 'Готово').length
+                    return (
+                      <div className="mb-3">
+                        <p className="text-xs text-gray-400">{done}/{ts.length} стратегических</p>
+                        {linked.length > 0 && <p className="text-xs text-gray-400 opacity-70">{linkedDone}/{linked.length} связанных</p>}
+                      </div>
+                    )
+                  })()}
                   <div className="w-full bg-gray-100 rounded-full h-1.5">
                     <div className="rounded-full h-1.5 transition-all" style={{ width:`${pct}%`, backgroundColor: cat.color }} />
                   </div>
