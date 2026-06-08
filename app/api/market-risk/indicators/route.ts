@@ -22,7 +22,7 @@ async function get(url: string): Promise<unknown> {
 // ── Currencies ────────────────────────────────────────────────────────────────
 async function getCurrencies() {
   const d = await get('https://cdn.jsdelivr.net/npm/@fawazahmed0/currency-api@latest/v1/currencies/usd.json')
-  const y = await get(`https://cdn.jsdelivr.net/npm/@fawazahmed0/currency-api@${new Date(Date.now()-86400000).toISOString().split('T')[0]}/v1/currencies/usd.json`)
+  const y = await get(`https://cdn.jsdelivr.net/npm/@fawazahmed0/currency-api@${new Date(Date.now()-7*86400000).toISOString().split('T')[0]}/v1/currencies/usd.json`)
   const cur  = (d as Record<string,Record<string,number>>)?.usd  ?? {}
   const prev = (y as Record<string,Record<string,number>>)?.usd  ?? {}
   const p = (code: string, label: string) => ({
@@ -72,9 +72,7 @@ async function getCommodities() {
 // ── Macro (World Bank + NBT static) ──────────────────────────────────────────
 async function getMacro() {
   const wb = [
-    { id:'gdp_growth',   label:'Рост ВВП РТ',               code:'NY.GDP.MKTP.KD.ZG',     unit:'%'        },
-    { id:'remittances',  label:'Денежные переводы (% ВВП)',  code:'BX.TRF.PWKR.DT.GD.ZS', unit:'% ВВП'    },
-    { id:'gdp_usd',      label:'ВВП Таджикистана',           code:'NY.GDP.MKTP.CD',        unit:'млрд USD' },
+    { id:'gdp_growth', label:'Рост ВВП РТ', code:'NY.GDP.MKTP.KD.ZG', unit:'%' },
   ]
   const wbResults = await Promise.allSettled(wb.map(async ind => {
     const d = await get(`https://api.worldbank.org/v2/country/TJ/indicator/${ind.code}?format=json&mrv=2&per_page=2`)
