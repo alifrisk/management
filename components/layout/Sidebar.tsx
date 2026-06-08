@@ -5,10 +5,8 @@ import { usePathname } from 'next/navigation'
 import { supabase } from '@/supabase/client'
 import { UserProfile } from '@/types'
 import { cn } from '@/lib/utils'
-import { Shield, FileText, TrendingUp, Droplets, LayoutDashboard, ChevronDown, ChevronRight, LogOut, Settings, Users, Menu, X, ClipboardList, BarChart3, Map, FolderOpen, ClipboardCheck, BookUser, Activity, Building2, ListTodo, Newspaper, Bot } from 'lucide-react'
-
+import { Shield, FileText, TrendingUp, Droplets, LayoutDashboard, ChevronDown, ChevronRight, LogOut, Settings, Users, Menu, X, ClipboardList, BarChart3, Map, FolderOpen, ClipboardCheck, BookUser, Activity, Building2, ListTodo, Newspaper, Bot, LineChart } from 'lucide-react'
 interface SidebarProps { user: UserProfile }
-
 const NAV_ITEMS = [
   { title: 'Главная', href: '/dashboard', icon: <LayoutDashboard className="w-4 h-4" />, adminOnly: false },
   {
@@ -36,6 +34,7 @@ const NAV_ITEMS = [
       { title: 'Оценка контрагентов', href: '/market-risk', icon: <TrendingUp className="w-3.5 h-3.5" /> },
       { title: 'Реестр контрагентов', href: '/counterparties', icon: <Building2 className="w-3.5 h-3.5" /> },
       { title: 'Стресс-тест', href: '/market-risk/stress-test', icon: <Activity className="w-3.5 h-3.5" /> },
+      { title: 'Индикаторы рынка', href: '/market-risk/indicators', icon: <LineChart className="w-3.5 h-3.5" /> },
     ],
   },
   { title: 'Ликвидность', href: '/liquidity', icon: <Droplets className="w-4 h-4" />, adminOnly: true, children: [{ title: 'Стресс-тест', href: '/liquidity', icon: <BarChart3 className="w-3.5 h-3.5" /> }] },
@@ -44,13 +43,11 @@ const NAV_ITEMS = [
   { title: 'Задачи СУР', href: '/tasks', icon: <ListTodo className="w-4 h-4" />, adminOnly: true },
   { title: 'Рисковик AI', href: '/ai-agent', icon: <Bot className="w-4 h-4" />, adminOnly: false },
 ]
-
 export default function Sidebar({ user }: SidebarProps) {
   const pathname = usePathname()
   const isAdmin = user.role === 'admin'
   const [mobileOpen, setMobileOpen] = useState(false)
   const [showLogoutConfirm, setShowLogoutConfirm] = useState(false)
-
   const getActiveMenu = () => {
     for (const item of NAV_ITEMS) {
       if (item.children?.some(c => pathname.startsWith(c.href))) return item.href
@@ -59,23 +56,19 @@ export default function Sidebar({ user }: SidebarProps) {
   }
   const [openMenu, setOpenMenu] = useState<string | null>(getActiveMenu)
   useEffect(() => { setOpenMenu(getActiveMenu()) }, [pathname])
-
   function toggleMenu(href: string) {
     setOpenMenu(prev => prev === href ? null : href)
   }
-
   async function confirmLogout() {
     sessionStorage.removeItem('alif_user')
     await supabase.auth.signOut()
     window.location.href = '/auth/login'
   }
-
   const initials = user.full_name
     ? user.full_name.split(' ').map((n: string) => n[0]).slice(0, 2).join('')
     : user.email[0].toUpperCase()
   const roleMap: Record<string, string> = { admin: 'Администратор', observer: 'Наблюдатель', coordinator: 'Риск-координатор', user: 'Пользователь' }
   const roleLabel = roleMap[user.role] || user.role
-
   const sidebarContent = (
     <div className="flex flex-col h-full">
       <div className="flex items-center gap-3 px-4 py-5 border-b border-white/10">
@@ -157,7 +150,6 @@ export default function Sidebar({ user }: SidebarProps) {
       </div>
     </div>
   )
-
   return (
     <>
       {showLogoutConfirm && (
