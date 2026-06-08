@@ -98,9 +98,8 @@ export default function TasksPage() {
   }, [tasks])
 
   // ── CRUD ──────────────────────────────────────────────────────────────────
-  async function quickAdd(status: Status) {
+  async function quickAdd(status: Status, category: string) {
     if (!addingTitle.trim()) { setAddingIn(null); return }
-    const category = currentCategory || 'Бэклог'
     await supabase.from('tasks').insert({
       title: addingTitle.trim(),
       category,
@@ -216,8 +215,8 @@ export default function TasksPage() {
   }
 
   // ─── Kanban Column ────────────────────────────────────────────────────────
-  const KanbanCol = ({ status }: { status: Status }) => {
-    const colTasks = rootTasks(currentCategory!).filter(t => t.status === status)
+  const KanbanCol = ({ status, category }: { status: Status; category: string }) => {
+    const colTasks = rootTasks(category).filter(t => t.status === status)
     const isAdding = addingIn === status
     return (
       <div
@@ -247,7 +246,7 @@ export default function TasksPage() {
               className="w-full text-sm outline-none text-gray-900 placeholder-gray-400"
             />
             <div className="flex gap-2 mt-2">
-              <button onClick={() => quickAdd(status)}
+              <button onClick={() => quickAdd(status, category)}
                 className="px-2.5 py-1 bg-[#1B8A4C] text-white rounded text-xs font-medium hover:bg-[#177040]">
                 Добавить
               </button>
@@ -334,6 +333,8 @@ export default function TasksPage() {
   const SidePanel = ({ task }: { task: Task }) => {
     const [newSubtitle, setNewSubtitle] = useState('')
     const [addingSub,   setAddingSub]   = useState(false)
+    const [localTitle,  setLocalTitle]  = useState(task.title)
+    const [localDesc,   setLocalDesc]   = useState(task.description || '')
     const subs = subTasks(task.id)
     const cat  = STRATEGIC_CATS.find(c => c.id === task.category)
 
@@ -361,8 +362,9 @@ export default function TasksPage() {
           {/* Title */}
           <div className="px-5 pt-4 pb-2">
             <textarea
-              value={task.title}
-              onChange={e => updateTask(task.id, { title: e.target.value })}
+              value={localTitle}
+              onChange={e => setLocalTitle(e.target.value)}
+              onBlur={() => { if (localTitle.trim() && localTitle !== task.title) updateTask(task.id, { title: localTitle.trim() }) }}
               className="w-full text-xl font-semibold text-gray-900 resize-none outline-none leading-snug"
               rows={2}
               placeholder="Название задачи"
@@ -426,8 +428,9 @@ export default function TasksPage() {
           <div className="px-5 py-4">
             <p className="text-xs font-medium text-gray-400 uppercase tracking-wide mb-2">Описание</p>
             <textarea
-              value={task.description || ''}
-              onChange={e => updateTask(task.id, { description: e.target.value || null })}
+              value={localDesc}
+              onChange={e => setLocalDesc(e.target.value)}
+              onBlur={() => { const d = localDesc || null; if (d !== task.description) updateTask(task.id, { description: d }) }}
               placeholder="Добавьте описание..."
               rows={4}
               className="w-full text-sm text-gray-700 resize-none outline-none placeholder-gray-300 leading-relaxed"
@@ -579,7 +582,7 @@ export default function TasksPage() {
           <div className="flex-1 min-h-0 overflow-auto">
             {viewMode === 'kanban' ? (
               <div className="flex gap-4 h-full">
-                {STATUSES.map(s => <KanbanCol key={s} status={s} />)}
+                {STATUSES.map(s => <KanbanCol key={s} status={s} category={currentCategory!} />)}
               </div>
             ) : (
               <div className="bg-white rounded-xl border border-gray-100 overflow-hidden">
