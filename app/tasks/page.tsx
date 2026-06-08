@@ -101,15 +101,18 @@ export default function TasksPage() {
   async function quickAdd(status: Status, category: string) {
     const title = addRef.current?.value?.trim() || addingTitleRef.current.trim()
     if (!title) { setAddingIn(null); return }
-    await supabase.from('tasks').insert({
+    const { data: newTask } = await supabase.from('tasks').insert({
       title: title,
       category,
       status,
       priority: 'Средний',
       task_year: new Date().getFullYear(),
       week_number: section === 'Еженедельные' ? filterWeek : null,
-    })
-    setAddingIn(null); addingTitleRef.current = ''; if(addRef.current) addRef.current.value = ''; fetch_()
+    }).select().single()
+    setAddingIn(null); addingTitleRef.current = ''; if(addRef.current) addRef.current.value = ''
+    await fetch_()
+    // Сразу открываем задачу в боковой панели для заполнения деталей
+    if (newTask) setSelectedTask(newTask as Task)
   }
 
   async function updateTask(id: string, patch: Partial<Task>) {
