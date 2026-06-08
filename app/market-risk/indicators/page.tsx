@@ -7,6 +7,7 @@ interface Indicator {
   label: string
   rate: number | null
   change: number | null
+  change7d?: number | null
   unit: string
 }
 
@@ -51,13 +52,27 @@ function Card({ item }: { item: Indicator }) {
         {item.rate !== null ? fmtRate(item.rate, item.unit) : '—'}
         <span className="text-xs font-normal text-gray-400 ml-1">{item.unit}</span>
       </p>
-      <div className={`flex items-center gap-1 text-sm font-semibold ${changeColor(item.change)}`}>
-        {item.change === null ? <Minus className="w-3.5 h-3.5" /> :
-         isPos ? <TrendingUp className="w-3.5 h-3.5" /> :
-         isNeg ? <TrendingDown className="w-3.5 h-3.5" /> :
-         <Minus className="w-3.5 h-3.5" />}
-        <span>{item.change !== null ? `${item.change > 0 ? '+' : ''}${item.change}%` : '—'}</span>
-        <span className="text-xs font-normal text-gray-400 ml-1">за 24ч</span>
+      <div className="flex flex-col gap-0.5">
+        {item.change7d !== undefined ? (
+          <>
+            <div className={`flex items-center gap-1 text-xs font-semibold ${changeColor(item.change)}`}>
+              {item.change != null && item.change > 0 ? <TrendingUp className="w-3 h-3"/> : item.change != null && item.change < 0 ? <TrendingDown className="w-3 h-3"/> : <Minus className="w-3 h-3"/>}
+              <span>{item.change != null ? `${item.change > 0 ? '+' : ''}${item.change}%` : '—'}</span>
+              <span className="font-normal text-gray-400">24ч</span>
+            </div>
+            <div className={`flex items-center gap-1 text-xs font-semibold ${changeColor(item.change7d ?? null)}`}>
+              {item.change7d != null && item.change7d > 0 ? <TrendingUp className="w-3 h-3"/> : item.change7d != null && item.change7d < 0 ? <TrendingDown className="w-3 h-3"/> : <Minus className="w-3 h-3"/>}
+              <span>{item.change7d != null ? `${item.change7d > 0 ? '+' : ''}${item.change7d}%` : '—'}</span>
+              <span className="font-normal text-gray-400">7д</span>
+            </div>
+          </>
+        ) : (
+          <div className={`flex items-center gap-1 text-xs font-semibold ${changeColor(item.change)}`}>
+            {item.change != null && item.change > 0 ? <TrendingUp className="w-3 h-3"/> : item.change != null && item.change < 0 ? <TrendingDown className="w-3 h-3"/> : <Minus className="w-3 h-3"/>}
+            <span>{item.change != null ? `${item.change > 0 ? '+' : ''}${item.change}%` : '—'}</span>
+            <span className="font-normal text-gray-400">24ч</span>
+          </div>
+        )}
       </div>
     </div>
   )
