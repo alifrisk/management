@@ -5,6 +5,7 @@ import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContai
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
 const fmtNum = (n: number) => new Intl.NumberFormat('ru-RU').format(Math.round(n))
+const fmtN   = (v: string)  => { const n = v.replace(/\D/g,''); return n ? new Intl.NumberFormat('ru-RU').format(Number(n)) : '' }
 
 function normalRandom(mean: number, sd: number) {
   let u = 0, v = 0
@@ -82,12 +83,12 @@ export default function MarketStressTest() {
   const [running,  setRunning]  = useState(false)
 
   // Model 2 inputs
-  const [gdpBase,    setGdpBase]    = useState('173000000000')
+  const [gdpBase,    setGdpBase]    = useState('173 000 000 000')
   const [gdpGrowth,  setGdpGrowth]  = useState('8.1')
   const [remitShare, setRemitShare] = useState('35.6')
   const [alifShare,  setAlifShare]  = useState('15.04')
   const [margin,     setMargin]     = useState('1.67')
-  const [baseIncome, setBaseIncome] = useState('83597906')
+  const [baseIncome, setBaseIncome] = useState('83 597 906')
 
   const inp  = "w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#1B8A4C] bg-white text-right"
   const lbl  = "block text-xs font-medium text-gray-600 mb-1"
@@ -427,16 +428,18 @@ export default function MarketStressTest() {
             <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-3">Входные данные</p>
             <div className="grid grid-cols-2 lg:grid-cols-3 gap-4">
               {[
-                { l: 'ВВП базовый (сомони)', v: gdpBase,    s: setGdpBase,    p: '173 000 000 000' },
-                { l: 'Прогноз роста ВВП (%)', v: gdpGrowth, s: setGdpGrowth,  p: '8.1' },
-                { l: 'Доля переводов в ВВП (%)', v: remitShare, s: setRemitShare, p: '35.6' },
-                { l: 'Доля Алиф в переводах (%)', v: alifShare,  s: setAlifShare,  p: '15.04' },
-                { l: 'Маржа доходности (%)', v: margin,     s: setMargin,     p: '1.67' },
-                { l: 'Базовый доход (сомони)', v: baseIncome, s: setBaseIncome, p: '83 597 906' },
+                { l: 'ВВП базовый (сомони)', v: gdpBase,    s: setGdpBase,    p: '173 000 000 000', fmt: true },
+                { l: 'Прогноз роста ВВП (%)', v: gdpGrowth, s: setGdpGrowth,  p: '8.1',             fmt: false },
+                { l: 'Доля переводов в ВВП (%)', v: remitShare, s: setRemitShare, p: '35.6',         fmt: false },
+                { l: 'Доля Алиф в переводах (%)', v: alifShare,  s: setAlifShare,  p: '15.04',       fmt: false },
+                { l: 'Маржа доходности (%)', v: margin,     s: setMargin,     p: '1.67',             fmt: false },
+                { l: 'Базовый доход (сомони)', v: baseIncome, s: setBaseIncome, p: '83 597 906',     fmt: true },
               ].map(f => (
                 <div key={f.l}>
                   <label className={lbl}>{f.l}</label>
-                  <input type="text" value={f.v} onChange={e => f.s(e.target.value)} placeholder={f.p} className={inp} />
+                  <input type="text" value={f.v}
+                    onChange={e => f.s(f.fmt ? fmtN(e.target.value) : e.target.value)}
+                    placeholder={f.p} className={inp} />
                 </div>
               ))}
             </div>
