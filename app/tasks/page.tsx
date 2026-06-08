@@ -259,7 +259,7 @@ export default function TasksPage() {
           </div>
         ) : (
           <button
-            onClick={() => { setAddingIn(status); setAddingTitle('') }}
+            onClick={() => { setAddingIn(status); addingTitleRef.current = '' }}
             className="mt-2 flex items-center gap-1.5 text-xs text-gray-400 hover:text-gray-600 px-1 py-1.5 rounded hover:bg-gray-100 transition-colors w-full"
           >
             <Plus className="w-3.5 h-3.5" /> Новая задача
@@ -604,7 +604,7 @@ export default function TasksPage() {
                     <tr>
                       <td colSpan={6} className="px-4 py-2">
                         <button
-                          onClick={() => { setAddingIn('Новая'); setAddingTitle('') }}
+                          onClick={() => { setAddingIn('Новая'); addingTitleRef.current = '' }}
                           className="flex items-center gap-1.5 text-xs text-gray-400 hover:text-gray-600">
                           <Plus className="w-3.5 h-3.5"/> Новая задача
                         </button>
