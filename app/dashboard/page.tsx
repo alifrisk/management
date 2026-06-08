@@ -1,4 +1,4 @@
-import { Shield, FileText, TrendingUp, Droplets, ArrowRight, FolderOpen, ClipboardCheck, BookUser, Building2, BarChart3, ListTodo, LineChart } from 'lucide-react'
+import { Shield, FileText, TrendingUp, Droplets, ArrowRight, FolderOpen, ClipboardCheck, BookUser, Building2, BarChart3, ListTodo, LineChart, Bot } from 'lucide-react'
 import Link from 'next/link'
 
 export default function DashboardPage() {
@@ -126,6 +126,23 @@ export default function DashboardPage() {
           <div className="flex flex-wrap gap-1">
             {['Мониторинг','Исполнение'].map(t => (
               <span key={t} className="text-[10px] bg-rose-50 text-rose-700 px-1.5 py-0.5 rounded-full">{t}</span>
+            ))}
+          </div>
+        </Link>
+
+        {/* Рисковик AI */}
+        <Link href="/ai-agent" className="group block bg-white rounded-xl border border-gray-100 p-4 shadow-sm hover:shadow-md transition-all">
+          <div className="flex items-start justify-between mb-2">
+            <div className="w-8 h-8 bg-emerald-50 rounded-lg flex items-center justify-center">
+              <Bot className="w-4 h-4 text-emerald-600" />
+            </div>
+            <ArrowRight className="w-3.5 h-3.5 text-gray-300 group-hover:text-[#1B8A4C] transition-colors" />
+          </div>
+          <h3 className="font-semibold text-gray-900 text-sm mb-0.5">Рисковик AI</h3>
+          <p className="text-[11px] text-gray-400 mb-2">AI-ассистент по управлению рисками</p>
+          <div className="flex flex-wrap gap-1">
+            {['Базель II/III','НБТ','ISO 31000','История чатов'].map(t => (
+              <span key={t} className="text-[10px] bg-emerald-50 text-emerald-700 px-1.5 py-0.5 rounded-full">{t}</span>
             ))}
           </div>
         </Link>
