@@ -188,8 +188,8 @@ export default function MarketIndicatorsPage() {
       <div className="text-xs text-gray-400 flex items-center gap-4 flex-wrap">
         <span>Источники: CoinGecko · Yahoo Finance · fawazahmed0</span>
         <span>Данные носят информационный характер</span>
-        {data?.updatedAt && (
-          <span>Данные от: {new Date(data.updatedAt).toLocaleString('ru-RU')}</span>
+        {lastFetch && (
+          <span>Данные от: {lastFetch.toLocaleString('ru-RU')}</span>
         )}
       </div>
     </div>
