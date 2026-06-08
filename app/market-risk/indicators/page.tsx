@@ -15,6 +15,7 @@ interface IndicatorsData {
   currencies:  Indicator[]
   crypto:      Indicator[]
   commodities: Indicator[]
+  macro:       (Indicator & { year?: string })[]
 }
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
@@ -83,15 +84,17 @@ export default function MarketIndicatorsPage() {
   const [loading,  setLoading]  = useState(true)
   const [error,    setError]    = useState<string | null>(null)
   const [lastFetch,setLastFetch]= useState<Date | null>(null)
+  const [fetchCount, setFetchCount] = useState(0)
 
   const fetchData = useCallback(async () => {
     setLoading(true); setError(null)
     try {
-      const res = await fetch('/api/market-risk/indicators')
+      const res = await fetch('/api/market-risk/indicators', { cache: 'no-store' })
       const json = await res.json()
       if (json.error) throw new Error(json.error)
       setData(json)
       setLastFetch(new Date())
+      setFetchCount(c => c + 1)
     } catch (e: unknown) {
       setError('Ошибка загрузки: ' + (e instanceof Error ? e.message : String(e)))
     }
@@ -116,9 +119,9 @@ export default function MarketIndicatorsPage() {
         </div>
         <div className="flex items-center gap-3">
           {lastFetch && (
-            <div className="flex items-center gap-1.5 text-xs text-gray-400">
+            <div key={fetchCount} className="flex items-center gap-1.5 text-xs text-gray-400">
               <Clock className="w-3.5 h-3.5" />
-              {lastFetch.toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' })}
+              Обновлено: {lastFetch.toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit', second: '2-digit' })}
             </div>
           )}
           <button onClick={fetchData} disabled={loading}
@@ -151,6 +154,33 @@ export default function MarketIndicatorsPage() {
           <Section title="Валюты (к USD)" icon="💱" items={data.currencies} />
           <Section title="Сырьё" icon="🛢️" items={data.commodities as Indicator[]} />
           <Section title="Криптовалюты" icon="₿" items={data.crypto} />
+          {data.macro?.length > 0 && (
+            <div>
+              <h2 className="text-sm font-semibold text-gray-700 mb-3 flex items-center gap-2">
+                <span className="text-base">🇹🇯</span> Макроэкономика Таджикистана
+              </h2>
+              <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+                {data.macro.map(item => (
+                  <div key={item.id} className="rounded-xl border border-gray-100 p-4 shadow-sm bg-gray-50">
+                    <p className="text-xs font-medium text-gray-500 mb-2 truncate">{item.label}</p>
+                    <p className="text-xl font-bold text-gray-900 mb-1">
+                      {item.rate !== null ? item.rate : '—'}
+                      <span className="text-xs font-normal text-gray-400 ml-1">{item.unit}</span>
+                    </p>
+                    {'year' in item && item.year && (
+                      <p className="text-[10px] text-gray-400">{item.year} г.</p>
+                    )}
+                    {item.change !== null && (
+                      <div className={`flex items-center gap-1 text-xs font-semibold mt-1 ${changeColor(item.change)}`}>
+                        {item.change > 0 ? <TrendingUp className="w-3 h-3" /> : <TrendingDown className="w-3 h-3" />}
+                        {item.change > 0 ? '+' : ''}{item.change} п.п.
+                      </div>
+                    )}
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
         </div>
       )}
 
