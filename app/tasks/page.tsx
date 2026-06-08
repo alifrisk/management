@@ -72,9 +72,9 @@ export default function TasksPage() {
   const [filterStratYear,setFilterStratYear]= useState(new Date().getFullYear())
   const [expanded,       setExpanded]       = useState<Set<string>>(new Set())
   // Inline add state per column
-  const [addingIn,    setAddingIn]    = useState<string|null>(null) // status column
-  const [addingTitle, setAddingTitle] = useState('')
-  const addRef = useRef<HTMLInputElement>(null)
+  const [addingIn,    setAddingIn]    = useState<string|null>(null)
+  const addRef        = useRef<HTMLInputElement>(null)
+  const addingTitleRef = useRef('')
 
   const fetch_ = useCallback(async () => {
     setLoading(true)
@@ -99,16 +99,17 @@ export default function TasksPage() {
 
   // ── CRUD ──────────────────────────────────────────────────────────────────
   async function quickAdd(status: Status, category: string) {
-    if (!addingTitle.trim()) { setAddingIn(null); return }
+    const title = addRef.current?.value?.trim() || addingTitleRef.current.trim()
+    if (!title) { setAddingIn(null); return }
     await supabase.from('tasks').insert({
-      title: addingTitle.trim(),
+      title: title,
       category,
       status,
       priority: 'Средний',
       task_year: new Date().getFullYear(),
       week_number: section === 'Еженедельные' ? filterWeek : null,
     })
-    setAddingIn(null); setAddingTitle(''); fetch_()
+    setAddingIn(null); addingTitleRef.current = ''; if(addRef.current) addRef.current.value = ''; fetch_()
   }
 
   async function updateTask(id: string, patch: Partial<Task>) {
@@ -239,9 +240,9 @@ export default function TasksPage() {
           <div className="mt-2 bg-white rounded-lg border border-[#1B8A4C] p-2 shadow-sm">
             <input
               ref={addRef}
-              value={addingTitle}
-              onChange={e => setAddingTitle(e.target.value)}
-              onKeyDown={e => { if (e.key === 'Enter') quickAdd(status); if (e.key === 'Escape') { setAddingIn(null); setAddingTitle('') } }}
+              defaultValue=""
+              onChange={e => { addingTitleRef.current = e.target.value }}
+              onKeyDown={e => { if (e.key === 'Enter') quickAdd(status, category); if (e.key === 'Escape') { setAddingIn(null); addingTitleRef.current = '' } }}
               placeholder="Название задачи..."
               className="w-full text-sm outline-none text-gray-900 placeholder-gray-400"
             />
@@ -250,7 +251,7 @@ export default function TasksPage() {
                 className="px-2.5 py-1 bg-[#1B8A4C] text-white rounded text-xs font-medium hover:bg-[#177040]">
                 Добавить
               </button>
-              <button onClick={() => { setAddingIn(null); setAddingTitle('') }}
+              <button onClick={() => { setAddingIn(null); addingTitleRef.current = '' }}
                 className="px-2.5 py-1 text-xs text-gray-500 hover:text-gray-700">
                 Отмена
               </button>
