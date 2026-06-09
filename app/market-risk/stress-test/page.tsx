@@ -330,7 +330,6 @@ export default function MarketStressTest() {
                   </ResponsiveContainer>
                 )}
               </div>
-            )}
 
 
           </div>
