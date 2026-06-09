@@ -59,6 +59,15 @@ function parseNBT(xml: string) {
 const GROWTH_ROWS = [-5, -3, -1, 0, 1, 2, 3, 4, 5, 6, 7, 8, 8.5]
 const REMIT_COLS  = [55, 50, 48, 45, 40, 35, 30, 25, 15, 10]
 
+const HORIZONS = [
+  { days: 1,   label: '1 день'   },
+  { days: 7,   label: '7 дней'   },
+  { days: 30,  label: '30 дней'  },
+  { days: 90,  label: '3 месяца' },
+  { days: 180, label: '6 месяцев'},
+  { days: 365, label: '1 год'    },
+]
+
 // ── Component ─────────────────────────────────────────────────────────────────
 export default function MarketStressTest() {
   const [model, setModel] = useState<1 | 2>(1)
@@ -76,7 +85,8 @@ export default function MarketStressTest() {
   // Parameters (auto-filled from NBT or manual)
   const [mean,   setMean]   = useState('')
   const [stdDev, setStdDev] = useState('')
-  const [iters,  setIters]  = useState(10000)
+  const [iters,   setIters]   = useState(10000)
+  const [horizon, setHorizon] = useState(1)
 
   // Monte Carlo results
   const [mcResult, setMcResult] = useState<ReturnType<typeof runMonteCarlo> | null>(null)
@@ -122,7 +132,10 @@ export default function MarketStressTest() {
     if (isNaN(m) || isNaN(sd) || sd <= 0) return
     setRunning(true)
     setTimeout(() => {
-      setMcResult(runMonteCarlo(m, sd, iters))
+      // Масштабируем по горизонту: μ×T, σ×√T (случайное блуждание)
+      const mH  = m  * horizon
+      const sdH = sd * Math.sqrt(horizon)
+      setMcResult(runMonteCarlo(mH, sdH, iters))
       setRunning(false)
     }, 50)
   }
@@ -308,7 +321,7 @@ export default function MarketStressTest() {
             <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-3">
               Шаг 2 — Параметры симуляции
             </p>
-            <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 items-end">
+            <div className="grid grid-cols-2 lg:grid-cols-5 gap-4 items-end">
               <div>
                 <label className={lbl}>
                   μ (Mean) {source === 'nbt' && nbtStats ? '— из НБТ' : '— введите'}
@@ -322,6 +335,13 @@ export default function MarketStressTest() {
                 </label>
                 <input type="text" value={stdDev} onChange={e => setStdDev(e.target.value)}
                   placeholder="6.40" className={`${inp} ${source === 'nbt' && nbtStats ? 'bg-green-50 border-green-200' : ''}`} />
+              </div>
+              <div>
+                <label className={lbl}>Горизонт прогноза</label>
+                <select value={horizon} onChange={e => setHorizon(Number(e.target.value))}
+                  className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#1B8A4C] bg-white">
+                  {HORIZONS.map(h => <option key={h.days} value={h.days}>{h.label}</option>)}
+                </select>
               </div>
               <div>
                 <label className={lbl}>Количество итераций</label>
@@ -350,7 +370,7 @@ export default function MarketStressTest() {
               <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
                 <div className={card}>
                   <p className="text-sm font-semibold text-gray-700 mb-3 flex items-center gap-2">
-                    <TrendingDown className="w-4 h-4 text-red-500" /> Вероятность девальвации TJS
+                    <TrendingDown className="w-4 h-4 text-red-500" /> Вероятность девальвации TJS · {HORIZONS.find(h => h.days === horizon)?.label || `${horizon} дн.`}
                   </p>
                   <table className="w-full text-sm">
                     <thead><tr className="bg-gray-50"><th className="px-3 py-2 text-left text-xs text-gray-500">#</th><th className="px-3 py-2 text-left text-xs text-gray-500">Порог</th><th className="px-3 py-2 text-right text-xs text-gray-500">Вероятность</th></tr></thead>
@@ -371,7 +391,7 @@ export default function MarketStressTest() {
                 </div>
                 <div className={card}>
                   <p className="text-sm font-semibold text-gray-700 mb-3 flex items-center gap-2">
-                    <TrendingUp className="w-4 h-4 text-green-500" /> Вероятность укрепления TJS
+                    <TrendingUp className="w-4 h-4 text-green-500" /> Вероятность укрепления TJS · {HORIZONS.find(h => h.days === horizon)?.label || `${horizon} дн.`}
                   </p>
                   <table className="w-full text-sm">
                     <thead><tr className="bg-gray-50"><th className="px-3 py-2 text-left text-xs text-gray-500">#</th><th className="px-3 py-2 text-left text-xs text-gray-500">Порог</th><th className="px-3 py-2 text-right text-xs text-gray-500">Вероятность</th></tr></thead>
@@ -393,7 +413,7 @@ export default function MarketStressTest() {
               </div>
               <div className={card}>
                 <p className="text-sm font-semibold text-gray-700 mb-1">Распределение результатов</p>
-                <p className="text-xs text-gray-400 mb-4">N(μ={mean}%, σ={stdDev}%) · {iters.toLocaleString('ru-RU')} итераций</p>
+                <p className="text-xs text-gray-400 mb-4">N(μ={mean}%, σ={stdDev}%) · горизонт: {HORIZONS.find(h => h.days === horizon)?.label} · {iters.toLocaleString('ru-RU')} итераций</p>
                 <ResponsiveContainer width="100%" height={200}>
                   <BarChart data={mcResult.hist}>
                     <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
