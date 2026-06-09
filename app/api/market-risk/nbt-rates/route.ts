@@ -74,13 +74,18 @@ async function buildHistoricalRates(
 }
 
 // ── Stats calculation ─────────────────────────────────────────────────────────
-function calcStats(rates: { date: string; value: number }[]) {
+function calcStats(rates: { date: string; value: number }[], trim = false) {
   if (rates.length < 2) return null
 
-  const returns: number[] = []
+  let returns: number[] = []
   for (let i = 1; i < rates.length; i++) {
     const ret = (rates[i].value - rates[i-1].value) / rates[i-1].value * 100
     returns.push(ret)
+  }
+  if (trim && returns.length > 10) {
+    const m = returns.reduce((s, r) => s + r, 0) / returns.length
+    const sig = Math.sqrt(returns.reduce((s, r) => s + (r - m) ** 2, 0) / returns.length)
+    returns = returns.filter(r => Math.abs(r - m) <= 2.5 * sig)
   }
 
   const mean     = returns.reduce((s, r) => s + r, 0) / returns.length
@@ -116,7 +121,8 @@ export async function GET(request: Request) {
     const rates = await buildHistoricalRates(base, d1, d2)
 
     if (rates.length >= 2) {
-      const stats = calcStats(rates)
+      const trimOutliers = searchParams.get('trim') === 'true'
+    const stats = calcStats(rates, trimOutliers)
       return NextResponse.json({
         currency,
         d1, d2,
