@@ -290,6 +290,12 @@ export default function MarketStressTest() {
                   </button>
                 </div>
                 {nbtError && <p className="text-xs text-red-600 bg-red-50 p-2 rounded-lg">{nbtError}</p>}
+                {nbtStats && parseFloat(stdDev) > 1.0 && (
+                  <div className="p-2.5 bg-yellow-50 border border-yellow-200 rounded-lg text-xs text-yellow-700">
+                    ⚠️ <strong>Высокая волатильность:</strong> σ={stdDev}%/день — возможно в выбранном периоде есть кризисный эпизод (например кризис рубля 2022).
+                    Рекомендуется исключить аномальный период или использовать более короткий диапазон.
+                  </div>
+                )}
                 {nbtStats && (
                   <div className="grid grid-cols-3 lg:grid-cols-6 gap-2 mt-2">
                     {[
@@ -494,14 +500,14 @@ export default function MarketStressTest() {
               </div>
               <div className={card}>
                 <p className="text-sm font-semibold text-gray-700 mb-1">Распределение результатов</p>
-                <p className="text-xs text-gray-400 mb-4">N(μ={mean}%, σ={stdDev}%) · горизонт: {HORIZONS.find(h => h.days === horizon)?.label} · {iters.toLocaleString('ru-RU')} итераций</p>
+                <p className="text-xs text-gray-400 mb-4">Распределение симулированных изменений курса · N(μ·T, σ·√T) · {HORIZONS.find(h => h.days === horizon)?.label} · {iters.toLocaleString('ru-RU')} итераций · ось Y = % симуляций в диапазоне</p>
                 <ResponsiveContainer width="100%" height={200}>
                   <BarChart data={mcResult.hist}>
                     <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
                     <XAxis dataKey="x" tick={{ fontSize: 9 }} />
-                    <YAxis tick={{ fontSize: 9 }} />
-                    <Tooltip formatter={(v: number) => [`${v} симуляций`, 'Частота']} />
-                    <Bar dataKey="n" fill="#1B8A4C" radius={[2, 2, 0, 0]} />
+                    <YAxis tick={{ fontSize: 9 }} tickFormatter={(v) => `${v}%`} />
+                    <Tooltip formatter={(v: number) => [`${v}%`, 'Доля симуляций']} />
+                    <Bar dataKey="pct" fill="#1B8A4C" radius={[2, 2, 0, 0]} name="% симуляций" />
                   </BarChart>
                 </ResponsiveContainer>
               </div>
