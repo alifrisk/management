@@ -16,18 +16,30 @@ function normalRandom(mean: number, sd: number) {
 
 function runMonteCarlo(mean: number, sd: number, n: number) {
   const results: number[] = Array.from({ length: n }, () => normalRandom(mean, sd))
+  const sorted = [...results].sort((a, b) => a - b)
+
   const devalT    = [1, 3, 5, 6, 10, 12, 15, 20]
   const appreciT  = [1, 2, 3, 5, 6, 10, 15]
   const probs: { label: string; pct: number; type: 'deval' | 'apprec' }[] = [
     ...devalT.map(t => ({ label: `> ${t}%`, pct: results.filter(r => r > t).length / n * 100, type: 'deval' as const })),
     ...appreciT.map(t => ({ label: `> ${t}%`, pct: results.filter(r => r < -t).length / n * 100, type: 'apprec' as const })),
   ]
+
+  // VaR metrics (quantile-based — международный стандарт)
+  const q = (p: number) => sorted[Math.floor(p * n)]
+  const var95loss = +(-q(0.05)).toFixed(2)   // 95% VaR (потеря)
+  const var99loss = +(-q(0.01)).toFixed(2)   // 99% VaR (потеря)
+  const median    = +q(0.50).toFixed(2)      // Медиана
+  const expected  = +(results.reduce((s,r) => s+r, 0) / n).toFixed(2) // Мат. ожидание
+
   // Histogram
   const min = Math.min(...results), max = Math.max(...results), bins = 40
   const step = (max - min) / bins
-  const hist = Array.from({ length: bins }, (_, i) => ({ x: `${(min + i * step).toFixed(1)}%`, n: 0 }))
+  const hist = Array.from({ length: bins }, (_, i) => ({ x: `${(min + i * step).toFixed(1)}%`, n: 0, pct: 0 }))
   results.forEach(r => { const i = Math.min(Math.floor((r - min) / step), bins - 1); hist[i].n++ })
-  return { probs, hist: hist.filter((_, i) => i % 2 === 0) }
+  hist.forEach(h => { h.pct = Math.round(h.n / n * 1000) / 10 })
+
+  return { probs, hist: hist.filter((_, i) => i % 2 === 0), var95loss, var99loss, median, expected }
 }
 
 function calcStats(rates: { date: string; value: number }[]) {
@@ -367,6 +379,36 @@ export default function MarketStressTest() {
           {/* Результаты */}
           {mcResult && (
             <>
+              {/* Методология + VaR */}
+              <div className={card}>
+                <div className="flex items-start gap-3 mb-4">
+                  <div className="flex-1">
+                    <p className="text-sm font-semibold text-gray-700 mb-1">
+                      📊 VaR — Value at Risk ({HORIZONS.find(h => h.days === horizon)?.label})
+                    </p>
+                    <p className="text-xs text-gray-500">Международный стандарт Basel II/III · Параметрический метод N(μ·T, σ·√T)</p>
+                  </div>
+                </div>
+                <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 mb-4">
+                  {[
+                    { l: 'Мат. ожидание', v: `${mcResult.expected > 0 ? '+' : ''}${mcResult.expected}%`, c: mcResult.expected > 0 ? 'text-red-600' : 'text-green-600', hint: 'Средний ожидаемый результат по всем сценариям' },
+                    { l: 'Медиана', v: `${mcResult.median > 0 ? '+' : ''}${mcResult.median}%`, c: mcResult.median > 0 ? 'text-red-500' : 'text-green-500', hint: 'В 50% сценариев изменение лучше этого значения' },
+                    { l: '95% VaR (потеря)', v: `${mcResult.var95loss > 0 ? '-' : '+'}${Math.abs(mcResult.var95loss)}%`, c: mcResult.var95loss > 0 ? 'text-red-700' : 'text-green-700', hint: 'В 95% сценариев потеря не превысит это значение' },
+                    { l: '99% VaR (потеря)', v: `${mcResult.var99loss > 0 ? '-' : '+'}${Math.abs(mcResult.var99loss)}%`, c: mcResult.var99loss > 0 ? 'text-red-700' : 'text-green-700', hint: 'В 99% сценариев потеря не превысит это значение' },
+                  ].map(s => (
+                    <div key={s.l} className="bg-gray-50 rounded-xl p-3">
+                      <p className="text-[10px] text-gray-400 mb-1">{s.l}</p>
+                      <p className={`text-lg font-bold ${s.c}`}>{s.v}</p>
+                      <p className="text-[10px] text-gray-400 mt-1 leading-tight">{s.hint}</p>
+                    </div>
+                  ))}
+                </div>
+                <div className="p-3 bg-blue-50 rounded-lg text-xs text-blue-700 leading-relaxed">
+                  <strong>Как читать таблицы ниже:</strong> Каждая строка — независимый вопрос.
+                  "Вероятность &gt;5% = 87%" означает: в 87 из 100 сценариев курс изменится более чем на 5% за выбранный период.
+                  Строки не складываются в 100% — это не доли пирога, а пороговые вероятности.
+                </div>
+              </div>
               <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
                 <div className={card}>
                   <p className="text-sm font-semibold text-gray-700 mb-3 flex items-center gap-2">
@@ -419,7 +461,7 @@ export default function MarketStressTest() {
                     <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
                     <XAxis dataKey="x" tick={{ fontSize: 9 }} />
                     <YAxis tick={{ fontSize: 9 }} />
-                    <Tooltip formatter={(v: number) => [v, 'Частота']} />
+                    <Tooltip formatter={(v: number, name: string, props: Record<string,unknown>) => [`${v} симуляций (${(props.payload as Record<string,unknown>)?.pct ?? '?'}%)`, 'Частота']} />
                     <Bar dataKey="n" fill="#1B8A4C" radius={[2, 2, 0, 0]} />
                   </BarChart>
                 </ResponsiveContainer>
