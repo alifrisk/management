@@ -107,6 +107,7 @@ export default function MarketStressTest() {
   const [dateTo,     setDateTo]     = useState(new Date().toISOString().split('T')[0])
   const [nbtLoading, setNbtLoading] = useState(false)
   const [nbtError,   setNbtError]   = useState<string | null>(null)
+  const [trimmed,    setTrimmed]    = useState(false)
   const [nbtStats,   setNbtStats]   = useState<ReturnType<typeof calcStats> | null>(null)
   const [nbtRates,   setNbtRates]   = useState<{ date: string; value: number }[]>([])
 
@@ -139,7 +140,7 @@ export default function MarketStressTest() {
       const codes: Record<string, { cn: string }> = { USD: { cn: '840' }, RUB: { cn: '643' }, EUR: { cn: '978' } }
       const { cn } = codes[currency] || { cn: '840' }
       const url = `https://nbt.tj/ru/kurs/export_xml_dynamic.php?d1=${dateFrom}&d2=${dateTo}&cn=${cn}&cs=${currency}&export=xml`
-      const res = await fetch(`/api/market-risk/nbt-rates?currency=${currency}&d1=${dateFrom}&d2=${dateTo}`)
+      const res = await fetch(`/api/market-risk/nbt-rates?currency=${currency}&d1=${dateFrom}&d2=${dateTo}${trimmed ? '&trim=true' : ''}`)
       const data = await res.json()
       if (data.error) throw new Error(data.error)
       const stats = data.stats
@@ -292,8 +293,22 @@ export default function MarketStressTest() {
                 {nbtError && <p className="text-xs text-red-600 bg-red-50 p-2 rounded-lg">{nbtError}</p>}
                 {nbtStats && parseFloat(stdDev) > 1.0 && (
                   <div className="p-2.5 bg-yellow-50 border border-yellow-200 rounded-lg text-xs text-yellow-700">
-                    ⚠️ <strong>Высокая волатильность:</strong> σ={stdDev}%/день — возможно в выбранном периоде есть кризисный эпизод (например кризис рубля 2022).
-                    Рекомендуется исключить аномальный период или использовать более короткий диапазон.
+                    <div className="flex items-start justify-between gap-3">
+                      <p>⚠️ <strong>Высокая волатильность:</strong> σ={stdDev}%/день — в данных есть кризисный период (например обвал рубля в 2022 — СВО).
+                      Аномальные выбросы искажают μ и σ и завышают VaR.</p>
+                      {!trimmed ? (
+                        <button onClick={() => { setTrimmed(true); setTimeout(fetchNBT, 100) }}
+                          className="flex-shrink-0 px-3 py-1.5 bg-yellow-600 text-white rounded-lg text-xs font-medium hover:bg-yellow-700 whitespace-nowrap">
+                          ✂️ Исключить аномалии
+                        </button>
+                      ) : (
+                        <button onClick={() => { setTrimmed(false); setTimeout(fetchNBT, 100) }}
+                          className="flex-shrink-0 px-3 py-1.5 bg-gray-500 text-white rounded-lg text-xs font-medium hover:bg-gray-600 whitespace-nowrap">
+                          ↩ Вернуть все данные
+                        </button>
+                      )}
+                    </div>
+                    {trimmed && <p className="mt-1.5 text-green-700 font-medium">✅ Аномалии исключены (±2.5σ фильтр) — данные очищены</p>}
                   </div>
                 )}
                 {nbtStats && (
@@ -499,8 +514,14 @@ export default function MarketStressTest() {
                 </div>
               </div>
               <div className={card}>
-                <p className="text-sm font-semibold text-gray-700 mb-1">Распределение результатов</p>
-                <p className="text-xs text-gray-400 mb-4">Распределение симулированных изменений курса · N(μ·T, σ·√T) · {HORIZONS.find(h => h.days === horizon)?.label} · {iters.toLocaleString('ru-RU')} итераций · ось Y = % симуляций в диапазоне</p>
+                <p className="text-sm font-semibold text-gray-700 mb-1">Распределение симулированных сценариев</p>
+                <div className="flex items-center justify-between mb-3">
+                  <p className="text-xs text-gray-400">Горизонт: {HORIZONS.find(h => h.days === horizon)?.label} · {iters.toLocaleString('ru-RU')} итераций</p>
+                  <div className="flex items-center gap-3 text-[10px]">
+                    <span className="flex items-center gap-1"><span className="w-3 h-2 bg-green-200 rounded inline-block"/>&lt;0% = укрепление TJS</span>
+                    <span className="flex items-center gap-1"><span className="w-3 h-2 bg-red-200 rounded inline-block"/>&gt;0% = ослабление TJS</span>
+                  </div>
+                </div>
                 <ResponsiveContainer width="100%" height={200}>
                   <BarChart data={mcResult.hist}>
                     <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
