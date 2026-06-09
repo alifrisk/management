@@ -1,7 +1,7 @@
 'use client'
 import { useState } from 'react'
-import { RefreshCw, Download, Printer, TrendingDown, TrendingUp, Info, Database, PenLine } from 'lucide-react'
-import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, BarChart, Bar } from 'recharts'
+import { RefreshCw, Download, Printer, TrendingDown, TrendingUp, Info, Database } from 'lucide-react'
+import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, BarChart, Bar, Cell } from 'recharts'
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
 const fmtNum = (n: number) => new Intl.NumberFormat('ru-RU').format(Math.round(n))
@@ -101,10 +101,11 @@ export default function MarketStressTest() {
   const [model, setModel] = useState<1 | 2>(1)
 
   // Model 1 — source
-  const [source,     setSource]     = useState<'nbt' | 'manual'>('nbt')
   const [currency,   setCurrency]   = useState('USD')
+  const handleCurrencyChange = (val: string) => { setCurrency(val); setTrimmed(false); setNbtStats(null); setNbtRates([]); setMean(''); setStdDev(''); setMcResult(null) }
   const [dateFrom,   setDateFrom]   = useState('2022-01-01')
   const [dateTo,     setDateTo]     = useState(new Date().toISOString().split('T')[0])
+  const handleDateChange = (key: 'from'|'to', val: string) => { if(key==='from') setDateFrom(val); else setDateTo(val); setTrimmed(false); setNbtStats(null); setNbtRates([]); setMean(''); setStdDev(''); setMcResult(null) }
   const [nbtLoading, setNbtLoading] = useState(false)
   const [nbtError,   setNbtError]   = useState<string | null>(null)
   const [trimmed,    setTrimmed]    = useState(false)
@@ -249,23 +250,13 @@ export default function MarketStressTest() {
             <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-3">
               Шаг 1 — Источник параметров (μ, σ)
             </p>
-            <div className="flex gap-2 mb-4">
-              <button onClick={() => setSource('nbt')}
-                className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium border-2 transition-all ${source === 'nbt' ? 'bg-green-50 border-[#1B8A4C] text-[#1B8A4C]' : 'bg-white border-gray-200 text-gray-500 hover:border-gray-300'}`}>
-                <Database className="w-4 h-4" /> Загрузить из НБТ
-              </button>
-              <button onClick={() => setSource('manual')}
-                className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium border-2 transition-all ${source === 'manual' ? 'bg-blue-50 border-blue-400 text-blue-700' : 'bg-white border-gray-200 text-gray-500 hover:border-gray-300'}`}>
-                <PenLine className="w-4 h-4" /> Ввести вручную
-              </button>
-            </div>
 
-            {source === 'nbt' && (
-              <div className="space-y-3">
+
+            <div className="space-y-3">
                 <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 items-end">
                   <div>
                     <label className={lbl}>Валюта</label>
-                    <select value={currency} onChange={e => setCurrency(e.target.value)}
+                    <select value={currency} onChange={e => handleCurrencyChange(e.target.value)}
                       className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#1B8A4C] bg-white">
                       <option value="USD">USD / TJS</option>
                       <option value="RUB">RUB / TJS</option>
@@ -275,13 +266,13 @@ export default function MarketStressTest() {
                   <div>
                     <label className={lbl}>Период — от</label>
                     <input type="date" value={dateFrom} max={dateTo}
-                      onChange={e => setDateFrom(e.target.value)}
+                      onChange={e => handleDateChange('from', e.target.value)}
                       className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#1B8A4C] bg-white" />
                   </div>
                   <div>
                     <label className={lbl}>Период — до</label>
                     <input type="date" value={dateTo} min={dateFrom} max={new Date().toISOString().split('T')[0]}
-                      onChange={e => setDateTo(e.target.value)}
+                      onChange={e => handleDateChange('to', e.target.value)}
                       className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#1B8A4C] bg-white" />
                   </div>
                   <button onClick={fetchNBT} disabled={nbtLoading}
@@ -341,28 +332,7 @@ export default function MarketStressTest() {
               </div>
             )}
 
-            {source === 'manual' && (
-              <div className="p-4 bg-blue-50 border border-blue-100 rounded-xl">
-                <div className="flex items-start gap-2 mb-3">
-                  <Info className="w-4 h-4 text-blue-500 mt-0.5 flex-shrink-0" />
-                  <p className="text-xs text-blue-700">
-                    Введите параметры из собственных расчётов. Пример: USD/TJS — μ=0%, σ=6.4% · RUB/TJS — μ=-0.03%, σ=12.47%
-                  </p>
-                </div>
-                <div className="grid grid-cols-2 gap-3">
-                  <div>
-                    <label className={lbl}>Среднее дневное изменение μ (%)</label>
-                    <input type="text" value={mean} onChange={e => setMean(e.target.value)}
-                      placeholder="0.00" className={inp} />
-                  </div>
-                  <div>
-                    <label className={lbl}>Стандартное отклонение σ (%)</label>
-                    <input type="text" value={stdDev} onChange={e => setStdDev(e.target.value)}
-                      placeholder="6.40" className={inp} />
-                  </div>
-                </div>
-              </div>
-            )}
+
           </div>
 
           {/* Шаг 2 — Параметры симуляции */}
@@ -373,17 +343,17 @@ export default function MarketStressTest() {
             <div className="grid grid-cols-2 lg:grid-cols-5 gap-4 items-end">
               <div>
                 <label className={lbl}>
-                  μ (Mean) {source === 'nbt' && nbtStats ? '— из НБТ' : '— введите'}
+                  μ (Mean) {nbtStats ? '— из данных' : '— загрузите данные'}
                 </label>
                 <input type="text" value={mean} onChange={e => setMean(e.target.value)}
-                  placeholder="0.00" className={`${inp} ${source === 'nbt' && nbtStats ? 'bg-green-50 border-green-200' : ''}`} />
+                  placeholder="0.00" className={`${inp} ${nbtStats ? 'bg-green-50 border-green-200' : ''}`} />
               </div>
               <div>
                 <label className={lbl}>
-                  σ (StdDev) {source === 'nbt' && nbtStats ? '— из НБТ' : '— введите'}
+                  σ (StdDev) {nbtStats ? '— из данных' : '— загрузите данные'}
                 </label>
                 <input type="text" value={stdDev} onChange={e => setStdDev(e.target.value)}
-                  placeholder="6.40" className={`${inp} ${source === 'nbt' && nbtStats ? 'bg-green-50 border-green-200' : ''}`} />
+                  placeholder="6.40" className={`${inp} ${nbtStats ? 'bg-green-50 border-green-200' : ''}`} />
               </div>
               <div>
                 <label className={lbl}>Горизонт прогноза</label>
@@ -515,20 +485,30 @@ export default function MarketStressTest() {
               </div>
               <div className={card}>
                 <p className="text-sm font-semibold text-gray-700 mb-1">Распределение симулированных сценариев</p>
-                <div className="flex items-center justify-between mb-3">
-                  <p className="text-xs text-gray-400">Горизонт: {HORIZONS.find(h => h.days === horizon)?.label} · {iters.toLocaleString('ru-RU')} итераций</p>
-                  <div className="flex items-center gap-3 text-[10px]">
-                    <span className="flex items-center gap-1"><span className="w-3 h-2 bg-green-200 rounded inline-block"/>&lt;0% = укрепление TJS</span>
-                    <span className="flex items-center gap-1"><span className="w-3 h-2 bg-red-200 rounded inline-block"/>&gt;0% = ослабление TJS</span>
-                  </div>
+                <p className="text-xs text-gray-500 mb-2">
+                  Горизонт: {HORIZONS.find(h => h.days === horizon)?.label} · {iters.toLocaleString('ru-RU')} итераций
+                </p>
+                <div className="flex items-center gap-4 mb-3 text-[11px]">
+                  <span className="flex items-center gap-1.5"><span className="w-3 h-3 bg-green-400 rounded inline-block"/> <strong>Левая зона (&lt;0%)</strong> = TJS укрепился</span>
+                  <span className="flex items-center gap-1.5"><span className="w-3 h-3 bg-red-400 rounded inline-block"/> <strong>Правая зона (&gt;0%)</strong> = TJS ослабел</span>
+                  <span className="text-gray-400">Высота бара = % симуляций в этом диапазоне</span>
                 </div>
                 <ResponsiveContainer width="100%" height={200}>
                   <BarChart data={mcResult.hist}>
                     <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
                     <XAxis dataKey="x" tick={{ fontSize: 9 }} />
-                    <YAxis tick={{ fontSize: 9 }} tickFormatter={(v) => `${v}%`} />
-                    <Tooltip formatter={(v: number) => [`${v}%`, 'Доля симуляций']} />
-                    <Bar dataKey="pct" fill="#1B8A4C" radius={[2, 2, 0, 0]} name="% симуляций" />
+                    <YAxis tick={{ fontSize: 9 }} tickFormatter={(v: number) => `${v}%`} />
+                    <Tooltip
+                      formatter={(v: number, _name: string, props: {payload?: {x?: string}}) => {
+                        const xVal = parseFloat(props?.payload?.x ?? '0')
+                        return [`${v}% симуляций`, xVal < 0 ? '🟢 Укрепление TJS' : '🔴 Ослабление TJS']
+                      }}
+                    />
+                    <Bar dataKey="pct" radius={[2, 2, 0, 0]} name="% симуляций">
+                      {mcResult.hist.map((entry, index) => (
+                        <Cell key={index} fill={parseFloat(entry.x) < 0 ? '#22c55e' : '#ef4444'} fillOpacity={0.7} />
+                      ))}
+                    </Bar>
                   </BarChart>
                 </ResponsiveContainer>
               </div>
@@ -538,9 +518,7 @@ export default function MarketStressTest() {
           {!mcResult && (
             <div className="text-center py-10 text-gray-400">
               <p className="text-sm">
-                {source === 'nbt'
-                  ? '① Выберите валюту и период → нажмите Загрузить → ② нажмите Монте Карло'
-                  : '① Введите μ и σ → ② нажмите Монте Карло'}
+  '① Выберите валюту и период → нажмите Загрузить → ② нажмите Монте Карло'
               </p>
             </div>
           )}
