@@ -119,8 +119,8 @@ export default function MarketStressTest() {
   const [horizon, setHorizon] = useState(1)
 
   // Monte Carlo results
-  const [mcResult, setMcResult] = useState<ReturnType<typeof runMonteCarlo> | null>(null)
-  const [running,  setRunning]  = useState(false)
+  const [mcResult,    setMcResult]    = useState<ReturnType<typeof runMonteCarlo> | null>(null)
+  const [running,     setRunning]     = useState(false)
 
   // Model 2 inputs
   const [gdpBase,    setGdpBase]    = useState('173 000 000 000')
@@ -387,10 +387,13 @@ export default function MarketStressTest() {
             <>
               {/* VaR три метода */}
               <div className={card}>
-                <p className="text-sm font-semibold text-gray-700 mb-1">
-                  📊 Value at Risk · {HORIZONS.find(h => h.days === horizon)?.label}
-                </p>
-                <p className="text-xs text-gray-500 mb-4">Мат. ожидание: <span className={mcResult.expected > 0 ? 'text-red-600 font-semibold' : 'text-green-600 font-semibold'}>{mcResult.expected > 0 ? '+' : ''}{mcResult.expected}%</span> · Медиана: {mcResult.median > 0 ? '+' : ''}{mcResult.median}%</p>
+                <div className="flex items-start justify-between mb-3">
+                  <div>
+                    <p className="text-sm font-semibold text-gray-700">📊 Value at Risk (VaR) · {HORIZONS.find(h => h.days === horizon)?.label}</p>
+                    <p className="text-xs text-gray-500 mt-0.5">Мат. ожидание: <span className={mcResult.expected > 0 ? 'text-red-600 font-semibold' : 'text-green-600 font-semibold'}>{mcResult.expected > 0 ? '+' : ''}{mcResult.expected}%</span> · Медиана: {mcResult.median > 0 ? '+' : ''}{mcResult.median}%</p>
+                  </div>
+                  <span className="text-[10px] bg-green-100 text-green-700 px-2 py-1 rounded-full font-medium">Основной показатель для отчёта</span>
+                </div>
                 <div className="overflow-x-auto">
                   <table className="w-full text-sm border-collapse">
                     <thead>
@@ -402,6 +405,12 @@ export default function MarketStressTest() {
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-gray-100">
+                      <tr className="bg-gray-50 border-b border-gray-200">
+                        <td className="px-4 py-2 text-[10px] text-gray-400 italic">Метод расчёта</td>
+                        <td className="px-4 py-2 text-[10px] text-gray-400 text-center italic">Макс. потеря в 95 из 100 сценариев</td>
+                        <td className="px-4 py-2 text-[10px] text-gray-400 text-center italic">Макс. потеря в 99 из 100 сценариев</td>
+                        <td className="px-4 py-2 text-[10px] text-gray-400 italic">Применение</td>
+                      </tr>
                       <tr className="bg-blue-50">
                         <td className="px-4 py-3">
                           <p className="font-semibold text-sm">📐 Параметрический VaR</p>
@@ -440,9 +449,10 @@ export default function MarketStressTest() {
               </div>
               <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
                 <div className={card}>
-                  <p className="text-sm font-semibold text-gray-700 mb-3 flex items-center gap-2">
+                  <p className="text-sm font-semibold text-gray-700 mb-1 flex items-center gap-2">
                     <TrendingDown className="w-4 h-4 text-red-500" /> Вероятность девальвации TJS · {HORIZONS.find(h => h.days === horizon)?.label || `${horizon} дн.`}
                   </p>
+                  <p className="text-[11px] text-gray-400 mb-3">Сколько симуляций показало ослабление TJS сильнее порога. Строки независимы — не складываются в 100%.</p>
                   <table className="w-full text-sm">
                     <thead><tr className="bg-gray-50"><th className="px-3 py-2 text-left text-xs text-gray-500">#</th><th className="px-3 py-2 text-left text-xs text-gray-500">Порог</th><th className="px-3 py-2 text-right text-xs text-gray-500">Вероятность</th></tr></thead>
                     <tbody className="divide-y divide-gray-100">
@@ -461,9 +471,10 @@ export default function MarketStressTest() {
                   </table>
                 </div>
                 <div className={card}>
-                  <p className="text-sm font-semibold text-gray-700 mb-3 flex items-center gap-2">
+                  <p className="text-sm font-semibold text-gray-700 mb-1 flex items-center gap-2">
                     <TrendingUp className="w-4 h-4 text-green-500" /> Вероятность укрепления TJS · {HORIZONS.find(h => h.days === horizon)?.label || `${horizon} дн.`}
                   </p>
+                  <p className="text-[11px] text-gray-400 mb-3">Сколько симуляций показало укрепление TJS сильнее порога. Строки независимы — не складываются в 100%.</p>
                   <table className="w-full text-sm">
                     <thead><tr className="bg-gray-50"><th className="px-3 py-2 text-left text-xs text-gray-500">#</th><th className="px-3 py-2 text-left text-xs text-gray-500">Порог</th><th className="px-3 py-2 text-right text-xs text-gray-500">Вероятность</th></tr></thead>
                     <tbody className="divide-y divide-gray-100">
@@ -483,10 +494,8 @@ export default function MarketStressTest() {
                 </div>
               </div>
               <div className={card}>
-                <p className="text-sm font-semibold text-gray-700 mb-1">Распределение симулированных сценариев</p>
-                <p className="text-xs text-gray-500 mb-2">
-                  Горизонт: {HORIZONS.find(h => h.days === horizon)?.label} · {iters.toLocaleString('ru-RU')} итераций
-                </p>
+                <p className="text-sm font-semibold text-gray-700 mb-1">📊 Гистограмма распределения</p>
+                <p className="text-[11px] text-gray-500 mb-2">Показывает как распределились все {iters.toLocaleString('ru-RU')} симуляций. Высота бара = % симуляций с таким изменением курса. Связь с таблицами: сумма всех зелёных баров = P(укрепление), сумма красных = P(ослабление).</p>
                 <div className="flex items-center gap-4 mb-3 text-[11px]">
                   <span className="flex items-center gap-1.5"><span className="w-3 h-3 bg-green-400 rounded inline-block"/> <strong>Левая зона (&lt;0%)</strong> = TJS укрепился</span>
                   <span className="flex items-center gap-1.5"><span className="w-3 h-3 bg-red-400 rounded inline-block"/> <strong>Правая зона (&gt;0%)</strong> = TJS ослабел</span>
