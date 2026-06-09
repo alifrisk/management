@@ -25,12 +25,28 @@ function runMonteCarlo(mean: number, sd: number, n: number) {
     ...appreciT.map(t => ({ label: `> ${t}%`, pct: results.filter(r => r < -t).length / n * 100, type: 'apprec' as const })),
   ]
 
-  // VaR metrics (quantile-based — международный стандарт)
+  // ── Исторический VaR (из симуляций, без предположений о распределении)
   const q = (p: number) => sorted[Math.floor(p * n)]
-  const var95loss = +(-q(0.05)).toFixed(2)   // 95% VaR (потеря)
-  const var99loss = +(-q(0.01)).toFixed(2)   // 99% VaR (потеря)
-  const median    = +q(0.50).toFixed(2)      // Медиана
-  const expected  = +(results.reduce((s,r) => s+r, 0) / n).toFixed(2) // Мат. ожидание
+  const histVar95 = +(-q(0.05)).toFixed(2)
+  const histVar99 = +(-q(0.01)).toFixed(2)
+
+  // ── Параметрический VaR (аналитическая формула нормального распределения)
+  const mu  = results.reduce((s,r) => s+r, 0) / n
+  const sig = Math.sqrt(results.reduce((s,r) => s+(r-mu)**2, 0) / n)
+  const paramVar95 = +(-(mu - 1.645 * sig)).toFixed(2)  // z=1.645 для 95%
+  const paramVar99 = +(-(mu - 2.326 * sig)).toFixed(2)  // z=2.326 для 99%
+
+  // ── CVaR / Expected Shortfall (среднее худших сценариев за порогом VaR)
+  const tail95 = sorted.slice(0, Math.floor(0.05 * n))
+  const tail99 = sorted.slice(0, Math.floor(0.01 * n))
+  const cvar95 = tail95.length ? +(-(tail95.reduce((s,r) => s+r, 0) / tail95.length)).toFixed(2) : 0
+  const cvar99 = tail99.length ? +(-(tail99.reduce((s,r) => s+r, 0) / tail99.length)).toFixed(2) : 0
+
+  const median   = +q(0.50).toFixed(2)
+  const expected = +mu.toFixed(2)
+
+  const var95loss = histVar95
+  const var99loss = histVar99
 
   // Histogram
   const min = Math.min(...results), max = Math.max(...results), bins = 40
@@ -39,7 +55,7 @@ function runMonteCarlo(mean: number, sd: number, n: number) {
   results.forEach(r => { const i = Math.min(Math.floor((r - min) / step), bins - 1); hist[i].n++ })
   hist.forEach(h => { h.pct = Math.round(h.n / n * 1000) / 10 })
 
-  return { probs, hist: hist.filter((_, i) => i % 2 === 0), var95loss, var99loss, median, expected }
+  return { probs, hist: hist.filter((_, i) => i % 2 === 0), var95loss, var99loss, median, expected, histVar95, histVar99, paramVar95, paramVar99, cvar95, cvar99 }
 }
 
 function calcStats(rates: { date: string; value: number }[]) {
@@ -379,34 +395,57 @@ export default function MarketStressTest() {
           {/* Результаты */}
           {mcResult && (
             <>
-              {/* Методология + VaR */}
+              {/* VaR три метода */}
               <div className={card}>
-                <div className="flex items-start gap-3 mb-4">
-                  <div className="flex-1">
-                    <p className="text-sm font-semibold text-gray-700 mb-1">
-                      📊 VaR — Value at Risk ({HORIZONS.find(h => h.days === horizon)?.label})
-                    </p>
-                    <p className="text-xs text-gray-500">Международный стандарт Basel II/III · Параметрический метод N(μ·T, σ·√T)</p>
-                  </div>
+                <p className="text-sm font-semibold text-gray-700 mb-1">
+                  📊 Value at Risk · {HORIZONS.find(h => h.days === horizon)?.label}
+                </p>
+                <p className="text-xs text-gray-500 mb-4">Мат. ожидание: <span className={mcResult.expected > 0 ? 'text-red-600 font-semibold' : 'text-green-600 font-semibold'}>{mcResult.expected > 0 ? '+' : ''}{mcResult.expected}%</span> · Медиана: {mcResult.median > 0 ? '+' : ''}{mcResult.median}%</p>
+                <div className="overflow-x-auto">
+                  <table className="w-full text-sm border-collapse">
+                    <thead>
+                      <tr className="bg-gray-800 text-white text-xs">
+                        <th className="px-4 py-2.5 text-left">Метод</th>
+                        <th className="px-4 py-2.5 text-center">95% уровень</th>
+                        <th className="px-4 py-2.5 text-center">99% уровень</th>
+                        <th className="px-4 py-2.5 text-left text-gray-300 font-normal">Что означает</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-gray-100">
+                      <tr className="bg-blue-50">
+                        <td className="px-4 py-3">
+                          <p className="font-semibold text-sm">📐 Параметрический VaR</p>
+                          <p className="text-[10px] text-gray-400">Нормальное распределение N(μ,σ)</p>
+                        </td>
+                        <td className="px-4 py-3 text-center font-bold text-red-600">{mcResult.paramVar95 > 0 ? '-' : '+'}{Math.abs(mcResult.paramVar95)}%</td>
+                        <td className="px-4 py-3 text-center font-bold text-red-700">{mcResult.paramVar99 > 0 ? '-' : '+'}{Math.abs(mcResult.paramVar99)}%</td>
+                        <td className="px-4 py-3 text-xs text-gray-500">Аналитическая формула. Быстро, но недооценивает хвосты</td>
+                      </tr>
+                      <tr className="bg-gray-50">
+                        <td className="px-4 py-3">
+                          <p className="font-semibold text-sm">📈 Исторический VaR</p>
+                          <p className="text-[10px] text-gray-400">Из симуляций Монте Карло</p>
+                        </td>
+                        <td className="px-4 py-3 text-center font-bold text-red-600">{mcResult.histVar95 > 0 ? '-' : '+'}{Math.abs(mcResult.histVar95)}%</td>
+                        <td className="px-4 py-3 text-center font-bold text-red-700">{mcResult.histVar99 > 0 ? '-' : '+'}{Math.abs(mcResult.histVar99)}%</td>
+                        <td className="px-4 py-3 text-xs text-gray-500">Перцентиль симуляций. В 95% сценариев потеря меньше этого</td>
+                      </tr>
+                      <tr className="bg-orange-50">
+                        <td className="px-4 py-3">
+                          <p className="font-semibold text-sm">⚠️ CVaR / Expected Shortfall</p>
+                          <p className="text-[10px] text-gray-400">Basel III · FRTB · Рекомендован IMF</p>
+                        </td>
+                        <td className="px-4 py-3 text-center font-bold text-orange-600">{mcResult.cvar95 > 0 ? '-' : '+'}{Math.abs(mcResult.cvar95)}%</td>
+                        <td className="px-4 py-3 text-center font-bold text-orange-700">{mcResult.cvar99 > 0 ? '-' : '+'}{Math.abs(mcResult.cvar99)}%</td>
+                        <td className="px-4 py-3 text-xs text-gray-500">Средняя потеря в худших сценариях за порогом VaR. Наиболее точный</td>
+                      </tr>
+                    </tbody>
+                  </table>
                 </div>
-                <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 mb-4">
-                  {[
-                    { l: 'Мат. ожидание', v: `${mcResult.expected > 0 ? '+' : ''}${mcResult.expected}%`, c: mcResult.expected > 0 ? 'text-red-600' : 'text-green-600', hint: 'Средний ожидаемый результат по всем сценариям' },
-                    { l: 'Медиана', v: `${mcResult.median > 0 ? '+' : ''}${mcResult.median}%`, c: mcResult.median > 0 ? 'text-red-500' : 'text-green-500', hint: 'В 50% сценариев изменение лучше этого значения' },
-                    { l: '95% VaR (потеря)', v: `${mcResult.var95loss > 0 ? '-' : '+'}${Math.abs(mcResult.var95loss)}%`, c: mcResult.var95loss > 0 ? 'text-red-700' : 'text-green-700', hint: 'В 95% сценариев потеря не превысит это значение' },
-                    { l: '99% VaR (потеря)', v: `${mcResult.var99loss > 0 ? '-' : '+'}${Math.abs(mcResult.var99loss)}%`, c: mcResult.var99loss > 0 ? 'text-red-700' : 'text-green-700', hint: 'В 99% сценариев потеря не превысит это значение' },
-                  ].map(s => (
-                    <div key={s.l} className="bg-gray-50 rounded-xl p-3">
-                      <p className="text-[10px] text-gray-400 mb-1">{s.l}</p>
-                      <p className={`text-lg font-bold ${s.c}`}>{s.v}</p>
-                      <p className="text-[10px] text-gray-400 mt-1 leading-tight">{s.hint}</p>
-                    </div>
-                  ))}
-                </div>
-                <div className="p-3 bg-blue-50 rounded-lg text-xs text-blue-700 leading-relaxed">
-                  <strong>Как читать таблицы ниже:</strong> Каждая строка — независимый вопрос.
-                  "Вероятность &gt;5% = 87%" означает: в 87 из 100 сценариев курс изменится более чем на 5% за выбранный период.
-                  Строки не складываются в 100% — это не доли пирога, а пороговые вероятности.
+                <div className="mt-3 p-3 bg-blue-50 rounded-lg text-xs text-blue-700">
+                  <strong>💡 Таблицы ниже — вероятности превышения порога.</strong> Пример: "Вероятность &gt;5% = 87%" →
+                  в 87 из 100 сценариев курс изменится более чем на 5% за {HORIZONS.find(h => h.days === horizon)?.label?.toLowerCase()}.
+                  CVaR всегда ≥ VaR — это нормально, он показывает глубину потерь в хвосте.
                 </div>
               </div>
               <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
