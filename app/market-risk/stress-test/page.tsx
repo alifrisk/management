@@ -461,7 +461,7 @@ export default function MarketStressTest() {
                     <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
                     <XAxis dataKey="x" tick={{ fontSize: 9 }} />
                     <YAxis tick={{ fontSize: 9 }} />
-                    <Tooltip formatter={(v: number, name: string, props: Record<string,unknown>) => [`${v} симуляций (${(props.payload as Record<string,unknown>)?.pct ?? '?'}%)`, 'Частота']} />
+                    <Tooltip formatter={(v: number) => [`${v} симуляций`, 'Частота']} />
                     <Bar dataKey="n" fill="#1B8A4C" radius={[2, 2, 0, 0]} />
                   </BarChart>
                 </ResponsiveContainer>
