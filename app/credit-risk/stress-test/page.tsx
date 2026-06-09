@@ -10,6 +10,13 @@ const parseN = (v: string) => Number(v.replace(/\D/g,'')) || 0
 const PAR_ROWS = [2.2, 2.5, 2.9, 3.0, 3.1, 3.2, 3.3, 3.4, 3.5, 3.6, 3.7, 3.9, 4.0, 5.0, 7.0, 8.0, 9.0, 10.0]
 const COV_COLS = [50, 55, 60, 65, 70, 75, 80, 85, 90, 95, 100]
 
+const CREDIT_HORIZONS = [
+  { months: 1,  label: '1 месяц',   pessMultiplier: 1 + 0.4/12, catMultiplier: 1 + 1.0/12 },
+  { months: 3,  label: '3 месяца',  pessMultiplier: 1 + 0.4/4,  catMultiplier: 1 + 1.0/4  },
+  { months: 6,  label: '6 месяцев', pessMultiplier: 1 + 0.4/2,  catMultiplier: 1 + 1.0/2  },
+  { months: 12, label: '1 год',     pessMultiplier: 1.4,         catMultiplier: 2.0         },
+]
+
 export default function CreditStressTest() {
   // Входные данные
   const [portfolio, setPortfolio]   = useState('')
@@ -22,7 +29,8 @@ export default function CreditStressTest() {
   const [budgetCov, setBudgetCov] = useState('')
 
   const [reportDate, setReportDate] = useState(() => new Date().toISOString().split('T')[0])
-  const [tab, setTab] = useState<1|2>(1)
+  const [tab, setTab]         = useState<1|2>(1)
+  const [horizonIdx, setHorizonIdx] = useState(3) // default: 1 год
 
   const P  = parseN(portfolio)
   const CP = parseFloat(currentPar)  || 0   // текущий PAR30 %
@@ -41,8 +49,9 @@ export default function CreditStressTest() {
     par: parseFloat(budgetPar) || CP,
     cov: parseFloat(budgetCov) || CC,
   }
-  const pess = { par: Math.round(CP * 1.4 * 10) / 10, cov: 80 }
-  const cat  = { par: Math.round(CP * 2.0 * 10) / 10, cov: 80 }
+  const currentHorizon = CREDIT_HORIZONS[horizonIdx]
+  const pess = { par: Math.round(CP * currentHorizon.pessMultiplier * 10) / 10, cov: 80 }
+  const cat  = { par: Math.round(CP * currentHorizon.catMultiplier  * 10) / 10, cov: 80 }
 
   // Excel экспорт
   function exportExcel() {
@@ -121,7 +130,7 @@ export default function CreditStressTest() {
       <div className="flex items-center justify-between flex-wrap gap-3">
         <div>
           <h1 className="text-xl font-semibold text-gray-900">Кредитный риск — Стресс-тест</h1>
-          <p className="text-sm text-gray-500 mt-0.5">Сценарный анализ PAR30 и What-If влияния на прибыль и убыток{reportDate && ` · ${new Date(reportDate).toLocaleDateString('ru-RU', {month:'long',year:'numeric'})}`}</p>
+          <p className="text-sm text-gray-500 mt-0.5">Сценарный анализ PAR30 · Горизонт: {CREDIT_HORIZONS[horizonIdx].label}{reportDate && ` · ${new Date(reportDate).toLocaleDateString('ru-RU', {month:'long',year:'numeric'})}`}</p>
         </div>
         <div className="flex items-center gap-2 print:hidden">
           <button onClick={exportExcel}
@@ -172,13 +181,27 @@ export default function CreditStressTest() {
           </div>
         </div>
 
+        {/* Горизонт прогноза */}
+        <div className="mt-4">
+          <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">Горизонт прогноза</p>
+          <div className="flex gap-2 flex-wrap">
+            {CREDIT_HORIZONS.map((h, i) => (
+              <button key={h.months} onClick={() => setHorizonIdx(i)}
+                className={`px-4 py-2 rounded-lg text-sm font-medium border-2 transition-all ${horizonIdx === i ? 'bg-green-50 border-[#1B8A4C] text-[#1B8A4C]' : 'bg-white border-gray-200 text-gray-500 hover:border-gray-300'}`}>
+                {h.label}
+              </button>
+            ))}
+          </div>
+          <p className="text-xs text-gray-400 mt-1.5">
+            Пессимистичный: PAR×{currentHorizon.pessMultiplier.toFixed(2)} · Катастрофический: PAR×{currentHorizon.catMultiplier.toFixed(2)} за {currentHorizon.label}
+          </p>
+        </div>
         {/* Формула */}
-        <div className="mt-4 p-3 bg-blue-50 rounded-lg flex items-start gap-2">
+        <div className="mt-3 p-3 bg-blue-50 rounded-lg flex items-start gap-2">
           <Info className="w-4 h-4 text-blue-500 mt-0.5 flex-shrink-0" />
           <p className="text-xs text-blue-700">
             <span className="font-semibold">Формула:</span> Доп. резерв = Портфель × (Новый PAR30% − Текущий PAR30%) × Coverage Rate% ·
-            Пессимистичный = PAR30 × 1.4 ·
-            Катастрофический = PAR30 × 2.0
+            Коэффициенты масштабируются по выбранному горизонту
           </p>
         </div>
       </div>
