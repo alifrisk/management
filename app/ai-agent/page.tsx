@@ -88,6 +88,16 @@ export default function RiskovikPage() {
     }
   }
 
+  async function deleteChat(id: string) {
+    await supabase.from('ai_messages').delete().eq('chat_id', id)
+    await supabase.from('ai_chats').delete().eq('id', id)
+    if (chatId === id) {
+      setChatId(null)
+      setMessages([])
+    }
+    loadChats()
+  }
+
   async function saveEdit(msgId: string) {
     if (!editText.trim() || !chatId) return
     // Update message in DB
@@ -215,11 +225,15 @@ export default function RiskovikPage() {
                   {chats.length === 0
                     ? <p className="text-xs text-gray-400 text-center py-4">Нет чатов</p>
                     : chats.map(c => (
-                      <button key={c.id} onClick={() => openChat(c.id)}
-                        className={`w-full text-left px-3 py-2 hover:bg-gray-50 border-b border-gray-50 ${chatId === c.id ? 'bg-green-50' : ''}`}>
-                        <p className="text-xs font-medium text-gray-700 truncate">{c.title}</p>
-                        <p className="text-[10px] text-gray-400">{new Date(c.created_at).toLocaleDateString('ru-RU', { day:'2-digit', month:'short', year:'numeric' })}</p>
-                      </button>
+                      <div key={c.id} className={`flex items-center border-b border-gray-50 ${chatId === c.id ? 'bg-green-50' : ''}`}>
+                        <button onClick={() => openChat(c.id)} className="flex-1 text-left px-3 py-2 hover:bg-gray-50">
+                          <p className="text-xs font-medium text-gray-700 truncate">{c.title}</p>
+                          <p className="text-[10px] text-gray-400">{new Date(c.created_at).toLocaleDateString('ru-RU', { day:'2-digit', month:'short', year:'numeric' })}</p>
+                        </button>
+                        <button onClick={() => deleteChat(c.id)} className="px-2 py-2 text-gray-300 hover:text-red-500 transition-colors flex-shrink-0">
+                          <X className="w-3.5 h-3.5" />
+                        </button>
+                      </div>
                     ))
                   }
                 </div>
