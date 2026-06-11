@@ -108,13 +108,28 @@ export default function IncidentFormPage() {
 
   return (
     <div className="min-h-screen" style={{background: 'linear-gradient(135deg, #0f3d24 0%, #1a7a43 60%, #1B8A4C 100%)'}}>
-      <div className="px-4 pt-10 pb-6 text-center">
-        <div className="inline-flex items-center gap-2 bg-white/10 backdrop-blur-sm rounded-full px-4 py-1.5 mb-4">
-          <FileText className="w-4 h-4 text-green-200" />
-          <span className="text-green-100 text-sm font-medium">Служба управления рисками</span>
+
+      {/* Sticky header */}
+      <div className="sticky top-0 z-30 border-b border-white/10"
+        style={{background: 'linear-gradient(135deg, rgba(11,49,28,0.98) 0%, rgba(20,92,44,0.98) 100%)', backdropFilter: 'blur(12px)', boxShadow: '0 4px 24px rgba(0,0,0,0.35)'}}>
+        <div className="max-w-2xl mx-auto px-4 py-3 flex items-center gap-3">
+          <div className="w-9 h-9 bg-white/15 rounded-xl flex items-center justify-center flex-shrink-0 border border-white/10">
+            <Shield className="w-5 h-5 text-green-200" />
+          </div>
+          <div className="flex-1 min-w-0">
+            <p className="text-white font-bold text-sm leading-tight">Анкета операционного инцидента</p>
+            <p className="text-green-300/60 text-xs">ОАО «Алиф Банк» · Служба управления рисками</p>
+          </div>
+          <div className="flex-shrink-0 flex items-center gap-1.5 bg-white/10 rounded-full px-3 py-1.5 border border-white/10">
+            <FileText className="w-3.5 h-3.5 text-green-300" />
+            <span className="text-green-100 text-xs font-medium hidden sm:block">Конфиденциально</span>
+          </div>
         </div>
-        <h1 className="text-2xl font-bold text-white mb-1">Анкета операционного инцидента</h1>
-        <p className="text-green-200/70 text-sm">ОАО «Алиф Банк» — заполните все обязательные поля</p>
+      </div>
+
+      <div className="px-4 pt-7 pb-3 text-center">
+        <h2 className="text-lg font-semibold text-white/90 mb-1">Заполните все обязательные поля</h2>
+        <p className="text-green-200/50 text-xs">Данные будут переданы в Службу управления рисками</p>
       </div>
 
       <div className="max-w-2xl mx-auto px-4 pb-10">
