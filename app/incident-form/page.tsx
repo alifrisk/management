@@ -2,7 +2,7 @@
 
 import { useState } from 'react'
 import { supabase } from '@/supabase/client'
-import { Loader2, CheckCircle2, AlertCircle, FileText, Building2, Briefcase, AlertTriangle, Monitor, Calendar, Mail, ChevronRight } from 'lucide-react'
+import { Loader2, CheckCircle2, AlertCircle, FileText, Building2, Briefcase, AlertTriangle, Monitor, Calendar, Mail, ChevronRight, Shield } from 'lucide-react'
 import { BUSINESS_PROCESSES, RISK_FACTORS, SYSTEMS, DEPARTMENTS } from '@/lib/constants'
 
 export default function IncidentFormPage() {
