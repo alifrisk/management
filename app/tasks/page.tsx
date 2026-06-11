@@ -18,7 +18,7 @@ const STRATEGIC_CATS = [
 ]
 const STATUSES   = ['Новая','В работе','На проверке','Готово'] as const
 const PRIORITIES = ['Низкий','Средний','Высокий','Срочный'] as const
-const ASSIGNEES  = ['muhammat.obidov','kamila.marodmamadova','orifjon.kadyrov','sokhibdzhon.kabilov','sunatullo.hikmatov']
+const ASSIGNEES  = ['Muhammat Obidov','Kamila Marodmamadova','Orifjon Kadyrov','Sokhibdzhon Kabilov','Farzona Sanginova']
 
 type Status   = typeof STATUSES[number]
 type Priority = typeof PRIORITIES[number]
