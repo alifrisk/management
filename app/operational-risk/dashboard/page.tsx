@@ -134,7 +134,7 @@ export default function DashboardPage() {
           <p className="text-xs text-gray-500 mb-1">Всего инцидентов</p>
           <p className="text-2xl font-bold text-gray-900">{total}</p>
           {countDiff && <p className={`text-xs mt-1 font-medium ${parseFloat(countDiff) > 0 ? 'text-red-500' : 'text-green-600'}`}>{parseFloat(countDiff) > 0 ? '▲' : '▼'} {Math.abs(parseFloat(countDiff))}% vs {year-1}</p>}
-          <div className="absolute bottom-full left-0 mb-2 hidden group-hover:block z-30 w-52 bg-gray-900 text-white text-xs rounded-xl p-3 shadow-2xl pointer-events-none">
+          <div className="absolute top-full left-0 mt-2 hidden group-hover:block z-30 w-52 bg-gray-900 text-white text-xs rounded-xl p-3 shadow-2xl pointer-events-none">
             <p className="font-semibold mb-2 border-b border-white/20 pb-1.5">Разбивка по статусу</p>
             <div className="space-y-1.5">
               <div className="flex justify-between"><span className="text-gray-300">Открыт:</span><span className="font-medium text-blue-300">{incidents.filter(i => i.incident_status === 'Открыт').length}</span></div>
@@ -142,7 +142,7 @@ export default function DashboardPage() {
               <div className="flex justify-between"><span className="text-gray-300">Закрыт:</span><span className="font-medium text-green-300">{incidents.filter(i => i.incident_status === 'Закрыт').length}</span></div>
               {prevCount > 0 && <div className="flex justify-between border-t border-white/10 pt-1.5 mt-1"><span className="text-gray-300">Пред. год ({year-1}):</span><span>{prevCount}</span></div>}
             </div>
-            <div className="absolute top-full left-5 -mt-px border-4 border-transparent border-t-gray-900" />
+            <div className="absolute bottom-full left-5 mb-[-1px] border-4 border-transparent border-b-gray-900" />
           </div>
         </div>
 
@@ -151,14 +151,14 @@ export default function DashboardPage() {
           <p className="text-xs text-gray-500 mb-1">Открытые</p>
           <p className="text-2xl font-bold text-blue-600">{open}</p>
           <p className="text-xs text-gray-400 mt-1">{total > 0 ? ((open/total)*100).toFixed(0) : 0}% от всех</p>
-          <div className="absolute bottom-full left-0 mb-2 hidden group-hover:block z-30 w-52 bg-gray-900 text-white text-xs rounded-xl p-3 shadow-2xl pointer-events-none">
+          <div className="absolute top-full left-0 mt-2 hidden group-hover:block z-30 w-52 bg-gray-900 text-white text-xs rounded-xl p-3 shadow-2xl pointer-events-none">
             <p className="font-semibold mb-2 border-b border-white/20 pb-1.5">Незакрытые инциденты</p>
             <div className="space-y-1.5">
               <div className="flex justify-between"><span className="text-gray-300">Открыт:</span><span className="text-blue-300">{incidents.filter(i => i.incident_status === 'Открыт').length}</span></div>
               <div className="flex justify-between"><span className="text-gray-300">В процессе:</span><span className="text-yellow-300">{incidents.filter(i => i.incident_status === 'В процессе').length}</span></div>
               <div className="flex justify-between border-t border-white/10 pt-1.5 mt-1"><span className="text-gray-300">Доля от всех:</span><span className="font-medium">{total > 0 ? ((open/total)*100).toFixed(1) : 0}%</span></div>
             </div>
-            <div className="absolute top-full left-5 -mt-px border-4 border-transparent border-t-gray-900" />
+            <div className="absolute bottom-full left-5 mb-[-1px] border-4 border-transparent border-b-gray-900" />
           </div>
         </div>
 
@@ -167,7 +167,7 @@ export default function DashboardPage() {
           <p className="text-xs text-gray-500 mb-1">Высокий риск</p>
           <p className="text-2xl font-bold text-orange-600">{high}</p>
           <p className="text-xs text-gray-400 mt-1">{total > 0 ? ((high/total)*100).toFixed(0) : 0}% от всех</p>
-          <div className="absolute bottom-full left-0 mb-2 hidden group-hover:block z-30 w-52 bg-gray-900 text-white text-xs rounded-xl p-3 shadow-2xl pointer-events-none">
+          <div className="absolute top-full left-0 mt-2 hidden group-hover:block z-30 w-52 bg-gray-900 text-white text-xs rounded-xl p-3 shadow-2xl pointer-events-none">
             <p className="font-semibold mb-2 border-b border-white/20 pb-1.5">По уровню риска</p>
             <div className="space-y-1.5">
               <div className="flex justify-between"><span className="text-gray-300">Низкий:</span><span className="text-green-400">{incidents.filter(i => i.risk_level === 'Низкий').length}</span></div>
@@ -175,7 +175,7 @@ export default function DashboardPage() {
               <div className="flex justify-between"><span className="text-gray-300">Высокий:</span><span className="text-orange-400">{incidents.filter(i => i.risk_level === 'Высокий').length}</span></div>
               <div className="flex justify-between"><span className="text-gray-300">Экстремальный:</span><span className="text-red-400">{incidents.filter(i => i.risk_level === 'Экстремальные').length}</span></div>
             </div>
-            <div className="absolute top-full left-5 -mt-px border-4 border-transparent border-t-gray-900" />
+            <div className="absolute bottom-full left-5 mb-[-1px] border-4 border-transparent border-b-gray-900" />
           </div>
         </div>
 
@@ -184,14 +184,14 @@ export default function DashboardPage() {
           <p className="text-xs text-gray-500 mb-1">Ущерб (TJS)</p>
           <p className="text-2xl font-bold text-red-600">{fmt(totalLoss)}</p>
           {lossDiff && <p className={`text-xs mt-1 font-medium ${parseFloat(lossDiff) > 0 ? 'text-red-500' : 'text-green-600'}`}>{parseFloat(lossDiff) > 0 ? '▲' : '▼'} {Math.abs(parseFloat(lossDiff))}% vs {year-1}</p>}
-          <div className="absolute bottom-full left-0 mb-2 hidden group-hover:block z-30 w-56 bg-gray-900 text-white text-xs rounded-xl p-3 shadow-2xl pointer-events-none">
+          <div className="absolute top-full left-0 mt-2 hidden group-hover:block z-30 w-56 bg-gray-900 text-white text-xs rounded-xl p-3 shadow-2xl pointer-events-none">
             <p className="font-semibold mb-2 border-b border-white/20 pb-1.5">Детали ущерба</p>
             <div className="space-y-1.5">
               <div className="flex justify-between"><span className="text-gray-300">Итого ущерб:</span><span className="text-red-300">{fmt(totalLoss)} TJS</span></div>
               <div className="flex justify-between"><span className="text-gray-300">Пред. год ({year-1}):</span><span>{fmt(prevLoss)} TJS</span></div>
               <div className="flex justify-between border-t border-white/10 pt-1.5 mt-1"><span className="text-gray-300">Среднее на инцидент:</span><span>{total > 0 ? fmt(Math.round(totalLoss/total)) : '—'} TJS</span></div>
             </div>
-            <div className="absolute top-full left-5 -mt-px border-4 border-transparent border-t-gray-900" />
+            <div className="absolute bottom-full left-5 mb-[-1px] border-4 border-transparent border-b-gray-900" />
           </div>
         </div>
 
@@ -200,14 +200,14 @@ export default function DashboardPage() {
           <p className="text-xs text-gray-500 mb-1">Возврат (TJS)</p>
           <p className="text-2xl font-bold text-[#1B8A4C]">{fmt(totalRecovery)}</p>
           <p className="text-xs text-gray-400 mt-1">{recoveryRate}% от ущерба</p>
-          <div className="absolute bottom-full left-0 mb-2 hidden group-hover:block z-30 w-56 bg-gray-900 text-white text-xs rounded-xl p-3 shadow-2xl pointer-events-none">
+          <div className="absolute top-full left-0 mt-2 hidden group-hover:block z-30 w-56 bg-gray-900 text-white text-xs rounded-xl p-3 shadow-2xl pointer-events-none">
             <p className="font-semibold mb-2 border-b border-white/20 pb-1.5">Детали возврата</p>
             <div className="space-y-1.5">
               <div className="flex justify-between"><span className="text-gray-300">Возвращено:</span><span className="text-green-400">{fmt(totalRecovery)} TJS</span></div>
               <div className="flex justify-between"><span className="text-gray-300">Не возвращено:</span><span className="text-red-400">{fmt(Math.max(0, totalLoss - totalRecovery))} TJS</span></div>
               <div className="flex justify-between border-t border-white/10 pt-1.5 mt-1"><span className="text-gray-300">Возвратность:</span><span className="font-bold text-green-400">{recoveryRate}%</span></div>
             </div>
-            <div className="absolute top-full left-5 -mt-px border-4 border-transparent border-t-gray-900" />
+            <div className="absolute bottom-full left-5 mb-[-1px] border-4 border-transparent border-b-gray-900" />
           </div>
         </div>
 
@@ -216,14 +216,14 @@ export default function DashboardPage() {
           <p className="text-xs text-gray-500 mb-1">Возвратность</p>
           <p className="text-2xl font-bold text-[#1B8A4C]">{recoveryRate}%</p>
           <p className="text-xs text-gray-400 mt-1">{fmt(totalRecovery)} / {fmt(totalLoss)}</p>
-          <div className="absolute bottom-full right-0 mb-2 hidden group-hover:block z-30 w-56 bg-gray-900 text-white text-xs rounded-xl p-3 shadow-2xl pointer-events-none">
+          <div className="absolute top-full right-0 mt-2 hidden group-hover:block z-30 w-56 bg-gray-900 text-white text-xs rounded-xl p-3 shadow-2xl pointer-events-none">
             <p className="font-semibold mb-2 border-b border-white/20 pb-1.5">Коэффициент возвратности</p>
             <div className="space-y-1.5">
               <div className="flex justify-between"><span className="text-gray-300">Возвращено:</span><span className="text-green-400">{fmt(totalRecovery)} TJS</span></div>
               <div className="flex justify-between"><span className="text-gray-300">Общий ущерб:</span><span>{fmt(totalLoss)} TJS</span></div>
               <div className="flex justify-between border-t border-white/10 pt-1.5 mt-1"><span className="text-gray-300">Коэффициент:</span><span className="font-bold text-green-400">{recoveryRate}%</span></div>
             </div>
-            <div className="absolute top-full right-5 -mt-px border-4 border-transparent border-t-gray-900" />
+            <div className="absolute bottom-full right-5 mb-[-1px] border-4 border-transparent border-b-gray-900" />
           </div>
         </div>
 
