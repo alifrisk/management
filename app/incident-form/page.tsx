@@ -113,9 +113,6 @@ export default function IncidentFormPage() {
       <div className="sticky top-0 z-30 border-b border-white/10"
         style={{background: 'linear-gradient(135deg, rgba(11,49,28,0.98) 0%, rgba(20,92,44,0.98) 100%)', backdropFilter: 'blur(12px)', boxShadow: '0 4px 24px rgba(0,0,0,0.35)'}}>
         <div className="max-w-2xl mx-auto px-4 py-3 flex items-center gap-3">
-          <div className="w-9 h-9 bg-white/15 rounded-xl flex items-center justify-center flex-shrink-0 border border-white/10">
-            <Shield className="w-5 h-5 text-green-200" />
-          </div>
           <div className="flex-1 min-w-0">
             <p className="text-white font-bold text-sm leading-tight">Анкета операционного инцидента</p>
             <p className="text-green-300/60 text-xs">ОАО «Алиф Банк» · Служба управления рисками</p>
