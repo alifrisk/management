@@ -209,39 +209,43 @@ export default function MappingPage() {
   const labelCls = "block text-xs font-medium text-gray-600 mb-1"
 
   return (
-    <div className="max-w-7xl mx-auto space-y-5">
-      <div className="flex items-center justify-between flex-wrap gap-3">
-        <div>
-          <h1 className="text-xl font-semibold text-gray-900">Картирование операционных рисков</h1>
-          <p className="text-sm text-gray-500 mt-0.5">Реестр рисков по бизнес-процессам</p>
+    <div className="max-w-7xl mx-auto">
+
+      {/* Sticky: заголовок + KPI */}
+      <div className="sticky top-0 z-20 -mx-6 lg:-mx-8 px-6 lg:px-8 pt-5 pb-4 bg-[#F5F8F6]" style={{boxShadow: '0 2px 12px rgba(0,0,0,0.06)'}}>
+        <div className="flex items-center justify-between flex-wrap gap-3 mb-4">
+          <div>
+            <h1 className="text-xl font-semibold text-gray-900">Картирование операционных рисков</h1>
+            <p className="text-sm text-gray-500 mt-0.5">Реестр рисков по бизнес-процессам</p>
+          </div>
+          <div className="flex items-center gap-2">
+            <button onClick={handleDownload}
+              className="flex items-center gap-2 px-3 py-2 border border-gray-200 rounded-lg text-sm text-gray-600 hover:bg-gray-50 bg-white">
+              <Download className="w-4 h-4" /> Скачать Excel
+            </button>
+            <button onClick={() => { setFormData(EMPTY_FORM); setEditingId(null); setShowModal(true) }}
+              className="flex items-center gap-2 px-4 py-2 bg-[#1B8A4C] text-white rounded-lg text-sm font-medium hover:bg-[#177040]">
+              <Plus className="w-4 h-4" /> Добавить риск
+            </button>
+          </div>
         </div>
-        <div className="flex items-center gap-2">
-          <button onClick={handleDownload}
-            className="flex items-center gap-2 px-3 py-2 border border-gray-200 rounded-lg text-sm text-gray-600 hover:bg-gray-50">
-            <Download className="w-4 h-4" /> Скачать Excel
-          </button>
-          <button onClick={() => { setFormData(EMPTY_FORM); setEditingId(null); setShowModal(true) }}
-            className="flex items-center gap-2 px-4 py-2 bg-[#1B8A4C] text-white rounded-lg text-sm font-medium hover:bg-[#177040]">
-            <Plus className="w-4 h-4" /> Добавить риск
-          </button>
+        <div className="grid grid-cols-3 gap-3">
+          <div className="bg-red-50 border border-red-200 rounded-xl p-4">
+            <p className="text-2xl font-bold text-red-700">{totalHigh}</p>
+            <p className="text-xs font-medium text-red-600 mt-0.5">Высокий риск</p>
+          </div>
+          <div className="bg-yellow-50 border border-yellow-200 rounded-xl p-4">
+            <p className="text-2xl font-bold text-yellow-700">{totalMedium}</p>
+            <p className="text-xs font-medium text-yellow-600 mt-0.5">Средний риск</p>
+          </div>
+          <div className="bg-green-50 border border-green-200 rounded-xl p-4">
+            <p className="text-2xl font-bold text-green-700">{totalLow}</p>
+            <p className="text-xs font-medium text-green-600 mt-0.5">Низкий риск</p>
+          </div>
         </div>
       </div>
 
-      {/* KPI */}
-      <div className="grid grid-cols-3 gap-3">
-        <div className="bg-red-50 border border-red-200 rounded-xl p-4">
-          <p className="text-2xl font-bold text-red-700">{totalHigh}</p>
-          <p className="text-xs font-medium text-red-600 mt-0.5">Высокий риск</p>
-        </div>
-        <div className="bg-yellow-50 border border-yellow-200 rounded-xl p-4">
-          <p className="text-2xl font-bold text-yellow-700">{totalMedium}</p>
-          <p className="text-xs font-medium text-yellow-600 mt-0.5">Средний риск</p>
-        </div>
-        <div className="bg-green-50 border border-green-200 rounded-xl p-4">
-          <p className="text-2xl font-bold text-green-700">{totalLow}</p>
-          <p className="text-xs font-medium text-green-600 mt-0.5">Низкий риск</p>
-        </div>
-      </div>
+      <div className="space-y-5 mt-5">
 
       {/* Heat Matrix */}
       <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-6">
@@ -414,6 +418,8 @@ export default function MappingPage() {
           })}
         </div>
       )}
+
+      </div>{/* end space-y-5 */}
 
       {/* View Risk Modal */}
       {viewingRisk && (
