@@ -104,30 +104,32 @@ export default function DashboardPage() {
   if (loading) return <div className="flex items-center justify-center h-64"><div className="text-gray-400 text-sm">Загрузка...</div></div>
 
   return (
-    <div className="max-w-7xl mx-auto space-y-5" ref={dashboardRef}>
-      {/* Header */}
-      <div className="flex items-center justify-between flex-wrap gap-3">
-        <div>
-          <h1 className="text-xl font-semibold text-gray-900">Дашборд — Операционный риск</h1>
-          <p className="text-sm text-gray-500 mt-0.5">Аналитика за {year}{filterMonth ? ` · ${MONTHS[parseInt(filterMonth) - 1]}` : ''}</p>
-        </div>
-        <div className="flex items-center gap-2 no-print">
-          <select value={year} onChange={e => { setYear(Number(e.target.value)); setFilterMonth('') }} className="px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#1B8A4C] bg-white">
-            {[2026, 2025, 2024, 2023].map(y => <option key={y} value={y}>{y}</option>)}
-          </select>
-          <select value={filterMonth} onChange={e => setFilterMonth(e.target.value)} className="px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#1B8A4C] bg-white">
-            <option value="">Все месяцы</option>
-            {MONTHS.map((m, i) => <option key={i} value={String(i + 1)}>{m}</option>)}
-          </select>
-          {filterMonth && <button onClick={() => setFilterMonth('')} className="px-3 py-2 border border-gray-200 rounded-lg text-sm text-gray-500 hover:bg-gray-50">Сбросить</button>}
-          <button onClick={handleDownload} className="flex items-center gap-2 px-4 py-2 bg-[#1B8A4C] text-white rounded-lg text-sm font-medium hover:bg-[#177040]">
-            <Download className="w-4 h-4" /> Скачать PDF
-          </button>
-        </div>
-      </div>
+    <div className="max-w-7xl mx-auto" ref={dashboardRef}>
 
-      {/* ✅ KPI Cards с тултипами */}
-      <div className="grid grid-cols-2 lg:grid-cols-6 gap-3">
+      {/* Sticky: заголовок + фильтры + KPI */}
+      <div className="sticky top-0 z-20 -mx-6 lg:-mx-8 px-6 lg:px-8 pt-5 pb-4 bg-[#F5F8F6] no-print" style={{boxShadow: '0 2px 12px rgba(0,0,0,0.06)'}}>
+        <div className="flex items-center justify-between flex-wrap gap-3 mb-4">
+          <div>
+            <h1 className="text-xl font-semibold text-gray-900">Дашборд — Операционный риск</h1>
+            <p className="text-sm text-gray-500 mt-0.5">Аналитика за {year}{filterMonth ? ` · ${MONTHS[parseInt(filterMonth) - 1]}` : ''}</p>
+          </div>
+          <div className="flex items-center gap-2">
+            <select value={year} onChange={e => { setYear(Number(e.target.value)); setFilterMonth('') }} className="px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#1B8A4C] bg-white">
+              {[2026, 2025, 2024, 2023].map(y => <option key={y} value={y}>{y}</option>)}
+            </select>
+            <select value={filterMonth} onChange={e => setFilterMonth(e.target.value)} className="px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#1B8A4C] bg-white">
+              <option value="">Все месяцы</option>
+              {MONTHS.map((m, i) => <option key={i} value={String(i + 1)}>{m}</option>)}
+            </select>
+            {filterMonth && <button onClick={() => setFilterMonth('')} className="px-3 py-2 border border-gray-200 rounded-lg text-sm text-gray-500 hover:bg-gray-50">Сбросить</button>}
+            <button onClick={handleDownload} className="flex items-center gap-2 px-4 py-2 bg-[#1B8A4C] text-white rounded-lg text-sm font-medium hover:bg-[#177040]">
+              <Download className="w-4 h-4" /> Скачать PDF
+            </button>
+          </div>
+        </div>
+
+        {/* KPI Cards с тултипами */}
+        <div className="grid grid-cols-2 lg:grid-cols-6 gap-3">
 
         {/* Всего инцидентов */}
         <div className={`${card} group relative cursor-default`}>
@@ -227,7 +229,10 @@ export default function DashboardPage() {
           </div>
         </div>
 
-      </div>
+        </div>{/* end KPI grid */}
+      </div>{/* end sticky */}
+
+      <div className="space-y-5 mt-5">
 
       {/* Top 3 */}
       {top3.length > 0 && (
@@ -402,6 +407,8 @@ export default function DashboardPage() {
           <p>Нет данных за {year} год</p>
         </div>
       )}
+
+      </div>{/* end space-y-5 mt-5 */}
     </div>
   )
 }
