@@ -247,51 +247,54 @@ export default function LiquidityPage() {
   )
 
   return (
-    <div className="max-w-6xl mx-auto space-y-5">
-      <div className="flex items-center justify-between flex-wrap gap-3">
-        <div>
-          <h1 className="text-xl font-semibold text-gray-900">Ликвидность — Стресс-тест</h1>
-          <p className="text-sm text-gray-500 mt-0.5">Оптимистичный / Пессимистичный / Катастрофический · T+1 / T+7 / T+30</p>
-        </div>
-        <button onClick={() => { setForm(EMPTY); setScenario('Пессимистичный'); setError(null); setShowModal(true) }}
-          className="flex items-center gap-2 px-4 py-2 bg-[#1B8A4C] text-white rounded-lg text-sm font-medium hover:bg-[#177040]">
-          <Plus className="w-4 h-4" /> Новый стресс-тест
-        </button>
-      </div>
-
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
-        {[
-          { label: 'Всего тестов', value: tests.length, c: 'text-gray-900' },
-          { label: 'Нормальный', value: tests.filter(t => t.risk_t30 === 'Normal').length, c: 'text-green-600' },
-          { label: 'Повышенный', value: tests.filter(t => t.risk_t30 === 'Elevated').length, c: 'text-yellow-600' },
-          { label: 'Высокий риск', value: tests.filter(t => t.risk_t30 === 'High').length, c: 'text-red-600' },
-        ].map(s => (
-          <div key={s.label} className="bg-white rounded-xl border border-gray-100 p-4 shadow-sm">
-            <p className={`text-2xl font-bold ${s.c}`}>{s.value}</p>
-            <p className="text-xs text-gray-500 mt-0.5">{s.label}</p>
+    <div className="max-w-6xl mx-auto">
+      <div className="sticky top-0 z-20 -mx-6 lg:-mx-8 px-6 lg:px-8 pt-5 pb-4 bg-[#F5F8F6]" style={{boxShadow: '0 2px 12px rgba(0,0,0,0.06)'}}>
+        <div className="flex items-center justify-between flex-wrap gap-3">
+          <div>
+            <h1 className="text-xl font-semibold text-gray-900">Ликвидность — Стресс-тест</h1>
+            <p className="text-sm text-gray-500 mt-0.5">Оптимистичный / Пессимистичный / Катастрофический · T+1 / T+7 / T+30</p>
           </div>
-        ))}
-      </div>
-
-      <div className="bg-white rounded-xl border border-gray-100 p-4 shadow-sm flex items-center gap-3 flex-wrap">
-        <Filter className="w-4 h-4 text-gray-400" />
-        <select value={filterYear} onChange={e => { setFilterYear(e.target.value); setFilterMonth('') }}
-          className="px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#1B8A4C] bg-white">
-          <option value="">Все годы</option>
-          {[2026,2025,2024].map(y => <option key={y} value={y}>{y}</option>)}
-        </select>
-        <select value={filterMonth} onChange={e => setFilterMonth(e.target.value)}
-          className="px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#1B8A4C] bg-white">
-          <option value="">Все месяцы</option>
-          {MONTHS.map((m,i) => <option key={i} value={String(i+1).padStart(2,'0')}>{m}</option>)}
-        </select>
-        {(filterYear || filterMonth) && (
-          <button onClick={() => { setFilterYear(''); setFilterMonth('') }} className="text-xs text-gray-500 hover:text-gray-700 flex items-center gap-1">
-            <X className="w-3.5 h-3.5" /> Сбросить
+          <button onClick={() => { setForm(EMPTY); setScenario('Пессимистичный'); setError(null); setShowModal(true) }}
+            className="flex items-center gap-2 px-4 py-2 bg-[#1B8A4C] text-white rounded-lg text-sm font-medium hover:bg-[#177040]">
+            <Plus className="w-4 h-4" /> Новый стресс-тест
           </button>
-        )}
+        </div>
+
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 mt-4">
+          {[
+            { label: 'Всего тестов', value: tests.length, c: 'text-gray-900' },
+            { label: 'Нормальный', value: tests.filter(t => t.risk_t30 === 'Normal').length, c: 'text-green-600' },
+            { label: 'Повышенный', value: tests.filter(t => t.risk_t30 === 'Elevated').length, c: 'text-yellow-600' },
+            { label: 'Высокий риск', value: tests.filter(t => t.risk_t30 === 'High').length, c: 'text-red-600' },
+          ].map(s => (
+            <div key={s.label} className="bg-white rounded-xl border border-gray-100 p-4 shadow-sm">
+              <p className={`text-2xl font-bold ${s.c}`}>{s.value}</p>
+              <p className="text-xs text-gray-500 mt-0.5">{s.label}</p>
+            </div>
+          ))}
+        </div>
+
+        <div className="bg-white rounded-xl border border-gray-100 p-4 shadow-sm flex items-center gap-3 flex-wrap mt-3">
+          <Filter className="w-4 h-4 text-gray-400" />
+          <select value={filterYear} onChange={e => { setFilterYear(e.target.value); setFilterMonth('') }}
+            className="px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#1B8A4C] bg-white">
+            <option value="">Все годы</option>
+            {[2026,2025,2024].map(y => <option key={y} value={y}>{y}</option>)}
+          </select>
+          <select value={filterMonth} onChange={e => setFilterMonth(e.target.value)}
+            className="px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#1B8A4C] bg-white">
+            <option value="">Все месяцы</option>
+            {MONTHS.map((m,i) => <option key={i} value={String(i+1).padStart(2,'0')}>{m}</option>)}
+          </select>
+          {(filterYear || filterMonth) && (
+            <button onClick={() => { setFilterYear(''); setFilterMonth('') }} className="text-xs text-gray-500 hover:text-gray-700 flex items-center gap-1">
+              <X className="w-3.5 h-3.5" /> Сбросить
+            </button>
+          )}
+        </div>
       </div>
 
+      <div className="space-y-5 mt-5">
       <div className="bg-white rounded-xl border border-gray-100 shadow-sm overflow-hidden">
         <div className="overflow-x-auto">
           <table className="w-full text-sm">
@@ -340,6 +343,7 @@ export default function LiquidityPage() {
             </tbody>
           </table>
         </div>
+      </div>
       </div>
 
       {/* View Modal */}

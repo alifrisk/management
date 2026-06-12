@@ -233,95 +233,98 @@ export default function RecommendationsPage() {
   const lbl = "block text-xs font-medium text-gray-600 mb-1"
 
   return (
-    <div className="max-w-6xl mx-auto space-y-5">
-      <div className="flex items-center justify-between flex-wrap gap-3">
-        <div>
-          <h1 className="text-xl font-semibold text-gray-900">Реестр рекомендаций СУР</h1>
-          <p className="text-sm text-gray-500 mt-0.5">Мониторинг исполнения рекомендаций по рапортам и заключениям</p>
-        </div>
-        <div className="flex items-center gap-2">
-          <button onClick={exportToExcel}
-            className="flex items-center gap-2 px-3 py-2 border border-gray-200 rounded-lg text-sm text-gray-600 hover:bg-gray-50">
-            <Download className="w-4 h-4" /> Excel
-          </button>
-          <button onClick={() => { setForm(EMPTY_FORM); setEditingId(null); setError(null); setShowModal(true) }}
-            className="flex items-center gap-2 px-4 py-2 bg-[#1B8A4C] text-white rounded-lg text-sm font-medium hover:bg-[#177040]">
-            <Plus className="w-4 h-4" /> Добавить рекомендацию
-          </button>
-        </div>
-      </div>
-
-      {/* KPI */}
-      <div className="grid grid-cols-2 lg:grid-cols-5 gap-3">
-        {[
-          { label: 'Всего', value: stats.total, c: 'text-gray-900' },
-          { label: 'Принята', value: stats.accepted, c: 'text-green-600' },
-          { label: 'Не принята', value: stats.notAccepted, c: 'text-red-600' },
-          { label: 'Выполнена', value: stats.done, c: 'text-blue-600' },
-          { label: 'Просрочена', value: stats.overdue, c: 'text-red-600' },
-        ].map(s => (
-          <div key={s.label} className="bg-white rounded-xl border border-gray-100 p-4 shadow-sm">
-            <p className={`text-2xl font-bold ${s.c}`}>{s.value}</p>
-            <p className="text-xs text-gray-500 mt-0.5">{s.label}</p>
+    <div className="max-w-6xl mx-auto">
+      <div className="sticky top-0 z-20 -mx-6 lg:-mx-8 px-6 lg:px-8 pt-5 pb-4 bg-[#F5F8F6]" style={{boxShadow: '0 2px 12px rgba(0,0,0,0.06)'}}>
+        <div className="flex items-center justify-between flex-wrap gap-3">
+          <div>
+            <h1 className="text-xl font-semibold text-gray-900">Реестр рекомендаций СУР</h1>
+            <p className="text-sm text-gray-500 mt-0.5">Мониторинг исполнения рекомендаций по рапортам и заключениям</p>
           </div>
-        ))}
-      </div>
-
-      {/* Progress */}
-      {stats.accepted > 0 && (
-        <div className="bg-white rounded-xl border border-gray-100 p-4 shadow-sm">
-          <div className="flex items-center justify-between mb-2">
-            <p className="text-sm font-medium text-gray-700">Исполнение принятых рекомендаций</p>
-            <p className="text-sm font-bold text-[#1B8A4C]">{completionRate}%</p>
-          </div>
-          <div className="h-3 bg-gray-100 rounded-full overflow-hidden">
-            <div className="h-full bg-[#1B8A4C] rounded-full transition-all" style={{ width: `${completionRate}%` }} />
+          <div className="flex items-center gap-2">
+            <button onClick={exportToExcel}
+              className="flex items-center gap-2 px-3 py-2 border border-gray-200 rounded-lg text-sm text-gray-600 hover:bg-gray-50">
+              <Download className="w-4 h-4" /> Excel
+            </button>
+            <button onClick={() => { setForm(EMPTY_FORM); setEditingId(null); setError(null); setShowModal(true) }}
+              className="flex items-center gap-2 px-4 py-2 bg-[#1B8A4C] text-white rounded-lg text-sm font-medium hover:bg-[#177040]">
+              <Plus className="w-4 h-4" /> Добавить рекомендацию
+            </button>
           </div>
         </div>
-      )}
 
-      {stats.overdue > 0 && (
-        <div className="flex items-center gap-3 p-4 bg-red-50 border border-red-200 rounded-xl">
-          <AlertCircle className="w-5 h-5 text-red-600 flex-shrink-0" />
-          <p className="text-sm text-red-700 font-medium">{stats.overdue} рекомендаций просрочено!</p>
+        {/* KPI */}
+        <div className="grid grid-cols-2 lg:grid-cols-5 gap-3 mt-4">
+          {[
+            { label: 'Всего', value: stats.total, c: 'text-gray-900' },
+            { label: 'Принята', value: stats.accepted, c: 'text-green-600' },
+            { label: 'Не принята', value: stats.notAccepted, c: 'text-red-600' },
+            { label: 'Выполнена', value: stats.done, c: 'text-blue-600' },
+            { label: 'Просрочена', value: stats.overdue, c: 'text-red-600' },
+          ].map(s => (
+            <div key={s.label} className="bg-white rounded-xl border border-gray-100 p-4 shadow-sm">
+              <p className={`text-2xl font-bold ${s.c}`}>{s.value}</p>
+              <p className="text-xs text-gray-500 mt-0.5">{s.label}</p>
+            </div>
+          ))}
         </div>
-      )}
 
-      {/* Filters */}
-      <div className="bg-white rounded-xl border border-gray-100 p-4 shadow-sm flex items-center gap-3 flex-wrap">
-        <div className="relative">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
-          <input type="text" placeholder="Поиск..." value={search} onChange={e => setSearch(e.target.value)}
-            className="pl-9 pr-4 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#1B8A4C] w-48" />
-        </div>
-        <select value={filterYear} onChange={e => { setFilterYear(e.target.value); setFilterMonth('') }} className="px-3 py-2 border border-gray-200 rounded-lg text-sm bg-white focus:outline-none focus:ring-2 focus:ring-[#1B8A4C]">
-          <option value="">Все годы</option>
-          {[2026,2025,2024].map(y => <option key={y} value={y}>{y}</option>)}
-        </select>
-        <select value={filterMonth} onChange={e => setFilterMonth(e.target.value)} className="px-3 py-2 border border-gray-200 rounded-lg text-sm bg-white focus:outline-none focus:ring-2 focus:ring-[#1B8A4C]">
-          <option value="">Все месяцы</option>
-          {MONTHS.map((m,i) => <option key={i} value={String(i+1).padStart(2,'0')}>{m}</option>)}
-        </select>
-        <select value={filterSource} onChange={e => setFilterSource(e.target.value)} className="px-3 py-2 border border-gray-200 rounded-lg text-sm bg-white focus:outline-none focus:ring-2 focus:ring-[#1B8A4C]">
-          <option value="">Все источники</option>
-          {SOURCE_TYPES.map(s => <option key={s.value} value={s.value}>{s.label}</option>)}
-        </select>
-        <select value={filterAccept} onChange={e => setFilterAccept(e.target.value)} className="px-3 py-2 border border-gray-200 rounded-lg text-sm bg-white focus:outline-none focus:ring-2 focus:ring-[#1B8A4C]">
-          <option value="">Все статусы принятия</option>
-          {ACCEPTANCE_STATUSES.map(s => <option key={s}>{s}</option>)}
-        </select>
-        <select value={filterStatus} onChange={e => setFilterStatus(e.target.value)} className="px-3 py-2 border border-gray-200 rounded-lg text-sm bg-white focus:outline-none focus:ring-2 focus:ring-[#1B8A4C]">
-          <option value="">Все статусы исполнения</option>
-          {EXEC_STATUSES.map(s => <option key={s}>{s}</option>)}
-        </select>
-        {(filterSource || filterStatus || filterAccept || filterYear || search) && (
-          <button onClick={() => { setFilterSource(''); setFilterStatus(''); setFilterAccept(''); setFilterYear(''); setFilterMonth(''); setSearch('') }}
-            className="text-xs text-gray-500 hover:text-gray-700 flex items-center gap-1">
-            <X className="w-3.5 h-3.5" /> Сбросить
-          </button>
+        {/* Progress */}
+        {stats.accepted > 0 && (
+          <div className="bg-white rounded-xl border border-gray-100 p-4 shadow-sm mt-3">
+            <div className="flex items-center justify-between mb-2">
+              <p className="text-sm font-medium text-gray-700">Исполнение принятых рекомендаций</p>
+              <p className="text-sm font-bold text-[#1B8A4C]">{completionRate}%</p>
+            </div>
+            <div className="h-3 bg-gray-100 rounded-full overflow-hidden">
+              <div className="h-full bg-[#1B8A4C] rounded-full transition-all" style={{ width: `${completionRate}%` }} />
+            </div>
+          </div>
         )}
+
+        {stats.overdue > 0 && (
+          <div className="flex items-center gap-3 p-4 bg-red-50 border border-red-200 rounded-xl mt-3">
+            <AlertCircle className="w-5 h-5 text-red-600 flex-shrink-0" />
+            <p className="text-sm text-red-700 font-medium">{stats.overdue} рекомендаций просрочено!</p>
+          </div>
+        )}
+
+        {/* Filters */}
+        <div className="bg-white rounded-xl border border-gray-100 p-4 shadow-sm flex items-center gap-3 flex-wrap mt-3">
+          <div className="relative">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+            <input type="text" placeholder="Поиск..." value={search} onChange={e => setSearch(e.target.value)}
+              className="pl-9 pr-4 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#1B8A4C] w-48" />
+          </div>
+          <select value={filterYear} onChange={e => { setFilterYear(e.target.value); setFilterMonth('') }} className="px-3 py-2 border border-gray-200 rounded-lg text-sm bg-white focus:outline-none focus:ring-2 focus:ring-[#1B8A4C]">
+            <option value="">Все годы</option>
+            {[2026,2025,2024].map(y => <option key={y} value={y}>{y}</option>)}
+          </select>
+          <select value={filterMonth} onChange={e => setFilterMonth(e.target.value)} className="px-3 py-2 border border-gray-200 rounded-lg text-sm bg-white focus:outline-none focus:ring-2 focus:ring-[#1B8A4C]">
+            <option value="">Все месяцы</option>
+            {MONTHS.map((m,i) => <option key={i} value={String(i+1).padStart(2,'0')}>{m}</option>)}
+          </select>
+          <select value={filterSource} onChange={e => setFilterSource(e.target.value)} className="px-3 py-2 border border-gray-200 rounded-lg text-sm bg-white focus:outline-none focus:ring-2 focus:ring-[#1B8A4C]">
+            <option value="">Все источники</option>
+            {SOURCE_TYPES.map(s => <option key={s.value} value={s.value}>{s.label}</option>)}
+          </select>
+          <select value={filterAccept} onChange={e => setFilterAccept(e.target.value)} className="px-3 py-2 border border-gray-200 rounded-lg text-sm bg-white focus:outline-none focus:ring-2 focus:ring-[#1B8A4C]">
+            <option value="">Все статусы принятия</option>
+            {ACCEPTANCE_STATUSES.map(s => <option key={s}>{s}</option>)}
+          </select>
+          <select value={filterStatus} onChange={e => setFilterStatus(e.target.value)} className="px-3 py-2 border border-gray-200 rounded-lg text-sm bg-white focus:outline-none focus:ring-2 focus:ring-[#1B8A4C]">
+            <option value="">Все статусы исполнения</option>
+            {EXEC_STATUSES.map(s => <option key={s}>{s}</option>)}
+          </select>
+          {(filterSource || filterStatus || filterAccept || filterYear || search) && (
+            <button onClick={() => { setFilterSource(''); setFilterStatus(''); setFilterAccept(''); setFilterYear(''); setFilterMonth(''); setSearch('') }}
+              className="text-xs text-gray-500 hover:text-gray-700 flex items-center gap-1">
+              <X className="w-3.5 h-3.5" /> Сбросить
+            </button>
+          )}
+        </div>
       </div>
 
+      <div className="space-y-5 mt-5">
       {/* Table */}
       <div className="bg-white rounded-xl border border-gray-100 shadow-sm overflow-hidden">
         <div className="overflow-x-auto">
@@ -427,6 +430,7 @@ export default function RecommendationsPage() {
             </div>
           </div>
         )}
+      </div>
       </div>
 
       {/* Modal */}
