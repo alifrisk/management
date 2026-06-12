@@ -1,4 +1,4 @@
-
+﻿
   'use client'
   import { useEffect, useState } from 'react'
   import { useRouter } from 'next/navigation'
@@ -36,9 +36,9 @@
    /></div>
     if (!user) return null
     return (
-      <div className="flex min-h-screen bg-[#F5F8F6]">
+      <div className="flex h-screen bg-[#F5F8F6]">
         <Sidebar user={user} />
-        <main className="flex-1 min-w-0 overflow-auto">
+        <main className="flex-1 min-w-0 overflow-y-auto">
           <div className="p-6 lg:p-8">{children}</div>
         </main>
       </div>
