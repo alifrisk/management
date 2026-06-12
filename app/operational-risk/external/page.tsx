@@ -3,6 +3,7 @@ import { useState, useEffect, useCallback } from 'react'
 import { supabase } from '@/supabase/client'
 import { Plus, X, Trash2, Eye, Download, Filter, Globe, AlertTriangle, CheckCircle, Minus } from 'lucide-react'
 
+const PAGE_SIZE  = 20
 const RISK_TYPES = ['Внутреннее мошенничество','Внешнее мошенничество','Технологический сбой','Операционная ошибка','Юридический риск','Киберинцидент','Другое']
 const RELEVANCE  = ['Высокая','Средняя','Низкая']
 const COUNTRIES  = ['Таджикистан','Россия','Казахстан','Узбекистан','Кыргызстан','Азербайджан','Грузия','США','Германия','Великобритания','Китай','ОАЭ','Другое']
@@ -54,6 +55,7 @@ export default function ExternalIncidentsPage() {
   const [filterType, setFilterType] = useState('')
   const [filterYear, setFilterYear] = useState('')
   const [filterMonth,setFilterMonth]= useState('')
+  const [currentPage, setCurrentPage] = useState(1)
 
   const fetch_ = useCallback(async () => {
     setLoading(true)
@@ -114,59 +116,66 @@ export default function ExternalIncidentsPage() {
   const inp = "w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#1B8A4C] bg-white"
   const lbl = "block text-xs font-medium text-gray-600 mb-1"
 
+  const totalPages = Math.ceil(incidents.length / PAGE_SIZE)
+  const paginated  = incidents.slice((currentPage - 1) * PAGE_SIZE, currentPage * PAGE_SIZE)
+
   return (
-    <div className="max-w-7xl mx-auto space-y-5">
-      <div className="flex items-center justify-between flex-wrap gap-3">
-        <div>
-          <h1 className="text-xl font-semibold text-gray-900">Реестр внешних инцидентов</h1>
-          <p className="text-sm text-gray-500 mt-0.5">External Loss Database — инциденты из СМИ и открытых источников</p>
+    <div className="max-w-7xl mx-auto">
+
+      {/* Sticky: заголовок + KPI */}
+      <div className="sticky top-0 z-20 -mx-6 lg:-mx-8 px-6 lg:px-8 pt-5 pb-4 bg-[#F5F8F6]" style={{boxShadow: '0 2px 12px rgba(0,0,0,0.06)'}}>
+        <div className="flex items-center justify-between flex-wrap gap-3 mb-4">
+          <div>
+            <h1 className="text-xl font-semibold text-gray-900">Реестр внешних инцидентов</h1>
+            <p className="text-sm text-gray-500 mt-0.5">External Loss Database — инциденты из СМИ и открытых источников</p>
+          </div>
+          <div className="flex items-center gap-2">
+            <button onClick={exportExcel}
+              className="flex items-center gap-1.5 px-3 py-2 border border-gray-200 rounded-lg text-sm text-gray-600 hover:bg-gray-50">
+              <Download className="w-4 h-4" /> Excel
+            </button>
+            <button onClick={() => { setForm(EMPTY); setShowForm(true) }}
+              className="flex items-center gap-2 px-4 py-2 bg-[#1B8A4C] text-white rounded-lg text-sm font-medium hover:bg-[#177040]">
+              <Plus className="w-4 h-4" /> Добавить инцидент
+            </button>
+          </div>
         </div>
-        <div className="flex items-center gap-2">
-          <button onClick={exportExcel}
-            className="flex items-center gap-1.5 px-3 py-2 border border-gray-200 rounded-lg text-sm text-gray-600 hover:bg-gray-50">
-            <Download className="w-4 h-4" /> Excel
-          </button>
-          <button onClick={() => { setForm(EMPTY); setShowForm(true) }}
-            className="flex items-center gap-2 px-4 py-2 bg-[#1B8A4C] text-white rounded-lg text-sm font-medium hover:bg-[#177040]">
-            <Plus className="w-4 h-4" /> Добавить инцидент
-          </button>
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+          {[
+            { l: 'Всего инцидентов', v: incidents.length, c: 'text-gray-900' },
+            { l: 'Высокая применимость', v: incidents.filter(i => i.relevance === 'Высокая').length, c: 'text-red-600' },
+            { l: 'Средняя применимость', v: incidents.filter(i => i.relevance === 'Средняя').length, c: 'text-yellow-600' },
+            { l: 'За этот год', v: incidents.filter(i => new Date(i.incident_date).getFullYear() === new Date().getFullYear()).length, c: 'text-blue-600' },
+          ].map(s => (
+            <div key={s.l} className="bg-white rounded-xl border border-gray-100 p-4 shadow-sm">
+              <p className={`text-2xl font-bold ${s.c}`}>{s.v}</p>
+              <p className="text-xs text-gray-500 mt-0.5">{s.l}</p>
+            </div>
+          ))}
         </div>
       </div>
 
-      {/* Статистика */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
-        {[
-          { l: 'Всего инцидентов', v: incidents.length, c: 'text-gray-900' },
-          { l: 'Высокая применимость', v: incidents.filter(i => i.relevance === 'Высокая').length, c: 'text-red-600' },
-          { l: 'Средняя применимость', v: incidents.filter(i => i.relevance === 'Средняя').length, c: 'text-yellow-600' },
-          { l: 'За этот год', v: incidents.filter(i => new Date(i.incident_date).getFullYear() === new Date().getFullYear()).length, c: 'text-blue-600' },
-        ].map(s => (
-          <div key={s.l} className="bg-white rounded-xl border border-gray-100 p-4 shadow-sm">
-            <p className={`text-2xl font-bold ${s.c}`}>{s.v}</p>
-            <p className="text-xs text-gray-500 mt-0.5">{s.l}</p>
-          </div>
-        ))}
-      </div>
+      <div className="space-y-5 mt-5">
 
       {/* Фильтры */}
       <div className="bg-white rounded-xl border border-gray-100 p-4 shadow-sm flex items-center gap-3 flex-wrap">
         <Filter className="w-4 h-4 text-gray-400" />
-        <select value={filterRel} onChange={e => setFilterRel(e.target.value)}
+        <select value={filterRel} onChange={e => { setFilterRel(e.target.value); setCurrentPage(1) }}
           className="px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#1B8A4C] bg-white">
           <option value="">Все применимости</option>
           {RELEVANCE.map(r => <option key={r}>{r}</option>)}
         </select>
-        <select value={filterType} onChange={e => setFilterType(e.target.value)}
+        <select value={filterType} onChange={e => { setFilterType(e.target.value); setCurrentPage(1) }}
           className="px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#1B8A4C] bg-white">
           <option value="">Все типы риска</option>
           {RISK_TYPES.map(r => <option key={r}>{r}</option>)}
         </select>
-        <select value={filterYear} onChange={e => { setFilterYear(e.target.value); setFilterMonth('') }}
+        <select value={filterYear} onChange={e => { setFilterYear(e.target.value); setFilterMonth(''); setCurrentPage(1) }}
           className="px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#1B8A4C] bg-white">
           <option value="">Все годы</option>
           {[2026,2025,2024,2023].map(y => <option key={y} value={y}>{y}</option>)}
         </select>
-        <select value={filterMonth} onChange={e => setFilterMonth(e.target.value)}
+        <select value={filterMonth} onChange={e => { setFilterMonth(e.target.value); setCurrentPage(1) }}
           className="px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#1B8A4C] bg-white">
           <option value="">Все месяцы</option>
           {['Январь','Февраль','Март','Апрель','Май','Июнь','Июль','Август','Сентябрь','Октябрь','Ноябрь','Декабрь'].map((m,i) =>
@@ -174,7 +183,7 @@ export default function ExternalIncidentsPage() {
           )}
         </select>
         {(filterRel || filterType || filterYear || filterMonth) && (
-          <button onClick={() => { setFilterRel(''); setFilterType(''); setFilterYear(''); setFilterMonth('') }}
+          <button onClick={() => { setFilterRel(''); setFilterType(''); setFilterYear(''); setFilterMonth(''); setCurrentPage(1) }}
             className="text-xs text-gray-500 hover:text-gray-700 flex items-center gap-1">
             <X className="w-3.5 h-3.5" /> Сбросить
           </button>
@@ -197,7 +206,7 @@ export default function ExternalIncidentsPage() {
                 ? <tr><td colSpan={8} className="text-center py-12 text-gray-400">Загрузка...</td></tr>
                 : incidents.length === 0
                 ? <tr><td colSpan={8} className="text-center py-12 text-gray-400">Нет записей</td></tr>
-                : incidents.map(i => (
+                : paginated.map(i => (
                   <tr key={i.id} className="hover:bg-gray-50">
                     <td className="px-4 py-3 text-xs text-gray-500 whitespace-nowrap">
                       {new Date(i.incident_date).toLocaleDateString('ru-RU')}
@@ -238,7 +247,33 @@ export default function ExternalIncidentsPage() {
             </tbody>
           </table>
         </div>
+        {incidents.length > 0 && (
+          <div className="px-4 py-3 border-t border-gray-100 flex items-center justify-between">
+            <p className="text-xs text-gray-500">
+              Показано {(currentPage - 1) * PAGE_SIZE + 1}–{Math.min(currentPage * PAGE_SIZE, incidents.length)} из {incidents.length} инцидентов
+            </p>
+            {totalPages > 1 && (
+              <div className="flex items-center gap-1">
+                <button onClick={() => setCurrentPage(p => Math.max(1, p - 1))} disabled={currentPage === 1}
+                  className="px-2.5 py-1 text-xs border border-gray-200 rounded disabled:opacity-40 hover:bg-gray-50">←</button>
+                {Array.from({ length: Math.min(totalPages, 7) }, (_, idx) => {
+                  const p = totalPages <= 7 ? idx + 1 : currentPage <= 4 ? idx + 1 : currentPage >= totalPages - 3 ? totalPages - 6 + idx : currentPage - 3 + idx
+                  return (
+                    <button key={p} onClick={() => setCurrentPage(p)}
+                      className={`px-2.5 py-1 text-xs rounded border ${currentPage === p ? 'bg-[#1B8A4C] text-white border-[#1B8A4C]' : 'border-gray-200 hover:bg-gray-50'}`}>
+                      {p}
+                    </button>
+                  )
+                })}
+                <button onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))} disabled={currentPage === totalPages}
+                  className="px-2.5 py-1 text-xs border border-gray-200 rounded disabled:opacity-40 hover:bg-gray-50">→</button>
+              </div>
+            )}
+          </div>
+        )}
       </div>
+
+      </div>{/* end space-y-5 mt-5 */}
 
       {/* View Modal */}
       {viewing && (
