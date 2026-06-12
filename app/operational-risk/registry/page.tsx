@@ -312,41 +312,46 @@ export default function RegistryPage() {
   const labelCls = "block text-xs font-medium text-gray-600 mb-1"
 
   return (
-    <div className="max-w-full space-y-4">
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-xl font-semibold text-gray-900">Реестр операционных инцидентов</h1>
-          <p className="text-sm text-gray-500 mt-0.5">Учёт и управление операционными инцидентами</p>
-        </div>
-        <div className="flex items-center gap-2">
-          {pendingForms.length > 0 && (
-            <button onClick={() => setShowFormsModal(true)} className="flex items-center gap-2 px-3 py-2 bg-amber-50 border border-amber-200 rounded-lg text-sm font-medium text-amber-700 hover:bg-amber-100 transition-colors">
-              <Bell className="w-4 h-4" /> {pendingForms.length} новых анкет
+    <div className="max-w-full">
+
+      {/* Sticky: заголовок + KPI */}
+      <div className="sticky top-0 z-20 -mx-6 lg:-mx-8 px-6 lg:px-8 pt-5 pb-4 bg-[#F5F8F6]" style={{boxShadow: '0 2px 12px rgba(0,0,0,0.06)'}}>
+        <div className="flex items-center justify-between mb-4">
+          <div>
+            <h1 className="text-xl font-semibold text-gray-900">Реестр операционных инцидентов</h1>
+            <p className="text-sm text-gray-500 mt-0.5">Учёт и управление операционными инцидентами</p>
+          </div>
+          <div className="flex items-center gap-2">
+            {pendingForms.length > 0 && (
+              <button onClick={() => setShowFormsModal(true)} className="flex items-center gap-2 px-3 py-2 bg-amber-50 border border-amber-200 rounded-lg text-sm font-medium text-amber-700 hover:bg-amber-100 transition-colors">
+                <Bell className="w-4 h-4" /> {pendingForms.length} новых анкет
+              </button>
+            )}
+            <button onClick={exportToExcel} className="flex items-center gap-2 px-3 py-2 border border-gray-200 rounded-lg text-sm font-medium text-gray-600 hover:bg-gray-50 transition-colors">
+              <Download className="w-4 h-4" /> Экспорт Excel
             </button>
-          )}
-          <button onClick={exportToExcel} className="flex items-center gap-2 px-3 py-2 border border-gray-200 rounded-lg text-sm font-medium text-gray-600 hover:bg-gray-50 transition-colors">
-            <Download className="w-4 h-4" /> Экспорт Excel
-          </button>
-          <button onClick={() => { setFormData(EMPTY_FORM); setEditingId(null); setActiveTab(1); setShowModal(true) }}
-            className="flex items-center gap-2 px-4 py-2 bg-[#1B8A4C] text-white rounded-lg text-sm font-medium hover:bg-[#177040] transition-colors">
-            <Plus className="w-4 h-4" /> Добавить инцидент
-          </button>
+            <button onClick={() => { setFormData(EMPTY_FORM); setEditingId(null); setActiveTab(1); setShowModal(true) }}
+              className="flex items-center gap-2 px-4 py-2 bg-[#1B8A4C] text-white rounded-lg text-sm font-medium hover:bg-[#177040] transition-colors">
+              <Plus className="w-4 h-4" /> Добавить инцидент
+            </button>
+          </div>
+        </div>
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+          {[
+            { label: 'Всего', value: incidents.length, color: 'text-gray-900' },
+            { label: 'Открытые', value: incidents.filter(i => i.incident_status === 'Открыт').length, color: 'text-blue-600' },
+            { label: 'В процессе', value: incidents.filter(i => i.incident_status === 'В процессе').length, color: 'text-yellow-600' },
+            { label: 'Закрытые', value: incidents.filter(i => i.incident_status === 'Закрыт').length, color: 'text-green-600' },
+          ].map(s => (
+            <div key={s.label} className="bg-white rounded-xl border border-gray-100 p-4 shadow-sm">
+              <p className={`text-2xl font-bold ${s.color}`}>{s.value}</p>
+              <p className="text-xs text-gray-500 mt-0.5">{s.label}</p>
+            </div>
+          ))}
         </div>
       </div>
 
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
-        {[
-          { label: 'Всего', value: incidents.length, color: 'text-gray-900' },
-          { label: 'Открытые', value: incidents.filter(i => i.incident_status === 'Открыт').length, color: 'text-blue-600' },
-          { label: 'В процессе', value: incidents.filter(i => i.incident_status === 'В процессе').length, color: 'text-yellow-600' },
-          { label: 'Закрытые', value: incidents.filter(i => i.incident_status === 'Закрыт').length, color: 'text-green-600' },
-        ].map(s => (
-          <div key={s.label} className="bg-white rounded-xl border border-gray-100 p-4 shadow-sm">
-            <p className={`text-2xl font-bold ${s.color}`}>{s.value}</p>
-            <p className="text-xs text-gray-500 mt-0.5">{s.label}</p>
-          </div>
-        ))}
-      </div>
+      <div className="space-y-4 mt-5">
 
       <div className="bg-white rounded-xl border border-gray-100 p-4 shadow-sm">
         <div className="flex items-center gap-3">
@@ -478,6 +483,8 @@ export default function RegistryPage() {
           </div>
         )}
       </div>
+
+      </div>{/* end space-y-4 mt-5 */}
 
       {/* Pending Forms Modal */}
       {showFormsModal && (
