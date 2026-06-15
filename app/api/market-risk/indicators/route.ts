@@ -36,8 +36,8 @@ export async function GET() {
       get(`https://cdn.jsdelivr.net/npm/@fawazahmed0/currency-api@${dateStr(0)}/v1/currencies/usd.json`),
       get(`https://cdn.jsdelivr.net/npm/@fawazahmed0/currency-api@${dateStr(1)}/v1/currencies/usd.json`),
       get(`https://cdn.jsdelivr.net/npm/@fawazahmed0/currency-api@${dateStr(7)}/v1/currencies/usd.json`),
-      get('https://api.coingecko.com/api/v3/simple/price?ids=bitcoin,ethereum&vs_currencies=usd&include_24hr_change=true'),
-      ...syms.map(t => get(`https://query1.finance.yahoo.com/v8/finance/chart/${t.s}?interval=1d&range=5d`)),
+      get('https://api.coingecko.com/api/v3/simple/price?ids=bitcoin,ethereum&vs_currencies=usd&include_24hr_change=true&include_7d_change=true'),
+      ...syms.map(t => get(`https://query1.finance.yahoo.com/v8/finance/chart/${t.s}?interval=1d&range=30d`)),
     ])
 
     // ── Currencies ──────────────────────────────────────────────────────────
@@ -61,20 +61,36 @@ export async function GET() {
     // ── Crypto ──────────────────────────────────────────────────────────────
     const cgd = (cg ?? {}) as Record<string, Record<string, number>>
     const crypto = [
-      cgd.bitcoin?.usd  && { id:'btc', label:'Bitcoin (BTC)',  rate: cgd.bitcoin.usd,  change: cgd.bitcoin.usd_24h_change  != null ? Math.round(cgd.bitcoin.usd_24h_change*100)/100  : null, unit:'USD' },
-      cgd.ethereum?.usd && { id:'eth', label:'Ethereum (ETH)', rate: cgd.ethereum.usd, change: cgd.ethereum.usd_24h_change != null ? Math.round(cgd.ethereum.usd_24h_change*100)/100 : null, unit:'USD' },
+      cgd.bitcoin?.usd  && { id:'btc', label:'Bitcoin (BTC)',  rate: cgd.bitcoin.usd,  change: cgd.bitcoin.usd_24h_change  != null ? Math.round(cgd.bitcoin.usd_24h_change*100)/100  : null, change7d: cgd.bitcoin.usd_7d_change   != null ? Math.round(cgd.bitcoin.usd_7d_change*100)/100   : null, unit:'USD' },
+      cgd.ethereum?.usd && { id:'eth', label:'Ethereum (ETH)', rate: cgd.ethereum.usd, change: cgd.ethereum.usd_24h_change != null ? Math.round(cgd.ethereum.usd_24h_change*100)/100 : null, change7d: cgd.ethereum.usd_7d_change  != null ? Math.round(cgd.ethereum.usd_7d_change*100)/100  : null, unit:'USD' },
     ].filter(Boolean)
 
     // ── Commodities ─────────────────────────────────────────────────────────
     const commodities = yahooResults.map((d, i) => {
       try {
-        const r0   = ((d as Record<string,unknown>)?.chart as Record<string,unknown>)?.result as Record<string,unknown>[]
-        const meta = r0[0].meta as Record<string,number>
-        const cls  = ((r0[0].indicators as Record<string,unknown[]>)?.quote[0] as Record<string,number[]>)?.close ?? []
-        const cur2 = meta.regularMarketPrice || (cls.length > 0 ? cls[cls.length-1] : 0)
-        const prv  = cls.length > 1 ? cls[cls.length-2] : meta.previousClose
+        const r0         = ((d as Record<string,unknown>)?.chart as Record<string,unknown>)?.result as Record<string,unknown>[]
+        const meta       = r0[0].meta as Record<string,number>
+        const quote      = (r0[0].indicators as Record<string,unknown[]>)?.quote[0] as Record<string,number[]>
+        const cls        = quote?.close ?? []
+        const timestamps = (r0[0].timestamp as number[]) ?? []
+        const cur2       = meta.regularMarketPrice || (cls.length > 0 ? cls[cls.length-1] : 0)
+        const prv        = cls.length > 1 ? cls[cls.length-2] : meta.previousClose
         if (!cur2) return null
-        return { id: syms[i].id, label: syms[i].label, rate: Math.round(cur2*100)/100, change: prv ? Math.round((cur2-prv)/prv*10000)/100 : null, unit: syms[i].u }
+
+        // find close price closest to 7 calendar days ago
+        let change7d: number | null = null
+        const ts7 = Date.now() / 1000 - 7 * 86400
+        if (timestamps.length > 0 && cls.length > 0) {
+          let bestIdx = 0, bestDiff = Math.abs(timestamps[0] - ts7)
+          for (let j = 1; j < timestamps.length; j++) {
+            const diff = Math.abs(timestamps[j] - ts7)
+            if (diff < bestDiff) { bestDiff = diff; bestIdx = j }
+          }
+          const prv7 = cls[bestIdx]
+          if (prv7) change7d = Math.round((cur2 - prv7) / prv7 * 10000) / 100
+        }
+
+        return { id: syms[i].id, label: syms[i].label, rate: Math.round(cur2*100)/100, change: prv ? Math.round((cur2-prv)/prv*10000)/100 : null, change7d, unit: syms[i].u }
       } catch { return null }
     }).filter(Boolean)
 
