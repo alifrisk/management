@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server'
+import { aiGenerateText } from '@/lib/ai-provider'
 export async function POST(request: Request) {
   try {
     const d = await request.json()
@@ -51,23 +52,7 @@ ROE (рентабельность):         ${pct(d.p1_roe)} → ${pct(d.p2_roe)
 5. ОБЩИЙ ВЫВОД
 Финансовое состояние улучшилось/ухудшилось/стабильно. Рекомендация по взаимодействию.`
 
-    const response = await fetch('https://api.anthropic.com/v1/messages', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'x-api-key': process.env.ANTHROPIC_API_KEY || '',
-        'anthropic-version': '2023-06-01',
-      },
-      body: JSON.stringify({
-        model: 'claude-sonnet-4-5',
-        max_tokens: 2000,
-        messages: [{ role: 'user', content: prompt }]
-      })
-    })
-    const data = await response.json()
-    if (!response.ok) throw new Error(`API: ${data?.error?.message || response.status}`)
-    const text = data.content?.[0]?.text || ''
-    if (!text) throw new Error('Пустой ответ AI')
+    const text = await aiGenerateText(prompt, 2000)
     return NextResponse.json({ conclusion: text })
   } catch (error) {
     console.error('Financial analysis error:', error)

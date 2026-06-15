@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useCallback } from 'react'
 import { supabase } from '@/supabase/client'
-import { Plus, FileText, Download, Eye, Trash2, X, Loader2, CheckCircle2, AlertCircle, Filter } from 'lucide-react'
+import { Plus, FileText, Download, Eye, Trash2, X, Loader2, CheckCircle2, AlertCircle, Filter, Upload } from 'lucide-react'
 
 interface Collateral { type: string; description: string; value: number }
 
@@ -156,6 +156,10 @@ export default function CreditRiskPage() {
   const [tab, setTab] = useState(1)
   const [filterYear, setFilterYear] = useState('')
   const [filterMonth, setFilterMonth] = useState('')
+  const [inputMode, setInputMode] = useState<'manual' | 'image'>('manual')
+  const [imageFile, setImageFile] = useState<File | null>(null)
+  const [extracting, setExtracting] = useState(false)
+  const [extractMsg, setExtractMsg] = useState<string | null>(null)
 
   const fetch_ = useCallback(async () => {
     setLoading(true)
@@ -286,6 +290,36 @@ export default function CreditRiskPage() {
     } finally { setGenerating(false) }
   }
 
+  async function handleExtract() {
+    if (!imageFile) return
+    setExtracting(true); setExtractMsg(null)
+    try {
+      const base64 = await new Promise<string>((resolve, reject) => {
+        const reader = new FileReader()
+        reader.onload = e => resolve((e.target?.result as string).split(',')[1])
+        reader.onerror = reject
+        reader.readAsDataURL(imageFile)
+      })
+      const res = await fetch('/api/extract-from-image', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ imageBase64: base64, mimeType: imageFile.type, module: 'credit' }),
+      })
+      const data = await res.json()
+      if (data.error) throw new Error(data.error)
+      const extracted: Record<string, string> = {}
+      for (const [k, v] of Object.entries(data.data)) {
+        if (v !== null && v !== undefined && v !== 0) extracted[k] = String(v)
+      }
+      setForm(prev => ({ ...prev, ...extracted }))
+      setInputMode('manual')
+      setImageFile(null)
+      setExtractMsg('Данные извлечены из скриншота. Проверьте и при необходимости исправьте.')
+    } catch (err: unknown) {
+      setExtractMsg('Ошибка: ' + (err instanceof Error ? err.message : String(err)))
+    } finally { setExtracting(false) }
+  }
+
   async function downloadWord(c: CreditConclusion) {
     try {
       const res = await fetch('/api/credit-risk/export-word', {
@@ -320,7 +354,7 @@ export default function CreditRiskPage() {
             <h1 className="text-xl font-semibold text-gray-900">Кредитный риск — AI-заключения</h1>
             <p className="text-sm text-gray-500 mt-0.5">Анализ заёмщиков SME с помощью искусственного интеллекта</p>
           </div>
-          <button onClick={() => { setForm(EMPTY); setCollaterals([{type:'Недвижимость',description:'',value:0}]); setTab(1); setShowModal(true) }}
+          <button onClick={() => { setForm(EMPTY); setCollaterals([{type:'Недвижимость',description:'',value:0}]); setTab(1); setInputMode('manual'); setImageFile(null); setExtractMsg(null); setShowModal(true) }}
             className="flex items-center gap-2 px-4 py-2 bg-[#1B8A4C] text-white rounded-lg text-sm font-medium hover:bg-[#177040]">
             <Plus className="w-4 h-4" /> Новое заключение
           </button>
@@ -444,7 +478,20 @@ export default function CreditRiskPage() {
               <button onClick={() => { setShowModal(false); setForm(EMPTY) }} className="text-gray-400 hover:text-gray-600"><X className="w-5 h-5" /></button>
             </div>
 
-            {/* Tabs */}
+            {/* Mode switcher */}
+            <div className="flex border-b border-gray-100 px-2 gap-0">
+              <button onClick={() => { setInputMode('manual'); setExtractMsg(null) }}
+                className={`px-4 py-2.5 text-xs font-semibold border-b-2 transition-colors flex items-center gap-1.5 ${inputMode === 'manual' ? 'border-[#1B8A4C] text-[#1B8A4C]' : 'border-transparent text-gray-400 hover:text-gray-600'}`}>
+                <FileText className="w-3.5 h-3.5" /> Ввести вручную
+              </button>
+              <button onClick={() => { setInputMode('image'); setExtractMsg(null) }}
+                className={`px-4 py-2.5 text-xs font-semibold border-b-2 transition-colors flex items-center gap-1.5 ${inputMode === 'image' ? 'border-[#1B8A4C] text-[#1B8A4C]' : 'border-transparent text-gray-400 hover:text-gray-600'}`}>
+                <Upload className="w-3.5 h-3.5" /> Загрузить скрин
+              </button>
+            </div>
+
+            {/* Tabs — only in manual mode */}
+            {inputMode === 'manual' && (
             <div className="flex border-b border-gray-100 px-2">
               {[{n:1,t:'Заёмщик'},{n:2,t:'Баланс'},{n:3,t:'ОПУ'},{n:4,t:'КешФлоу'},{n:5,t:'Залог'}].map(({n:tn,t}) => (
                 <button key={tn} onClick={() => setTab(tn)}
@@ -453,8 +500,50 @@ export default function CreditRiskPage() {
                 </button>
               ))}
             </div>
+            )}
 
             <div className="flex-1 overflow-y-auto p-5">
+              {/* Image upload zone */}
+              {inputMode === 'image' && (
+                <div className="space-y-4">
+                  <p className="text-sm text-gray-600">Загрузите скриншот финансовой отчётности — баланс, ОПУ или кеш-флоу. AI извлечёт данные и заполнит форму автоматически.</p>
+                  <label className="block cursor-pointer">
+                    <div className={`border-2 border-dashed rounded-xl p-10 text-center transition-colors ${imageFile ? 'border-[#1B8A4C] bg-green-50' : 'border-gray-200 hover:border-[#1B8A4C] hover:bg-gray-50'}`}>
+                      {imageFile ? (
+                        <div className="space-y-2">
+                          <CheckCircle2 className="w-10 h-10 text-green-500 mx-auto" />
+                          <p className="text-sm font-medium text-gray-800">{imageFile.name}</p>
+                          <p className="text-xs text-gray-400">{(imageFile.size / 1024).toFixed(0)} KB · Готово к извлечению</p>
+                        </div>
+                      ) : (
+                        <div className="space-y-2">
+                          <Upload className="w-10 h-10 text-gray-300 mx-auto" />
+                          <p className="text-sm font-medium text-gray-500">Нажмите или перетащите файл</p>
+                          <p className="text-xs text-gray-400">PNG, JPG, WEBP · до 5 МБ</p>
+                        </div>
+                      )}
+                    </div>
+                    <input type="file" accept="image/png,image/jpeg,image/webp" className="hidden"
+                      onChange={e => { setImageFile(e.target.files?.[0] || null); setExtractMsg(null) }} />
+                  </label>
+                  {extractMsg && (
+                    <div className="flex items-center gap-2 p-3 bg-red-50 border border-red-100 rounded-lg">
+                      <AlertCircle className="w-4 h-4 text-red-500 flex-shrink-0" />
+                      <p className="text-sm text-red-600">{extractMsg}</p>
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {/* Manual form */}
+              {inputMode === 'manual' && <>
+              {extractMsg && (
+                <div className="flex items-center gap-2 p-3 bg-green-50 border border-green-100 rounded-lg mb-4">
+                  <CheckCircle2 className="w-4 h-4 text-green-500 flex-shrink-0" />
+                  <p className="text-sm text-green-700 flex-1">{extractMsg}</p>
+                  <button onClick={() => setExtractMsg(null)}><X className="w-3.5 h-3.5 text-gray-400 hover:text-gray-600" /></button>
+                </div>
+              )}
               {error && <div className="flex items-center gap-2 p-3 bg-red-50 border border-red-100 rounded-lg mb-4"><AlertCircle className="w-4 h-4 text-red-500 flex-shrink-0" /><p className="text-sm text-red-600">{error}</p></div>}
 
               {/* Tab 1: Заёмщик */}
@@ -633,18 +722,36 @@ export default function CreditRiskPage() {
                   </div>
                 </div>
               )}
+              </>}
             </div>
 
             <div className="flex items-center justify-between p-5 border-t border-gray-100">
-              <div>{tab > 1 && <button onClick={() => setTab(tab-1)} className="px-4 py-2 border border-gray-200 rounded-lg text-sm text-gray-600 hover:bg-gray-50">← Назад</button>}</div>
-              <div className="flex gap-2">
-                <button onClick={() => { setShowModal(false); setForm(EMPTY) }} className="px-4 py-2 border border-gray-200 rounded-lg text-sm text-gray-600 hover:bg-gray-50">Отмена</button>
-                {tab < 5
-                  ? <button onClick={() => setTab(tab+1)} className="px-4 py-2 bg-[#1B8A4C] text-white rounded-lg text-sm font-medium hover:bg-[#177040]">Далее →</button>
-                  : <button onClick={handleGenerate} disabled={generating} className="flex items-center gap-2 px-4 py-2 bg-[#1B8A4C] text-white rounded-lg text-sm font-medium hover:bg-[#177040] disabled:opacity-70">
-                      {generating ? <><Loader2 className="w-4 h-4 animate-spin" /> AI анализирует...</> : <><CheckCircle2 className="w-4 h-4" /> Сгенерировать</>}
-                    </button>}
-              </div>
+              {inputMode === 'image' ? (
+                <>
+                  <div />
+                  <div className="flex gap-2">
+                    <button onClick={() => { setShowModal(false); setForm(EMPTY); setInputMode('manual'); setImageFile(null); setExtractMsg(null) }}
+                      className="px-4 py-2 border border-gray-200 rounded-lg text-sm text-gray-600 hover:bg-gray-50">Отмена</button>
+                    <button onClick={handleExtract} disabled={!imageFile || extracting}
+                      className="flex items-center gap-2 px-4 py-2 bg-[#1B8A4C] text-white rounded-lg text-sm font-medium hover:bg-[#177040] disabled:opacity-50">
+                      {extracting ? <><Loader2 className="w-4 h-4 animate-spin" /> Извлечение...</> : <><Upload className="w-4 h-4" /> Извлечь данные</>}
+                    </button>
+                  </div>
+                </>
+              ) : (
+                <>
+                  <div>{tab > 1 && <button onClick={() => setTab(tab-1)} className="px-4 py-2 border border-gray-200 rounded-lg text-sm text-gray-600 hover:bg-gray-50">← Назад</button>}</div>
+                  <div className="flex gap-2">
+                    <button onClick={() => { setShowModal(false); setForm(EMPTY); setInputMode('manual'); setImageFile(null); setExtractMsg(null) }}
+                      className="px-4 py-2 border border-gray-200 rounded-lg text-sm text-gray-600 hover:bg-gray-50">Отмена</button>
+                    {tab < 5
+                      ? <button onClick={() => setTab(tab+1)} className="px-4 py-2 bg-[#1B8A4C] text-white rounded-lg text-sm font-medium hover:bg-[#177040]">Далее →</button>
+                      : <button onClick={handleGenerate} disabled={generating} className="flex items-center gap-2 px-4 py-2 bg-[#1B8A4C] text-white rounded-lg text-sm font-medium hover:bg-[#177040] disabled:opacity-70">
+                          {generating ? <><Loader2 className="w-4 h-4 animate-spin" /> AI анализирует...</> : <><CheckCircle2 className="w-4 h-4" /> Сгенерировать</>}
+                        </button>}
+                  </div>
+                </>
+              )}
             </div>
           </div>
         </div>

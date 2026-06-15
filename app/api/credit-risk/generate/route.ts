@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server'
+import { aiGenerateText } from '@/lib/ai-provider'
 
 export async function POST(request: Request) {
   try {
@@ -62,27 +63,7 @@ ${(formData.collaterals||[]).map((c: {type:string;description:string;value:numbe
 РЕКОМЕНДАЦИЯ: [Одобрить / Условно одобрить / Отклонить]
 УРОВЕНЬ РИСКА: [Низкий / Средний / Высокий]`
 
-    const response = await fetch('https://api.anthropic.com/v1/messages', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'x-api-key': process.env.ANTHROPIC_API_KEY || '',
-        'anthropic-version': '2023-06-01',
-      },
-      body: JSON.stringify({
-        model: 'claude-sonnet-4-5',
-        max_tokens: 3000,
-        messages: [{ role: 'user', content: prompt }]
-      })
-    })
-
-    const data = await response.json()
-    if (!response.ok) {
-      console.error('Anthropic API error:', data)
-      throw new Error(`Anthropic API: ${data?.error?.message || response.status}`)
-    }
-    const text = data.content?.[0]?.text || ''
-    if (!text) throw new Error('AI вернул пустой ответ')
+    const text = await aiGenerateText(prompt, 3000)
 
     const recommMatch = text.match(/РЕКОМЕНДАЦИЯ:\s*(.+)/i)
     const riskMatch = text.match(/УРОВЕНЬ РИСКА:\s*(.+)/i)
