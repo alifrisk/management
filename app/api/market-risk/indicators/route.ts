@@ -36,7 +36,7 @@ export async function GET() {
       get(`https://cdn.jsdelivr.net/npm/@fawazahmed0/currency-api@${dateStr(0)}/v1/currencies/usd.json`),
       get(`https://cdn.jsdelivr.net/npm/@fawazahmed0/currency-api@${dateStr(1)}/v1/currencies/usd.json`),
       get(`https://cdn.jsdelivr.net/npm/@fawazahmed0/currency-api@${dateStr(7)}/v1/currencies/usd.json`),
-      get('https://api.coingecko.com/api/v3/simple/price?ids=bitcoin,ethereum&vs_currencies=usd&include_24hr_change=true&include_7d_change=true'),
+      get('https://api.coingecko.com/api/v3/coins/markets?vs_currency=usd&ids=bitcoin,ethereum&price_change_percentage=7d'),
       ...syms.map(t => get(`https://query1.finance.yahoo.com/v8/finance/chart/${t.s}?interval=1d&range=30d`)),
     ])
 
@@ -59,10 +59,11 @@ export async function GET() {
     ]
 
     // ── Crypto ──────────────────────────────────────────────────────────────
-    const cgd = (cg ?? {}) as Record<string, Record<string, number>>
+    const cgArr = Array.isArray(cg) ? (cg as Record<string, number>[]) : []
+    const cgMap = Object.fromEntries(cgArr.map(c => [c.id, c]))
     const crypto = [
-      cgd.bitcoin?.usd  && { id:'btc', label:'Bitcoin (BTC)',  rate: cgd.bitcoin.usd,  change: cgd.bitcoin.usd_24h_change  != null ? Math.round(cgd.bitcoin.usd_24h_change*100)/100  : null, change7d: cgd.bitcoin.usd_7d_change   != null ? Math.round(cgd.bitcoin.usd_7d_change*100)/100   : null, unit:'USD' },
-      cgd.ethereum?.usd && { id:'eth', label:'Ethereum (ETH)', rate: cgd.ethereum.usd, change: cgd.ethereum.usd_24h_change != null ? Math.round(cgd.ethereum.usd_24h_change*100)/100 : null, change7d: cgd.ethereum.usd_7d_change  != null ? Math.round(cgd.ethereum.usd_7d_change*100)/100  : null, unit:'USD' },
+      cgMap.bitcoin  && { id:'btc', label:'Bitcoin (BTC)',  rate: cgMap.bitcoin.current_price,  change: cgMap.bitcoin.price_change_percentage_24h   != null ? Math.round(cgMap.bitcoin.price_change_percentage_24h*100)/100   : null, change7d: cgMap.bitcoin.price_change_percentage_7d_in_currency  != null ? Math.round(cgMap.bitcoin.price_change_percentage_7d_in_currency*100)/100  : null, unit:'USD' },
+      cgMap.ethereum && { id:'eth', label:'Ethereum (ETH)', rate: cgMap.ethereum.current_price, change: cgMap.ethereum.price_change_percentage_24h  != null ? Math.round(cgMap.ethereum.price_change_percentage_24h*100)/100  : null, change7d: cgMap.ethereum.price_change_percentage_7d_in_currency != null ? Math.round(cgMap.ethereum.price_change_percentage_7d_in_currency*100)/100 : null, unit:'USD' },
     ].filter(Boolean)
 
     // ── Commodities ─────────────────────────────────────────────────────────
