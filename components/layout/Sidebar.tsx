@@ -5,46 +5,50 @@ import { usePathname } from 'next/navigation'
 import { supabase } from '@/supabase/client'
 import { UserProfile } from '@/types'
 import { cn } from '@/lib/utils'
+import { useI18n, type TranslationKey, type Lang } from '@/lib/i18n'
 import { Shield, FileText, TrendingUp, Droplets, LayoutDashboard, ChevronDown, ChevronRight, LogOut, Settings, Users, Menu, X, ClipboardList, BarChart3, Map, FolderOpen, ClipboardCheck, BookUser, Activity, Building2, ListTodo, Newspaper, Bot, LineChart, Sun, Moon } from 'lucide-react'
+
 interface SidebarProps { user: UserProfile }
+
 const NAV_ITEMS = [
-  { title: 'Главная', href: '/dashboard', icon: <LayoutDashboard className="w-4 h-4" />, adminOnly: false },
+  { titleKey: 'nav.home' as TranslationKey, href: '/dashboard', icon: <LayoutDashboard className="w-4 h-4" />, adminOnly: false },
   {
-    title: 'Операционный риск', href: '/operational-risk', icon: <Shield className="w-4 h-4" />, adminOnly: false,
+    titleKey: 'nav.operationalRisk' as TranslationKey, href: '/operational-risk', icon: <Shield className="w-4 h-4" />, adminOnly: false,
     children: [
-      { title: 'Реестр инцидентов', href: '/operational-risk/registry', icon: <ClipboardList className="w-3.5 h-3.5" /> },
-      { title: 'Внешние инциденты', href: '/operational-risk/external', icon: <Newspaper className="w-3.5 h-3.5" /> },
-      { title: 'Дашборд аналитика', href: '/operational-risk/dashboard', icon: <BarChart3 className="w-3.5 h-3.5" /> },
-      { title: 'Картирование рисков', href: '/operational-risk/mapping', icon: <Map className="w-3.5 h-3.5" /> },
-      { title: 'Стресс-тест', href: '/operational-risk/stress-test', icon: <Activity className="w-3.5 h-3.5" /> },
+      { titleKey: 'nav.incidentRegistry' as TranslationKey,   href: '/operational-risk/registry',   icon: <ClipboardList className="w-3.5 h-3.5" /> },
+      { titleKey: 'nav.externalIncidents' as TranslationKey,  href: '/operational-risk/external',   icon: <Newspaper className="w-3.5 h-3.5" /> },
+      { titleKey: 'nav.analyticsDashboard' as TranslationKey, href: '/operational-risk/dashboard',  icon: <BarChart3 className="w-3.5 h-3.5" /> },
+      { titleKey: 'nav.riskMapping' as TranslationKey,        href: '/operational-risk/mapping',    icon: <Map className="w-3.5 h-3.5" /> },
+      { titleKey: 'nav.stressTest' as TranslationKey,         href: '/operational-risk/stress-test',icon: <Activity className="w-3.5 h-3.5" /> },
     ],
   },
   {
-    title: 'Кредитный риск', href: '/credit-risk', icon: <FileText className="w-4 h-4" />, adminOnly: true,
+    titleKey: 'nav.creditRisk' as TranslationKey, href: '/credit-risk', icon: <FileText className="w-4 h-4" />, adminOnly: true,
     children: [
-      { title: 'Заключения SME', href: '/credit-risk', icon: <FileText className="w-3.5 h-3.5" /> },
-      { title: 'Реестр заёмщиков', href: '/borrowers', icon: <BookUser className="w-3.5 h-3.5" /> },
-      { title: 'Стресс-тест', href: '/credit-risk/stress-test', icon: <Activity className="w-3.5 h-3.5" /> },
+      { titleKey: 'nav.smeConclusions' as TranslationKey,   href: '/credit-risk',            icon: <FileText className="w-3.5 h-3.5" /> },
+      { titleKey: 'nav.borrowerRegistry' as TranslationKey, href: '/borrowers',              icon: <BookUser className="w-3.5 h-3.5" /> },
+      { titleKey: 'nav.stressTest' as TranslationKey,       href: '/credit-risk/stress-test',icon: <Activity className="w-3.5 h-3.5" /> },
     ],
   },
   {
-    title: 'Рыночный риск', href: '/market-risk', icon: <TrendingUp className="w-4 h-4" />, adminOnly: true,
+    titleKey: 'nav.marketRisk' as TranslationKey, href: '/market-risk', icon: <TrendingUp className="w-4 h-4" />, adminOnly: true,
     children: [
-      { title: 'Фин. анализ контрагента', href: '/market-risk/financial-analysis', icon: <BarChart3 className="w-3.5 h-3.5" /> },
-      { title: 'Оценка контрагентов', href: '/market-risk', icon: <TrendingUp className="w-3.5 h-3.5" /> },
-      { title: 'Реестр контрагентов', href: '/counterparties', icon: <Building2 className="w-3.5 h-3.5" /> },
-      { title: 'Стресс-тест', href: '/market-risk/stress-test', icon: <Activity className="w-3.5 h-3.5" /> },
-      { title: 'Индикаторы рынка', href: '/market-risk/indicators', icon: <LineChart className="w-3.5 h-3.5" /> },
+      { titleKey: 'nav.financialAnalysis' as TranslationKey,      href: '/market-risk/financial-analysis', icon: <BarChart3 className="w-3.5 h-3.5" /> },
+      { titleKey: 'nav.counterpartyAssessment' as TranslationKey, href: '/market-risk',                   icon: <TrendingUp className="w-3.5 h-3.5" /> },
+      { titleKey: 'nav.counterpartyRegistry' as TranslationKey,   href: '/counterparties',                icon: <Building2 className="w-3.5 h-3.5" /> },
+      { titleKey: 'nav.stressTest' as TranslationKey,             href: '/market-risk/stress-test',       icon: <Activity className="w-3.5 h-3.5" /> },
+      { titleKey: 'nav.marketIndicators' as TranslationKey,       href: '/market-risk/indicators',        icon: <LineChart className="w-3.5 h-3.5" /> },
     ],
   },
-  { title: 'Ликвидность', href: '/liquidity', icon: <Droplets className="w-4 h-4" />, adminOnly: true, children: [{ title: 'Стресс-тест', href: '/liquidity', icon: <BarChart3 className="w-3.5 h-3.5" /> }] },
-  { title: 'ВНД СУР', href: '/vnd', icon: <FolderOpen className="w-4 h-4" />, adminOnly: false, children: [{ title: 'Документы', href: '/vnd', icon: <FolderOpen className="w-3.5 h-3.5" /> }] },
-  { title: 'Реестр рекомендаций', href: '/recommendations', icon: <ClipboardCheck className="w-4 h-4" />, adminOnly: false, children: [{ title: 'Рекомендации', href: '/recommendations', icon: <ClipboardList className="w-3.5 h-3.5" /> }] },
-  { title: 'Задачи СУР', href: '/tasks', icon: <ListTodo className="w-4 h-4" />, adminOnly: true },
-  { title: 'Рисковик AI', href: '/ai-agent', icon: <Bot className="w-4 h-4" />, adminOnly: false },
+  { titleKey: 'nav.liquidity' as TranslationKey, href: '/liquidity', icon: <Droplets className="w-4 h-4" />, adminOnly: true, children: [{ titleKey: 'nav.stressTest' as TranslationKey, href: '/liquidity', icon: <BarChart3 className="w-3.5 h-3.5" /> }] },
+  { titleKey: 'nav.vnd' as TranslationKey, href: '/vnd', icon: <FolderOpen className="w-4 h-4" />, adminOnly: false, children: [{ titleKey: 'nav.documents' as TranslationKey, href: '/vnd', icon: <FolderOpen className="w-3.5 h-3.5" /> }] },
+  { titleKey: 'nav.recommendations' as TranslationKey, href: '/recommendations', icon: <ClipboardCheck className="w-4 h-4" />, adminOnly: false, children: [{ titleKey: 'nav.recommendationsList' as TranslationKey, href: '/recommendations', icon: <ClipboardList className="w-3.5 h-3.5" /> }] },
+  { titleKey: 'nav.tasks' as TranslationKey, href: '/tasks', icon: <ListTodo className="w-4 h-4" />, adminOnly: true },
+  { titleKey: 'nav.aiAgent' as TranslationKey, href: '/ai-agent', icon: <Bot className="w-4 h-4" />, adminOnly: false },
 ]
 export default function Sidebar({ user }: SidebarProps) {
   const pathname = usePathname()
+  const { t, lang, setLang } = useI18n()
   const isAdmin = user.role === 'admin'
   const [mobileOpen, setMobileOpen] = useState(false)
   const [showLogoutConfirm, setShowLogoutConfirm] = useState(false)
@@ -80,8 +84,11 @@ export default function Sidebar({ user }: SidebarProps) {
   const initials = user.full_name
     ? user.full_name.split(' ').map((n: string) => n[0]).slice(0, 2).join('')
     : user.email[0].toUpperCase()
-  const roleMap: Record<string, string> = { admin: 'Администратор', observer: 'Наблюдатель', coordinator: 'Риск-координатор', user: 'Пользователь' }
-  const roleLabel = roleMap[user.role] || user.role
+  const roleMap: Record<string, TranslationKey> = {
+    admin: 'roles.admin', observer: 'roles.observer',
+    coordinator: 'roles.coordinator', user: 'roles.user',
+  }
+  const roleLabel = roleMap[user.role] ? t(roleMap[user.role]) : user.role
   const sidebarContent = (
     <div className="flex flex-col h-full">
       <div className="flex items-center gap-3 px-4 py-5 border-b border-white/10">
@@ -103,7 +110,7 @@ export default function Sidebar({ user }: SidebarProps) {
                     item.children.some(c => pathname.startsWith(c.href)) ? 'bg-white/20 text-white' : 'text-green-100 hover:bg-white/10 hover:text-white'
                   )}>
                   <span className="flex-shrink-0 text-green-200">{item.icon}</span>
-                  <span className="flex-1 text-left font-medium">{item.title}</span>
+                  <span className="flex-1 text-left font-medium">{t(item.titleKey)}</span>
                   {openMenu === item.href ? <ChevronDown className="w-3.5 h-3.5 text-green-200" /> : <ChevronRight className="w-3.5 h-3.5 text-green-200" />}
                 </button>
                 {openMenu === item.href && (
@@ -114,7 +121,7 @@ export default function Sidebar({ user }: SidebarProps) {
                           pathname === child.href ? 'bg-white/20 text-white font-medium' : 'text-green-100/80 hover:bg-white/10 hover:text-white'
                         )}>
                         <span className="text-green-200 flex-shrink-0">{child.icon}</span>
-                        <span className="flex-1">{child.title}</span>
+                        <span className="flex-1">{t(child.titleKey)}</span>
                       </Link>
                     ))}
                   </div>
@@ -126,40 +133,52 @@ export default function Sidebar({ user }: SidebarProps) {
                   pathname === item.href ? 'bg-white/20 text-white font-medium' : 'text-green-100 hover:bg-white/10 hover:text-white'
                 )}>
                 <span className="flex-shrink-0 text-green-200">{item.icon}</span>
-                {item.title}
+                {t(item.titleKey)}
               </Link>
             )}
           </div>
         ))}
         {isAdmin && (
           <div className="pt-3 mt-3 border-t border-white/10">
-            <p className="text-green-300/50 text-xs font-medium px-3 mb-2 uppercase tracking-wider">Администрирование</p>
+            <p className="text-green-300/50 text-xs font-medium px-3 mb-2 uppercase tracking-wider">{t('nav.admin')}</p>
             <Link href="/admin/users" onClick={() => setMobileOpen(false)}
               className={cn('flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm transition-all',
                 pathname.startsWith('/admin/users') ? 'bg-white/20 text-white font-medium' : 'text-green-100 hover:bg-white/10 hover:text-white'
               )}>
-              <Users className="w-4 h-4 text-green-200" /> Пользователи
+              <Users className="w-4 h-4 text-green-200" /> {t('nav.users')}
             </Link>
             <Link href="/admin/settings" onClick={() => setMobileOpen(false)}
               className={cn('flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm transition-all',
                 pathname.startsWith('/admin/settings') ? 'bg-white/20 text-white font-medium' : 'text-green-100 hover:bg-white/10 hover:text-white'
               )}>
-              <Settings className="w-4 h-4 text-green-200" /> Настройки
+              <Settings className="w-4 h-4 text-green-200" /> {t('nav.settings')}
             </Link>
           </div>
         )}
       </nav>
-      <div className="px-3 py-3 border-t border-white/10">
+      <div className="px-3 py-3 border-t border-white/10 space-y-2">
+        {/* Language switcher */}
+        <div className="flex items-center gap-1 px-2">
+          {(['ru', 'tg', 'en'] as Lang[]).map(l => (
+            <button key={l} onClick={() => setLang(l)}
+              className={`flex-1 py-1 text-xs rounded font-medium transition-colors ${
+                lang === l ? 'bg-white/20 text-white' : 'text-green-200/50 hover:text-green-100'
+              }`}>
+              {l.toUpperCase()}
+            </button>
+          ))}
+        </div>
+        {/* User row */}
         <div className="flex items-center gap-3 px-2 py-2 rounded-lg">
           <div className="flex-shrink-0 w-8 h-8 bg-white/20 rounded-full flex items-center justify-center text-white text-xs font-semibold">{initials}</div>
           <div className="flex-1 min-w-0">
             <p className="text-white text-sm font-medium truncate">{user.full_name || user.email}</p>
             <p className="text-green-200/60 text-xs">{roleLabel}</p>
           </div>
-          <button onClick={toggleTheme} title={isDark ? 'Светлая тема' : 'Тёмная тема'} className="flex-shrink-0 text-green-200/60 hover:text-white transition-colors">
+          <button onClick={toggleTheme} title={isDark ? t('theme.light') : t('theme.dark')} className="flex-shrink-0 text-green-200/60 hover:text-white transition-colors">
             {isDark ? <Sun className="w-4 h-4" /> : <Moon className="w-4 h-4" />}
           </button>
-          <button onClick={() => setShowLogoutConfirm(true)} title="Выйти" className="flex-shrink-0 text-green-200/60 hover:text-white transition-colors">
+          <button onClick={() => setShowLogoutConfirm(true)} title={t('logout.confirm')} className="flex-shrink-0 text-green-200/60 hover:text-white transition-colors">
             <LogOut className="w-4 h-4" />
           </button>
         </div>
@@ -171,11 +190,11 @@ export default function Sidebar({ user }: SidebarProps) {
       {showLogoutConfirm && (
         <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-[200] p-4">
           <div className="bg-white rounded-2xl p-6 w-72 shadow-2xl">
-            <h3 className="font-semibold text-gray-900 mb-1 text-sm text-center">Выйти из системы?</h3>
-            <p className="text-xs text-gray-500 mb-5 text-center">Вы уверены что хотите выйти?</p>
+            <h3 className="font-semibold text-gray-900 mb-1 text-sm text-center">{t('logout.title')}</h3>
+            <p className="text-xs text-gray-500 mb-5 text-center">{t('logout.description')}</p>
             <div className="flex gap-2">
-              <button onClick={() => setShowLogoutConfirm(false)} className="flex-1 py-2.5 border border-gray-200 rounded-xl text-xs font-medium text-gray-600 hover:bg-gray-50">Отмена</button>
-              <button onClick={confirmLogout} className="flex-1 py-2.5 bg-red-500 hover:bg-red-600 rounded-xl text-xs font-medium text-white">Выйти</button>
+              <button onClick={() => setShowLogoutConfirm(false)} className="flex-1 py-2.5 border border-gray-200 rounded-xl text-xs font-medium text-gray-600 hover:bg-gray-50">{t('logout.cancel')}</button>
+              <button onClick={confirmLogout} className="flex-1 py-2.5 bg-red-500 hover:bg-red-600 rounded-xl text-xs font-medium text-white">{t('logout.confirm')}</button>
             </div>
           </div>
         </div>

@@ -1,5 +1,6 @@
 import type { Metadata } from 'next'
 import './globals.css'
+import { Providers } from '@/components/Providers'
 
 export const metadata: Metadata = {
   title: 'Risk Management System | Служба управления рисками',
@@ -21,7 +22,7 @@ export default function RootLayout({
         <script dangerouslySetInnerHTML={{ __html: `try{if(localStorage.getItem('alif-theme')==='dark')document.documentElement.classList.add('dark')}catch(e){}` }} />
       </head>
       <body className="antialiased bg-[#F5F8F6] min-h-screen">
-        {children}
+        <Providers>{children}</Providers>
       </body>
     </html>
   )
