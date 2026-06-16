@@ -5,7 +5,7 @@ import { usePathname } from 'next/navigation'
 import { supabase } from '@/supabase/client'
 import { UserProfile } from '@/types'
 import { cn } from '@/lib/utils'
-import { Shield, FileText, TrendingUp, Droplets, LayoutDashboard, ChevronDown, ChevronRight, LogOut, Settings, Users, Menu, X, ClipboardList, BarChart3, Map, FolderOpen, ClipboardCheck, BookUser, Activity, Building2, ListTodo, Newspaper, Bot, LineChart } from 'lucide-react'
+import { Shield, FileText, TrendingUp, Droplets, LayoutDashboard, ChevronDown, ChevronRight, LogOut, Settings, Users, Menu, X, ClipboardList, BarChart3, Map, FolderOpen, ClipboardCheck, BookUser, Activity, Building2, ListTodo, Newspaper, Bot, LineChart, Sun, Moon } from 'lucide-react'
 interface SidebarProps { user: UserProfile }
 const NAV_ITEMS = [
   { title: 'Главная', href: '/dashboard', icon: <LayoutDashboard className="w-4 h-4" />, adminOnly: false },
@@ -48,6 +48,19 @@ export default function Sidebar({ user }: SidebarProps) {
   const isAdmin = user.role === 'admin'
   const [mobileOpen, setMobileOpen] = useState(false)
   const [showLogoutConfirm, setShowLogoutConfirm] = useState(false)
+  const [isDark, setIsDark] = useState(false)
+
+  useEffect(() => {
+    setIsDark(document.documentElement.classList.contains('dark'))
+  }, [])
+
+  function toggleTheme() {
+    const html = document.documentElement
+    const next = !html.classList.contains('dark')
+    html.classList.toggle('dark', next)
+    localStorage.setItem('alif-theme', next ? 'dark' : 'light')
+    setIsDark(next)
+  }
   const getActiveMenu = () => {
     for (const item of NAV_ITEMS) {
       if (item.children?.some(c => pathname.startsWith(c.href))) return item.href
@@ -143,6 +156,9 @@ export default function Sidebar({ user }: SidebarProps) {
             <p className="text-white text-sm font-medium truncate">{user.full_name || user.email}</p>
             <p className="text-green-200/60 text-xs">{roleLabel}</p>
           </div>
+          <button onClick={toggleTheme} title={isDark ? 'Светлая тема' : 'Тёмная тема'} className="flex-shrink-0 text-green-200/60 hover:text-white transition-colors">
+            {isDark ? <Sun className="w-4 h-4" /> : <Moon className="w-4 h-4" />}
+          </button>
           <button onClick={() => setShowLogoutConfirm(true)} title="Выйти" className="flex-shrink-0 text-green-200/60 hover:text-white transition-colors">
             <LogOut className="w-4 h-4" />
           </button>

@@ -15,7 +15,11 @@ export default function RootLayout({
   children: React.ReactNode
 }>) {
   return (
-    <html lang="ru">
+    <html lang="ru" suppressHydrationWarning>
+      <head>
+        {/* Prevent flash of wrong theme on load */}
+        <script dangerouslySetInnerHTML={{ __html: `try{if(localStorage.getItem('alif-theme')==='dark')document.documentElement.classList.add('dark')}catch(e){}` }} />
+      </head>
       <body className="antialiased bg-[#F5F8F6] min-h-screen">
         {children}
       </body>
