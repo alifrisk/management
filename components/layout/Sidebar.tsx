@@ -164,7 +164,7 @@ export default function Sidebar({ user }: SidebarProps) {
               className={`flex-1 py-1 text-xs rounded font-medium transition-colors ${
                 lang === l ? 'bg-white/20 text-white' : 'text-green-200/50 hover:text-green-100'
               }`}>
-              {l.toUpperCase()}
+              {l === 'tg' ? 'TJ' : l.toUpperCase()}
             </button>
           ))}
         </div>
@@ -172,7 +172,7 @@ export default function Sidebar({ user }: SidebarProps) {
         <div className="flex items-center gap-3 px-2 py-2 rounded-lg">
           <div className="flex-shrink-0 w-8 h-8 bg-white/20 rounded-full flex items-center justify-center text-white text-xs font-semibold">{initials}</div>
           <div className="flex-1 min-w-0">
-            <p className="text-white text-sm font-medium truncate">{user.full_name || user.email}</p>
+            <p className="text-white text-xs font-medium truncate">{user.full_name || user.email}</p>
             <p className="text-green-200/60 text-xs">{roleLabel}</p>
           </div>
           <button onClick={toggleTheme} title={isDark ? t('theme.light') : t('theme.dark')} className="flex-shrink-0 text-green-200/60 hover:text-white transition-colors">
