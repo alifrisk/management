@@ -141,6 +141,8 @@ export default function FinancialAnalysisPage() {
   const [imageFile, setImageFile] = useState<File | null>(null)
   const [extracting, setExtracting] = useState(false)
   const [extractMsg, setExtractMsg] = useState<string | null>(null)
+  const [extractWarn, setExtractWarn] = useState<string[]>([])
+  const [sameRate, setSameRate] = useState(false)
 
   const fetch_ = useCallback(async () => {
     setLoading(true)
@@ -198,7 +200,7 @@ export default function FinancialAnalysisPage() {
 
   async function handleExtract() {
     if (!imageFile) return
-    setExtracting(true); setExtractMsg(null)
+    setExtracting(true); setExtractMsg(null); setExtractWarn([])
     try {
       const base64 = await new Promise<string>((resolve, reject) => {
         const reader = new FileReader()
@@ -212,14 +214,36 @@ export default function FinancialAnalysisPage() {
       })
       const data = await res.json()
       if (data.error) throw new Error(data.error)
+
+      const STRING_FIELDS = ['p1_label', 'p2_label']
       const extracted: Record<string, string> = {}
       for (const [k, v] of Object.entries(data.data)) {
-        if (v !== null && v !== undefined && v !== 0) extracted[k] = String(v)
+        if (v !== null && v !== undefined && v !== 0) {
+          extracted[k] = STRING_FIELDS.includes(k) ? String(v) : fmtN(String(Math.round(Number(v))))
+        }
       }
       setForm(prev => ({ ...prev, ...extracted }))
+
+      // Check for missing required sections
+      const d = data.data as Record<string, number>
+      const warnings: string[] = []
+      const hasAssets = (d.p1_cash || 0) + (d.p1_loans_issued || 0) + (d.p1_investments || 0) + (d.p1_receivables || 0) > 0
+      const hasLiab = (d.p1_deposits || 0) + (d.p1_borrowings || 0) > 0
+      const hasEquity = (d.p1_equity || 0) > 0
+      const hasIncome = (d.p1_interest_income || 0) + (d.p1_net_profit || 0) > 0
+      const hasP2 = (d.p2_cash || 0) + (d.p2_loans_issued || 0) + (d.p2_equity || 0) > 0
+      if (!hasAssets) warnings.push('активы (денежные средства, кредитный портфель)')
+      if (!hasLiab) warnings.push('обязательства (депозиты, заимствования)')
+      if (!hasEquity) warnings.push('собственный капитал')
+      if (!hasIncome) warnings.push('доходы (процентные доходы или чистая прибыль)')
+      if (!hasP2) warnings.push('данные второго периода (П2)')
+      setExtractWarn(warnings)
+
       setInputMode('manual')
       setImageFile(null)
-      setExtractMsg('Данные извлечены из скриншота. Проверьте и при необходимости исправьте.')
+      setExtractMsg(warnings.length === 0
+        ? 'Данные извлечены. Проверьте и при необходимости исправьте.'
+        : 'Данные частично извлечены. Не хватает некоторых разделов — заполните вручную.')
     } catch (err: unknown) {
       setExtractMsg('Ошибка: ' + (err instanceof Error ? err.message : String(err)))
     } finally { setExtracting(false) }
@@ -520,10 +544,19 @@ export default function FinancialAnalysisPage() {
               {/* Manual form */}
               {inputMode === 'manual' && <>
               {extractMsg && (
-                <div className="flex items-center gap-2 p-3 bg-green-50 border border-green-100 rounded-lg mb-4">
-                  <CheckCircle2 className="w-4 h-4 text-green-500 flex-shrink-0" />
-                  <p className="text-sm text-green-700 flex-1">{extractMsg}</p>
-                  <button onClick={() => setExtractMsg(null)}><X className="w-3.5 h-3.5 text-gray-400 hover:text-gray-600" /></button>
+                <div className={`flex items-start gap-2 p-3 border rounded-lg mb-2 ${extractWarn.length > 0 ? 'bg-yellow-50 border-yellow-100' : 'bg-green-50 border-green-100'}`}>
+                  {extractWarn.length > 0
+                    ? <AlertCircle className="w-4 h-4 text-yellow-500 flex-shrink-0 mt-0.5" />
+                    : <CheckCircle2 className="w-4 h-4 text-green-500 flex-shrink-0 mt-0.5" />}
+                  <div className="flex-1">
+                    <p className={`text-sm ${extractWarn.length > 0 ? 'text-yellow-700' : 'text-green-700'}`}>{extractMsg}</p>
+                    {extractWarn.length > 0 && (
+                      <ul className="mt-1 space-y-0.5">
+                        {extractWarn.map(w => <li key={w} className="text-xs text-yellow-600">• Не найдено: {w}</li>)}
+                      </ul>
+                    )}
+                  </div>
+                  <button onClick={() => { setExtractMsg(null); setExtractWarn([]) }}><X className="w-3.5 h-3.5 text-gray-400 hover:text-gray-600" /></button>
                 </div>
               )}
               {error && <div className="flex items-center gap-2 p-3 bg-red-50 border border-red-100 rounded-lg mb-4"><AlertCircle className="w-4 h-4 text-red-500" /><p className="text-sm text-red-600">{error}</p></div>}
@@ -554,33 +587,48 @@ export default function FinancialAnalysisPage() {
                       {CURRENCIES.map(c => <option key={c.code} value={c.code}>{c.symbol} {c.name} ({c.code})</option>)}
                     </select>
                   </div>
-                  <div>
-                    <label className={lbl}>
-                      {form.currency === 'USD' ? 'Курс П1 (USD — основная)' : `Курс П1: 1 USD = ? ${form.currency}`}
-                    </label>
-                    <input type="text" inputMode="decimal" value={form.p1_usd_rate}
-                      onChange={e => setF('p1_usd_rate', e.target.value)}
-                      disabled={form.currency === 'USD'}
-                      placeholder={form.currency === 'USD' ? '1' : 'Например: 92.5'}
-                      className={`${inp} ${form.currency === 'USD' ? 'bg-gray-50 text-gray-400' : ''}`}
-                    />
-                    {form.currency !== 'USD' && Number(form.p1_usd_rate) > 0 && (
-                      <p className="text-xs text-green-700 mt-1">Период 1: 1 USD = {form.p1_usd_rate} {form.currency}</p>
-                    )}
-                  </div>
-                  <div>
-                    <label className={lbl}>
-                      {form.currency === 'USD' ? 'Курс П2 (USD — основная)' : `Курс П2: 1 USD = ? ${form.currency}`}
-                    </label>
-                    <input type="text" inputMode="decimal" value={form.p2_usd_rate}
-                      onChange={e => setF('p2_usd_rate', e.target.value)}
-                      disabled={form.currency === 'USD'}
-                      placeholder={form.currency === 'USD' ? '1' : 'Например: 89.3'}
-                      className={`${inp} ${form.currency === 'USD' ? 'bg-gray-50 text-gray-400' : ''}`}
-                    />
-                    {form.currency !== 'USD' && Number(form.p2_usd_rate) > 0 && (
-                      <p className="text-xs text-green-700 mt-1">Период 2: 1 USD = {form.p2_usd_rate} {form.currency}</p>
-                    )}
+                  <div className="lg:col-span-2">
+                    <div className="flex items-center justify-between mb-1">
+                      <label className={lbl + ' mb-0'}>
+                        {form.currency === 'USD' ? 'Курс (USD — основная валюта)' : `Курс: 1 USD = ? ${form.currency}`}
+                      </label>
+                      {form.currency !== 'USD' && (
+                        <label className="flex items-center gap-1.5 cursor-pointer">
+                          <input type="checkbox" checked={sameRate} onChange={e => {
+                            setSameRate(e.target.checked)
+                            if (e.target.checked) setF('p2_usd_rate', form.p1_usd_rate)
+                          }} className="rounded" />
+                          <span className="text-xs text-gray-500">Одинаковый для П1 и П2</span>
+                        </label>
+                      )}
+                    </div>
+                    <div className={`grid gap-3 ${sameRate || form.currency === 'USD' ? 'grid-cols-1' : 'grid-cols-2'}`}>
+                      <div>
+                        {!sameRate && form.currency !== 'USD' && <p className="text-xs text-gray-400 mb-1">Период 1</p>}
+                        <input type="text" inputMode="decimal" value={form.p1_usd_rate}
+                          onChange={e => { setF('p1_usd_rate', e.target.value); if (sameRate) setF('p2_usd_rate', e.target.value) }}
+                          disabled={form.currency === 'USD'}
+                          placeholder={form.currency === 'USD' ? '1' : 'Например: 10.92'}
+                          className={`${inp} ${form.currency === 'USD' ? 'bg-gray-50 text-gray-400' : ''}`}
+                        />
+                        {form.currency !== 'USD' && Number(form.p1_usd_rate) > 0 && (
+                          <p className="text-xs text-green-700 mt-1">1 USD = {form.p1_usd_rate} {form.currency}</p>
+                        )}
+                      </div>
+                      {!sameRate && form.currency !== 'USD' && (
+                        <div>
+                          <p className="text-xs text-gray-400 mb-1">Период 2</p>
+                          <input type="text" inputMode="decimal" value={form.p2_usd_rate}
+                            onChange={e => setF('p2_usd_rate', e.target.value)}
+                            placeholder="Например: 10.85"
+                            className={inp}
+                          />
+                          {Number(form.p2_usd_rate) > 0 && (
+                            <p className="text-xs text-green-700 mt-1">1 USD = {form.p2_usd_rate} {form.currency}</p>
+                          )}
+                        </div>
+                      )}
+                    </div>
                   </div>
 
                   <div className="lg:col-span-2 bg-blue-50 border border-blue-100 rounded-lg p-3">
