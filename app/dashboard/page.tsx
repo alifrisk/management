@@ -37,9 +37,9 @@ export default function DashboardPage() {
             <ArrowRight className="w-3.5 h-3.5 text-gray-300 group-hover:text-[#1B8A4C] transition-colors" />
           </div>
           <h3 className="font-semibold text-gray-900 text-sm mb-0.5">Кредитный риск</h3>
-          <p className="text-[11px] text-gray-400 mb-2">AI-заключения по SME заёмщикам</p>
+          <p className="text-[11px] text-gray-400 mb-2">AI-заключения по МСБ заёмщикам</p>
           <div className="flex flex-wrap gap-1">
-            {['Заключения SME','Заёмщики','Стресс-тест'].map(t => (
+            {['Заключения МСБ','Заёмщики','Стресс-тест'].map(t => (
               <span key={t} className="text-[10px] bg-green-50 text-green-700 px-1.5 py-0.5 rounded-full">{t}</span>
             ))}
           </div>

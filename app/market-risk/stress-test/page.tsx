@@ -55,7 +55,10 @@ function runMonteCarlo(mean: number, sd: number, n: number) {
   results.forEach(r => { const i = Math.min(Math.floor((r - min) / step), bins - 1); hist[i].n++ })
   hist.forEach(h => { h.pct = Math.round(h.n / n * 1000) / 10 })
 
-  return { probs, hist: hist.filter((_, i) => i % 2 === 0), var95loss, var99loss, median, expected, histVar95, histVar99, paramVar95, paramVar99, cvar95, cvar99 }
+  const appreciationPct = +(results.filter(r => r < 0).length / n * 100).toFixed(1)
+  const depreciationPct = +(results.filter(r => r > 0).length / n * 100).toFixed(1)
+
+  return { probs, hist: hist.filter((_, i) => i % 2 === 0), var95loss, var99loss, median, expected, histVar95, histVar99, paramVar95, paramVar99, cvar95, cvar99, appreciationPct, depreciationPct }
 }
 
 function calcStats(rates: { date: string; value: number }[]) {
@@ -494,12 +497,28 @@ export default function MarketStressTest() {
                 </div>
               </div>
               <div className={card}>
-                <p className="text-sm font-semibold text-gray-700 mb-1">📊 Гистограмма распределения</p>
-                <p className="text-[11px] text-gray-500 mb-2">Показывает как распределились все {iters.toLocaleString('ru-RU')} симуляций. Высота бара = % симуляций с таким изменением курса. Связь с таблицами: сумма всех зелёных баров = P(укрепление), сумма красных = P(ослабление).</p>
-                <div className="flex items-center gap-4 mb-3 text-[11px]">
-                  <span className="flex items-center gap-1.5"><span className="w-3 h-3 bg-green-400 rounded inline-block"/> <strong>Левая зона (&lt;0%)</strong> = TJS укрепился</span>
-                  <span className="flex items-center gap-1.5"><span className="w-3 h-3 bg-red-400 rounded inline-block"/> <strong>Правая зона (&gt;0%)</strong> = TJS ослабел</span>
-                  <span className="text-gray-400">Высота бара = % симуляций в этом диапазоне</span>
+                <p className="text-sm font-semibold text-gray-700 mb-1">📊 Распределение симуляций</p>
+                <p className="text-[11px] text-gray-500 mb-3">
+                  Каждый столбец = доля симуляций с данным изменением курса TJS/USD за выбранный горизонт.
+                  Ось X — изменение курса в %, ось Y — доля симуляций (%). Левая зона (отрицательные %) = TJS укрепился, правая = ослабел.
+                </p>
+                <div className="grid grid-cols-2 gap-3 mb-4">
+                  <div className="bg-green-50 border border-green-100 rounded-xl p-3 text-center">
+                    <p className="text-[11px] text-green-600 font-medium mb-0.5">🟢 Укрепление TJS</p>
+                    <p className="text-3xl font-bold text-green-600">{mcResult.appreciationPct}%</p>
+                    <p className="text-[10px] text-green-500 mt-0.5">симуляций показали укрепление</p>
+                    <p className="text-[10px] text-gray-400 mt-1">Изменение курса &lt; 0% (TJS/USD ↓)</p>
+                  </div>
+                  <div className="bg-red-50 border border-red-100 rounded-xl p-3 text-center">
+                    <p className="text-[11px] text-red-600 font-medium mb-0.5">🔴 Ослабление TJS</p>
+                    <p className="text-3xl font-bold text-red-600">{mcResult.depreciationPct}%</p>
+                    <p className="text-[10px] text-red-500 mt-0.5">симуляций показали ослабление</p>
+                    <p className="text-[10px] text-gray-400 mt-1">Изменение курса &gt; 0% (TJS/USD ↑)</p>
+                  </div>
+                </div>
+                <div className="flex items-center gap-4 mb-2 text-[11px]">
+                  <span className="flex items-center gap-1.5"><span className="w-3 h-3 bg-green-400 rounded inline-block"/> TJS укрепился (столбцы слева от 0)</span>
+                  <span className="flex items-center gap-1.5"><span className="w-3 h-3 bg-red-400 rounded inline-block"/> TJS ослабел (столбцы справа от 0)</span>
                 </div>
                 <ResponsiveContainer width="100%" height={200}>
                   <BarChart data={mcResult.hist}>

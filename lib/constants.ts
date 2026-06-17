@@ -260,7 +260,7 @@ export const NAVIGATION = [
     icon: 'FileText',
     adminOnly: true,
     children: [
-      { title: 'Заключения SME', href: '/credit-risk' },
+      { title: 'Заключения МСБ', href: '/credit-risk' },
     ],
   },
   {

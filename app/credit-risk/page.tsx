@@ -352,7 +352,7 @@ export default function CreditRiskPage() {
         <div className="flex items-center justify-between">
           <div>
             <h1 className="text-xl font-semibold text-gray-900">Кредитный риск — AI-заключения</h1>
-            <p className="text-sm text-gray-500 mt-0.5">Анализ заёмщиков SME с помощью искусственного интеллекта</p>
+            <p className="text-sm text-gray-500 mt-0.5">Анализ заёмщиков МСБ с помощью искусственного интеллекта</p>
           </div>
           <button onClick={() => { setForm(EMPTY); setCollaterals([{type:'Недвижимость',description:'',value:0}]); setTab(1); setInputMode('manual'); setImageFile(null); setExtractMsg(null); setShowModal(true) }}
             className="flex items-center gap-2 px-4 py-2 bg-[#1B8A4C] text-white rounded-lg text-sm font-medium hover:bg-[#177040]">
@@ -474,7 +474,7 @@ export default function CreditRiskPage() {
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50">
           <div className="bg-white rounded-2xl shadow-2xl w-full max-w-4xl max-h-[95vh] flex flex-col">
             <div className="flex items-center justify-between p-5 border-b border-gray-100">
-              <h2 className="text-base font-semibold text-gray-900">Заключение о кредитоспособности SME</h2>
+              <h2 className="text-base font-semibold text-gray-900">Заключение о кредитоспособности МСБ</h2>
               <button onClick={() => { setShowModal(false); setForm(EMPTY) }} className="text-gray-400 hover:text-gray-600"><X className="w-5 h-5" /></button>
             </div>
 
