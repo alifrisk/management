@@ -1,11 +1,12 @@
 'use client'
 import { useState, useRef, useEffect, useCallback } from 'react'
 import { supabase } from '@/supabase/client'
-import { Send, Bot, User, Loader2, Copy, Check, Paperclip, X, FileText, Plus, History, ChevronDown, Edit2 } from 'lucide-react'
+import { Send, Bot, User, Loader2, Copy, Check, Paperclip, X, FileText, Plus, History, ChevronDown, Edit2, BookOpen, Trash2, Zap } from 'lucide-react'
 
 interface Message { id: string; role: 'user' | 'assistant'; content: string }
 interface Chat { id: string; title: string; created_at: string }
 interface DocFile { name: string; content: string }
+interface KBDoc { id: string; title: string; content: string }
 
 const SUGGESTED = [
   'Какой норматив достаточности капитала требует НБТ?',
@@ -46,20 +47,47 @@ export default function RiskovikPage() {
   const [showHist,  setShowHist]  = useState(false)
   const [editId,    setEditId]    = useState<string | null>(null)
   const [editText,  setEditText]  = useState('')
+
+  // Knowledge base
+  const [showKB,    setShowKB]    = useState(false)
+  const [kbDocs,    setKbDocs]    = useState<KBDoc[]>([])
+  const [kbTitle,   setKbTitle]   = useState('')
+  const [kbContent, setKbContent] = useState('')
+  const [kbSaving,  setKbSaving]  = useState(false)
+  const [isAdmin,   setIsAdmin]   = useState(false)
+
+  // Live data from Supabase
+  const [liveData,  setLiveData]  = useState('')
+  const [liveLoading, setLiveLoading] = useState(false)
+
   const bottomRef = useRef<HTMLDivElement>(null)
   const fileRef   = useRef<HTMLInputElement>(null)
 
   useEffect(() => { bottomRef.current?.scrollIntoView({ behavior: 'smooth' }) }, [messages, loading])
 
-  // Load chat list
   const loadChats = useCallback(async () => {
     const { data } = await supabase.from('ai_chats').select('id, title, created_at').order('updated_at', { ascending: false }).limit(20)
     setChats(data || [])
   }, [])
 
-  // Load most recent chat on mount
+  const loadKBDocs = useCallback(async () => {
+    const { data } = await supabase
+      .from('knowledge_documents')
+      .select('id, title, content')
+      .eq('is_active', true)
+      .order('created_at', { ascending: true })
+    setKbDocs(data || [])
+  }, [])
+
   useEffect(() => {
     async function init() {
+      // Check admin role
+      const { data: { user } } = await supabase.auth.getUser()
+      if (user) {
+        const { data: profile } = await supabase.from('user_profiles').select('role').eq('id', user.id).single()
+        setIsAdmin(profile?.role === 'admin')
+      }
+      await loadKBDocs()
       await loadChats()
       const { data: chatsData } = await supabase.from('ai_chats').select('id').order('updated_at', { ascending: false }).limit(1)
       if (chatsData && chatsData.length > 0) {
@@ -68,6 +96,99 @@ export default function RiskovikPage() {
     }
     init()
   }, [])
+
+  // Fetch live data when context changes
+  useEffect(() => {
+    async function fetchLive() {
+      if (!context) { setLiveData(''); return }
+      setLiveLoading(true)
+      try {
+        let text = ''
+
+        if (context.includes('Операционный риск')) {
+          const { data } = await supabase
+            .from('operational_incidents')
+            .select('incident_number, incident_status, risk_level, factor, business_process, loss_amount_tjs, incident_date, case_description, department')
+            .order('created_at', { ascending: false })
+            .limit(50)
+          if (data && data.length > 0) {
+            const open = data.filter(i => i.incident_status === 'Открыт').length
+            const inProg = data.filter(i => i.incident_status === 'В процессе').length
+            const extreme = data.filter(i => i.risk_level === 'Экстремальные').length
+            const high = data.filter(i => i.risk_level === 'Высокий').length
+            const totalLoss = data.reduce((s, i) => s + (Number(i.loss_amount_tjs) || 0), 0)
+            text = `Операционный риск — последние ${data.length} инцидентов:\n`
+            text += `Открытых: ${open} | В процессе: ${inProg} | Экстремальный: ${extreme} | Высокий: ${high}\n`
+            text += `Суммарные потери: ${totalLoss.toLocaleString('ru-RU')} TJS\n\n`
+            const critical = data.filter(i => i.risk_level === 'Экстремальные' || i.risk_level === 'Высокий').slice(0, 15)
+            if (critical.length > 0) {
+              text += `Критические инциденты:\n`
+              critical.forEach(i => {
+                text += `• №${i.incident_number} [${i.risk_level}] ${i.business_process} — ${(i.case_description || '').slice(0, 80)} | ${i.incident_status}\n`
+              })
+            }
+          }
+
+        } else if (context.includes('Кредитный риск')) {
+          const { data } = await supabase
+            .from('credit_conclusions')
+            .select('borrower_name, loan_amount, currency, recommendation, risk_level, created_at, analyst_name')
+            .order('created_at', { ascending: false })
+            .limit(20)
+          if (data && data.length > 0) {
+            const approved = data.filter(c => c.recommendation === 'Одобрить').length
+            const rejected = data.filter(c => c.recommendation === 'Отклонить').length
+            const cond = data.filter(c => c.recommendation === 'Условно одобрить').length
+            text = `Кредитный риск — последние ${data.length} заключений:\n`
+            text += `Одобрено: ${approved} | Отклонено: ${rejected} | Условно: ${cond}\n\n`
+            text += `Последние заключения:\n`
+            data.slice(0, 10).forEach(c => {
+              text += `• ${c.borrower_name} | ${Number(c.loan_amount).toLocaleString()} ${c.currency} | ${c.recommendation} [${c.risk_level}]\n`
+            })
+          }
+
+        } else if (context.includes('Рыночный риск')) {
+          const { data } = await supabase
+            .from('counterparty_assessments')
+            .select('bank_name, country, total_score, reliability_category, recommended_limit_usd, created_at')
+            .order('created_at', { ascending: false })
+            .limit(20)
+          if (data && data.length > 0) {
+            text = `Рыночный риск — оценки контрагентов (${data.length}):\n`
+            data.forEach(a => {
+              text += `• ${a.bank_name} (${a.country}) | Оценка: ${a.total_score} | ${a.reliability_category} | Лимит: $${Number(a.recommended_limit_usd || 0).toLocaleString()}\n`
+            })
+          }
+
+        } else if (context.toLowerCase().includes('ликвидност')) {
+          const { data } = await supabase
+            .from('liquidity_stress_tests')
+            .select('test_date, period, results, analyst_name')
+            .order('created_at', { ascending: false })
+            .limit(5)
+          if (data && data.length > 0) {
+            text = `Стресс-тесты ликвидности (последние ${data.length}):\n`
+            data.forEach(t => {
+              // eslint-disable-next-line @typescript-eslint/no-explicit-any
+              const res = t.results as any
+              text += `• Период: ${t.period} | Дата: ${t.test_date}`
+              if (res?.pessimistic?.t30) {
+                text += ` | Пессим. T+30: покрытие ${Number(res.pessimistic.t30.coverage_cash_equiv || 0).toFixed(1)}%`
+              }
+              text += ` | Аналитик: ${t.analyst_name}\n`
+            })
+          }
+        }
+
+        setLiveData(text)
+      } catch {
+        setLiveData('')
+      } finally {
+        setLiveLoading(false)
+      }
+    }
+    fetchLive()
+  }, [context])
 
   async function openChat(id: string) {
     setChatId(id)
@@ -91,37 +212,38 @@ export default function RiskovikPage() {
   async function deleteChat(id: string) {
     await supabase.from('ai_messages').delete().eq('chat_id', id)
     await supabase.from('ai_chats').delete().eq('id', id)
-    if (chatId === id) {
-      setChatId(null)
-      setMessages([])
-    }
+    if (chatId === id) { setChatId(null); setMessages([]) }
     loadChats()
+  }
+
+  async function addKBDoc() {
+    if (!kbTitle.trim() || !kbContent.trim()) return
+    setKbSaving(true)
+    const { error } = await supabase.from('knowledge_documents').insert({ title: kbTitle.trim(), content: kbContent.trim() })
+    if (!error) { setKbTitle(''); setKbContent(''); await loadKBDocs() }
+    setKbSaving(false)
+  }
+
+  async function removeKBDoc(id: string) {
+    await supabase.from('knowledge_documents').delete().eq('id', id)
+    setKbDocs(prev => prev.filter(d => d.id !== id))
   }
 
   async function saveEdit(msgId: string) {
     if (!editText.trim() || !chatId) return
-    // Update message in DB
     await supabase.from('ai_messages').update({ content: editText }).eq('id', msgId)
-    // Remove all messages after this one and regenerate
     const idx = messages.findIndex(m => m.id === msgId)
     const msgsAfter = messages.slice(idx + 1)
-    for (const m of msgsAfter) {
-      await supabase.from('ai_messages').delete().eq('id', m.id)
-    }
+    for (const m of msgsAfter) await supabase.from('ai_messages').delete().eq('id', m.id)
     const updatedMsgs = messages.slice(0, idx).concat([{ id: msgId, role: 'user', content: editText }])
     setMessages(updatedMsgs)
-    setEditId(null)
-    setEditText('')
-    // Regenerate AI response
+    setEditId(null); setEditText('')
     setLoading(true)
     try {
       const res = await fetch('/api/ai-agent', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          messages: updatedMsgs.map(m => ({ role: m.role, content: m.content })),
-          context,
-        }),
+        body: JSON.stringify({ messages: updatedMsgs.map(m => ({ role: m.role, content: m.content })), context, live_data: liveData || undefined }),
       })
       const data = await res.json()
       if (data.error) throw new Error(data.error)
@@ -161,7 +283,9 @@ export default function RiskovikPage() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           messages: [...messages, userMsg].map(m => ({ role: m.role, content: m.content })),
-          context, document_context: docCtx,
+          context,
+          document_context: docCtx,
+          live_data: liveData || undefined,
         }),
       })
       const data = await res.json()
@@ -205,13 +329,84 @@ export default function RiskovikPage() {
           </div>
         </div>
         <div className="flex items-center gap-2">
-          <select value={context} onChange={e => setContext(e.target.value)}
-            className="px-3 py-1.5 border border-gray-200 rounded-lg text-xs focus:outline-none focus:ring-2 focus:ring-[#1B8A4C] bg-white text-gray-600">
-            {CONTEXTS.map(c => <option key={c.value} value={c.value}>{c.label}</option>)}
-          </select>
+          {/* Context with live data indicator */}
+          <div className="relative flex items-center">
+            <select value={context} onChange={e => setContext(e.target.value)}
+              className="px-3 py-1.5 border border-gray-200 rounded-lg text-xs focus:outline-none focus:ring-2 focus:ring-[#1B8A4C] bg-white text-gray-600 pr-7">
+              {CONTEXTS.map(c => <option key={c.value} value={c.value}>{c.label}</option>)}
+            </select>
+            {context && (
+              <span className="absolute right-2 flex items-center">
+                {liveLoading
+                  ? <Loader2 className="w-2.5 h-2.5 text-[#1B8A4C] animate-spin" />
+                  : liveData
+                  ? <span className="w-2 h-2 rounded-full bg-green-500" title="Живые данные загружены" />
+                  : <span className="w-2 h-2 rounded-full bg-gray-300" />
+                }
+              </span>
+            )}
+          </div>
+
+          {/* Knowledge Base */}
+          <div className="relative">
+            <button onClick={() => { setShowKB(v => !v); setShowHist(false) }}
+              className={`flex items-center gap-1.5 px-3 py-1.5 border rounded-lg text-xs transition-colors ${showKB ? 'border-[#1B8A4C] bg-green-50 text-[#1B8A4C]' : 'border-gray-200 text-gray-600 hover:bg-gray-50'}`}>
+              <BookOpen className="w-3.5 h-3.5" />
+              База знаний
+              {kbDocs.length > 0 && <span className="bg-[#1B8A4C] text-white text-[9px] rounded-full w-4 h-4 flex items-center justify-center">{kbDocs.length}</span>}
+            </button>
+            {showKB && (
+              <div className="absolute right-0 top-9 z-50 w-96 bg-white border border-gray-200 rounded-xl shadow-xl overflow-hidden">
+                <div className="p-3 border-b border-gray-100 flex items-center justify-between bg-gray-50">
+                  <div>
+                    <span className="text-xs font-semibold text-gray-700">База знаний</span>
+                    <p className="text-[10px] text-gray-400">Документы всегда доступны AI в каждом чате</p>
+                  </div>
+                  <button onClick={() => setShowKB(false)}><X className="w-3.5 h-3.5 text-gray-400" /></button>
+                </div>
+                <div className="max-h-64 overflow-y-auto divide-y divide-gray-50">
+                  {kbDocs.length === 0
+                    ? <p className="text-xs text-gray-400 text-center py-6">База знаний пуста</p>
+                    : kbDocs.map(d => (
+                      <div key={d.id} className="flex items-start gap-2 px-3 py-2.5 hover:bg-gray-50">
+                        <FileText className="w-3.5 h-3.5 text-[#1B8A4C] mt-0.5 flex-shrink-0" />
+                        <div className="flex-1 min-w-0">
+                          <p className="text-xs font-medium text-gray-700 truncate">{d.title}</p>
+                          <p className="text-[10px] text-gray-400 truncate">{d.content.slice(0, 60)}...</p>
+                        </div>
+                        {isAdmin && (
+                          <button onClick={() => removeKBDoc(d.id)} className="text-gray-300 hover:text-red-500 transition-colors flex-shrink-0">
+                            <Trash2 className="w-3.5 h-3.5" />
+                          </button>
+                        )}
+                      </div>
+                    ))
+                  }
+                </div>
+                {isAdmin && (
+                  <div className="p-3 border-t border-gray-100 space-y-2 bg-gray-50">
+                    <p className="text-[10px] text-gray-500 font-medium">Добавить документ</p>
+                    <input value={kbTitle} onChange={e => setKbTitle(e.target.value)}
+                      placeholder="Название (напр. «Политика ОР 2024»)"
+                      className="w-full px-2.5 py-1.5 text-xs border border-gray-200 rounded-lg focus:outline-none focus:ring-1 focus:ring-[#1B8A4C] bg-white" />
+                    <textarea value={kbContent} onChange={e => setKbContent(e.target.value)}
+                      placeholder="Содержание документа..."
+                      rows={3}
+                      className="w-full px-2.5 py-1.5 text-xs border border-gray-200 rounded-lg focus:outline-none focus:ring-1 focus:ring-[#1B8A4C] resize-none bg-white" />
+                    <button onClick={addKBDoc} disabled={kbSaving || !kbTitle.trim() || !kbContent.trim()}
+                      className="w-full py-1.5 bg-[#1B8A4C] text-white rounded-lg text-xs font-medium hover:bg-[#177040] disabled:opacity-40 transition-colors flex items-center justify-center gap-1.5">
+                      {kbSaving ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Plus className="w-3.5 h-3.5" />}
+                      Добавить в базу знаний
+                    </button>
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
+
           {/* История чатов */}
           <div className="relative">
-            <button onClick={() => setShowHist(v => !v)}
+            <button onClick={() => { setShowHist(v => !v); setShowKB(false) }}
               className="flex items-center gap-1.5 px-3 py-1.5 border border-gray-200 rounded-lg text-xs text-gray-600 hover:bg-gray-50">
               <History className="w-3.5 h-3.5" /> История <ChevronDown className="w-3 h-3" />
             </button>
@@ -247,7 +442,15 @@ export default function RiskovikPage() {
         </div>
       </div>
 
-      {/* Docs */}
+      {/* Live data badge */}
+      {liveData && (
+        <div className="flex items-center gap-1.5 mb-2 px-2.5 py-1.5 bg-green-50 border border-green-200 rounded-lg text-xs text-green-700">
+          <Zap className="w-3 h-3 flex-shrink-0" />
+          <span>Живые данные подключены — AI видит актуальные данные из системы</span>
+        </div>
+      )}
+
+      {/* Session docs */}
       {docs.length > 0 && (
         <div className="flex items-center gap-2 flex-wrap mb-2 flex-shrink-0">
           {docs.map((d, i) => (
@@ -263,14 +466,15 @@ export default function RiskovikPage() {
       )}
 
       {/* Messages */}
-      <div className="overflow-y-auto space-y-4 pb-3" style={{ minHeight: "300px", maxHeight: "calc(100vh - 280px)" }}>
+      <div className="overflow-y-auto space-y-4 pb-3" style={{ minHeight: "300px", maxHeight: "calc(100vh - 300px)" }}>
         {messages.length === 0 && (
           <div className="text-center pt-6 pb-6">
             <div className="w-16 h-16 bg-gradient-to-br from-[#1B8A4C] to-[#145c32] rounded-2xl flex items-center justify-center mx-auto mb-4 shadow-lg">
               <Bot className="w-8 h-8 text-white" />
             </div>
             <h2 className="text-lg font-semibold text-gray-900 mb-1">Привет, я Рисковик!</h2>
-            <p className="text-sm text-gray-500 max-w-sm mx-auto mb-5">Знаю Базель II/III, нормативы НБТ, ISO 31000. История чатов сохраняется.</p>
+            <p className="text-sm text-gray-500 max-w-sm mx-auto mb-1">Знаю Базель II/III, нормативы НБТ, ISO 31000.</p>
+            <p className="text-xs text-gray-400 max-w-sm mx-auto mb-5">Выберите модуль выше — AI подключится к живым данным системы.</p>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-left">
               {SUGGESTED.map((q, i) => (
                 <button key={i} onClick={() => send(q)}
@@ -368,7 +572,7 @@ export default function RiskovikPage() {
             {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />}
           </button>
         </div>
-        <p className="text-[10px] text-gray-400 mt-1.5 px-1">📎 TXT/PDF — Рисковик прочитает · История сохраняется автоматически</p>
+        <p className="text-[10px] text-gray-400 mt-1.5 px-1">📎 TXT/PDF для сессии · 📚 База знаний — постоянные документы · История сохраняется автоматически</p>
       </div>
     </div>
   )

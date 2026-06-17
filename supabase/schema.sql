@@ -435,3 +435,46 @@ COMMENT ON TABLE public.credit_conclusions IS 'Заключения по кре�
 COMMENT ON TABLE public.counterparty_assessments IS 'Оценки контрагентов (рыночный риск)';
 COMMENT ON TABLE public.liquidity_stress_tests IS 'Стресс-тесты ликвидности';
 COMMENT ON TABLE public.audit_logs IS 'Журнал действий пользователей';
+
+-- ============================================
+-- 11. БАЗА ЗНАНИЙ ДЛЯ AI АГЕНТА
+-- ============================================
+CREATE TABLE IF NOT EXISTS public.knowledge_documents (
+  id UUID DEFAULT uuid_generate_v4() PRIMARY KEY,
+  title TEXT NOT NULL,
+  content TEXT NOT NULL,
+  is_active BOOLEAN NOT NULL DEFAULT true,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+ALTER TABLE public.knowledge_documents ENABLE ROW LEVEL SECURITY;
+
+-- Все могут читать активные документы (нужно для AI агента)
+CREATE POLICY "Anyone can read active knowledge documents"
+  ON public.knowledge_documents FOR SELECT
+  USING (is_active = true);
+
+CREATE POLICY "Admins can insert knowledge documents"
+  ON public.knowledge_documents FOR INSERT
+  WITH CHECK (
+    EXISTS (SELECT 1 FROM public.user_profiles WHERE id = auth.uid() AND role = 'admin')
+  );
+
+CREATE POLICY "Admins can update knowledge documents"
+  ON public.knowledge_documents FOR UPDATE
+  USING (
+    EXISTS (SELECT 1 FROM public.user_profiles WHERE id = auth.uid() AND role = 'admin')
+  );
+
+CREATE POLICY "Admins can delete knowledge documents"
+  ON public.knowledge_documents FOR DELETE
+  USING (
+    EXISTS (SELECT 1 FROM public.user_profiles WHERE id = auth.uid() AND role = 'admin')
+  );
+
+CREATE TRIGGER update_knowledge_documents_updated_at
+  BEFORE UPDATE ON public.knowledge_documents
+  FOR EACH ROW EXECUTE FUNCTION update_updated_at();
+
+COMMENT ON TABLE public.knowledge_documents IS 'База знаний для AI агента Рисковик';

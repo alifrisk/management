@@ -1,7 +1,9 @@
 import { NextResponse } from 'next/server'
+import { createServerClient } from '@/supabase/server'
 
 const SYSTEM_PROMPT = `Ты — Рисковик, AI-ассистент по управлению рисками ОАО «Алиф Банк» (Таджикистан).
 Твоя роль: старший риск-менеджер с глубокими знаниями банковских рисков, нормативов НБТ и стандартов Базель II/III.
+У тебя есть доступ к реальным данным системы управления рисками Алиф Банка — используй их для конкретных ответов.
 
 ════════════════════════════════════════
 БАЗЕЛЬ II — СТРУКТУРА
@@ -105,24 +107,50 @@ ERM (ENTERPRISE RISK MANAGEMENT)
 
 ПРАВИЛА ОТВЕТОВ:
 - Конкретный и профессиональный стиль
+- Когда есть живые данные банка — используй их в ответе с конкретными цифрами
 - Давай практические рекомендации применительно к Алиф Банку в РТ
 - Используй точные цифры и нормативы
-- Если вопрос про конкретный модуль системы — учитывай контекст
+- Если вопрос про конкретный модуль системы — учитывай контекст и данные
 - Отвечай на русском языке
 - Честно говори если нужно проверить актуальные данные на nbt.tj или bis.org
 - Данные клиентов не упоминай и не запрашивай`
 
+async function fetchKnowledgeDocs(): Promise<string> {
+  try {
+    const supabase = createServerClient()
+    const { data: docs } = await supabase
+      .from('knowledge_documents')
+      .select('title, content')
+      .eq('is_active', true)
+      .order('created_at', { ascending: true })
+
+    if (!docs || docs.length === 0) return ''
+
+    let result = '\n\n════════════════════════════════════════\nБАЗА ЗНАНИЙ АЛИФ БАНКА\n════════════════════════════════════════'
+    docs.forEach(d => {
+      result += `\n\n=== ${d.title} ===\n${d.content}`
+    })
+    return result
+  } catch {
+    return ''
+  }
+}
+
 export async function POST(request: Request) {
   try {
-    const { messages, context, document_context } = await request.json()
+    const { messages, context, document_context, live_data } = await request.json()
 
     const conversation = messages.map((m: { role: string; content: string }) => ({
       role: m.role,
       content: m.content,
     }))
 
+    const knowledgeDocs = await fetchKnowledgeDocs()
+
     let systemFinal = SYSTEM_PROMPT
+    if (knowledgeDocs) systemFinal += knowledgeDocs
     if (context) systemFinal += `\n\nТЕКУЩИЙ КОНТЕКСТ ПОЛЬЗОВАТЕЛЯ:\n${context}`
+    if (live_data) systemFinal += `\n\n════════════════════════════════════════\nЖИВЫЕ ДАННЫЕ ИЗ СИСТЕМЫ АЛИФ БАНКА\n════════════════════════════════════════\n${live_data}`
     if (document_context) systemFinal += `\n\nЗАГРУЖЕННЫЕ ДОКУМЕНТЫ:\n${document_context}`
 
     const response = await fetch('https://api.anthropic.com/v1/messages', {
@@ -133,8 +161,8 @@ export async function POST(request: Request) {
         'anthropic-version': '2023-06-01',
       },
       body: JSON.stringify({
-        model: 'claude-sonnet-4-5',
-        max_tokens: 2000,
+        model: process.env.CLAUDE_MODEL || 'claude-sonnet-4-6',
+        max_tokens: 4096,
         system: systemFinal,
         messages: conversation,
       }),
