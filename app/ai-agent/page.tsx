@@ -218,42 +218,53 @@ export default function RiskovikPage() {
     loadChats()
   }
 
+  async function extractFileText(file: File): Promise<string> {
+    const ext = file.name.split('.').pop()?.toLowerCase()
+    const toBase64 = async (f: File) => {
+      const ab = await f.arrayBuffer()
+      return btoa(Array.from(new Uint8Array(ab), b => String.fromCharCode(b)).join(''))
+    }
+    const callApi = async (url: string, base64: string) => {
+      const res = await fetch(url, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ fileBase64: base64 }) })
+      const json = await res.json()
+      if (json.error) throw new Error(json.error)
+      return json.text as string
+    }
+
+    if (ext === 'docx') return callApi('/api/extract-docx', await toBase64(file))
+    if (ext === 'pdf') return callApi('/api/extract-pdf', await toBase64(file))
+    if (ext === 'xlsx' || ext === 'xls') {
+      const XLSX = (await import('xlsx')).default
+      const ab = await file.arrayBuffer()
+      const wb = XLSX.read(ab)
+      const parts: string[] = []
+      wb.SheetNames.forEach(name => {
+        const csv = XLSX.utils.sheet_to_csv(wb.Sheets[name])
+        if (csv.trim()) parts.push(`[Лист: ${name}]\n${csv}`)
+      })
+      return parts.join('\n\n')
+    }
+    return file.text()
+  }
+
   async function handleKBFile(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0]
     if (!file) return
     if (kbFileRef.current) kbFileRef.current.value = ''
 
     const ext = file.name.split('.').pop()?.toLowerCase()
-    const title = file.name.replace(/\.[^.]+$/, '')
-    let text = ''
-
-    if (ext === 'docx') {
-      try {
-        const ab = await file.arrayBuffer()
-        const base64 = btoa(Array.from(new Uint8Array(ab), b => String.fromCharCode(b)).join(''))
-        const res = await fetch('/api/extract-docx', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ fileBase64: base64 }),
-        })
-        const json = await res.json()
-        if (json.error) throw new Error(json.error)
-        text = json.text
-      } catch (err) {
-        alert('Ошибка чтения Word файла: ' + String(err))
-        return
-      }
-    } else {
-      const supported = ['txt', 'md', 'csv', 'json']
-      if (!supported.includes(ext || '')) {
-        alert('Поддерживаются форматы: TXT, MD, CSV, JSON, DOCX.')
-        return
-      }
-      text = await file.text()
+    const supported = ['txt', 'md', 'csv', 'json', 'docx', 'pdf', 'xlsx', 'xls']
+    if (!supported.includes(ext || '')) {
+      alert('Поддерживаются: TXT, MD, CSV, JSON, DOCX, PDF, XLSX')
+      return
     }
-
-    setKbTitle(title)
-    setKbContent(text.slice(0, 15000))
+    try {
+      const text = await extractFileText(file)
+      setKbTitle(file.name.replace(/\.[^.]+$/, ''))
+      setKbContent(text.slice(0, 15000))
+    } catch (err) {
+      alert('Ошибка чтения файла: ' + String(err))
+    }
   }
 
   async function addKBDoc() {
@@ -342,30 +353,12 @@ export default function RiskovikPage() {
   async function handleFile(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0]
     if (!file) return
-    const ext = file.name.split('.').pop()?.toLowerCase()
-    let text = ''
-
-    if (ext === 'docx') {
-      try {
-        const ab = await file.arrayBuffer()
-        const base64 = btoa(Array.from(new Uint8Array(ab), b => String.fromCharCode(b)).join(''))
-        const res = await fetch('/api/extract-docx', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ fileBase64: base64 }),
-        })
-        const json = await res.json()
-        if (json.error) throw new Error(json.error)
-        text = json.text
-      } catch (err) {
-        alert('Ошибка чтения Word файла: ' + String(err))
-        return
-      }
-    } else {
-      text = await file.text()
+    try {
+      const text = await extractFileText(file)
+      setDocs(prev => [...prev, { name: file.name, content: text.slice(0, 8000) }])
+    } catch (err) {
+      alert('Ошибка чтения файла: ' + String(err))
     }
-
-    setDocs(prev => [...prev, { name: file.name, content: text.slice(0, 8000) }])
     if (fileRef.current) fileRef.current.value = ''
   }
 
@@ -452,7 +445,7 @@ export default function RiskovikPage() {
                         <Paperclip className="w-3 h-3" /> Загрузить файл
                       </button>
                     </div>
-                    <input ref={kbFileRef} type="file" accept=".txt,.md,.csv,.json,.docx" onChange={handleKBFile} className="hidden" />
+                    <input ref={kbFileRef} type="file" accept=".txt,.md,.csv,.json,.docx,.pdf,.xlsx,.xls" onChange={handleKBFile} className="hidden" />
                     <input value={kbTitle} onChange={e => setKbTitle(e.target.value)}
                       placeholder="Название (напр. «Политика ОР 2024»)"
                       className="w-full px-2.5 py-1.5 text-xs border border-gray-200 rounded-lg focus:outline-none focus:ring-1 focus:ring-[#1B8A4C] bg-white" />
@@ -624,7 +617,7 @@ export default function RiskovikPage() {
       {/* Input */}
       <div className="flex-shrink-0 bg-white border border-gray-200 rounded-2xl shadow-sm p-3 mt-2">
         <div className="flex gap-2 items-end">
-          <input ref={fileRef} type="file" accept=".txt,.pdf,.md,.csv,.docx" onChange={handleFile} className="hidden" />
+          <input ref={fileRef} type="file" accept=".txt,.md,.csv,.docx,.pdf,.xlsx,.xls" onChange={handleFile} className="hidden" />
           <button onClick={() => fileRef.current?.click()}
             className="flex-shrink-0 w-9 h-9 text-gray-400 hover:text-[#1B8A4C] hover:bg-green-50 rounded-xl flex items-center justify-center transition-colors border border-gray-200">
             <Paperclip className="w-4 h-4" />

@@ -16,8 +16,14 @@ export async function aiExtractFromImage(
     : claudeVision(imageBase64, mimeType, prompt, maxTokens)
 }
 
+export async function aiExtractFromPDF(pdfBase64: string, maxTokens = 4000): Promise<string> {
+  return PROVIDER === 'gemini'
+    ? geminiText(`Извлеки весь текст из прикреплённого PDF документа. Сохрани структуру: заголовки, таблицы (в виде текста), абзацы.`, maxTokens)
+    : claudePDF(pdfBase64, maxTokens)
+}
+
 // ── Claude ──────────────────────────────────────────────────────────────────
-const CLAUDE_MODEL = process.env.CLAUDE_MODEL || 'claude-sonnet-4-5'
+const CLAUDE_MODEL = process.env.CLAUDE_MODEL || 'claude-sonnet-4-6'
 const ANTHROPIC_KEY = () => process.env.ANTHROPIC_API_KEY || ''
 
 async function claudeText(prompt: string, maxTokens: number) {
@@ -41,6 +47,30 @@ async function claudeVision(imageBase64: string, mimeType: string, prompt: strin
         content: [
           { type: 'image', source: { type: 'base64', media_type: mimeType, data: imageBase64 } },
           { type: 'text', text: prompt },
+        ],
+      }],
+    }),
+  })
+  return parseClaude(res)
+}
+
+async function claudePDF(pdfBase64: string, maxTokens: number) {
+  const res = await fetch('https://api.anthropic.com/v1/messages', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'x-api-key': ANTHROPIC_KEY(),
+      'anthropic-version': '2023-06-01',
+      'anthropic-beta': 'pdfs-2024-09-25',
+    },
+    body: JSON.stringify({
+      model: CLAUDE_MODEL,
+      max_tokens: maxTokens,
+      messages: [{
+        role: 'user',
+        content: [
+          { type: 'document', source: { type: 'base64', media_type: 'application/pdf', data: pdfBase64 } },
+          { type: 'text', text: 'Извлеки весь текст из этого PDF документа. Сохрани структуру: заголовки, таблицы (в виде текста), абзацы. Верни только текст без лишних пояснений.' },
         ],
       }],
     }),
