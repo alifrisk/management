@@ -1,7 +1,11 @@
 import { NextResponse } from 'next/server'
 import { aiGenerateText } from '@/lib/ai-provider'
+import { requireAuth } from '@/lib/auth-check'
 
 export async function POST(request: Request) {
+  const auth = await requireAuth(request)
+  if (auth instanceof NextResponse) return auth
+
   try {
     const { formData } = await request.json()
     const f = (v: unknown) => v ? new Intl.NumberFormat('ru-RU').format(Math.round(Number(v))) : '0'

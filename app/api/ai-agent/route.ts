@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server'
 import { createServerClient } from '@/supabase/server'
+import { requireAuth } from '@/lib/auth-check'
 
 const SYSTEM_PROMPT = `Ты — Рисковик, AI-ассистент по управлению рисками ОАО «Алиф Банк» (Таджикистан).
 Твоя роль: старший риск-менеджер с глубокими знаниями банковских рисков, нормативов НБТ и стандартов Базель II/III.
@@ -137,6 +138,9 @@ async function fetchKnowledgeDocs(): Promise<string> {
 }
 
 export async function POST(request: Request) {
+  const auth = await requireAuth(request)
+  if (auth instanceof NextResponse) return auth
+
   try {
     const { messages, context, document_context, live_data } = await request.json()
 

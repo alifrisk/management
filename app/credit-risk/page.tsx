@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useCallback } from 'react'
 import { supabase } from '@/supabase/client'
+import { apiFetch } from '@/lib/api-fetch'
 import { Plus, FileText, Download, Eye, Trash2, X, Loader2, CheckCircle2, AlertCircle, Filter, Upload } from 'lucide-react'
 
 interface Collateral { type: string; description: string; value: number }
@@ -235,8 +236,8 @@ export default function CreditRiskPage() {
         p1_total_liabilities: p1_total_liab, p2_total_liabilities: p2_total_liab,
         p1_cash_end, p2_cash_end, monthly_payment: monthlyPayment,
       }
-      const res = await fetch('/api/credit-risk/generate', {
-        method: 'POST', headers: { 'Content-Type': 'application/json' },
+      const res = await apiFetch('/api/credit-risk/generate', {
+        method: 'POST',
         body: JSON.stringify({ formData: payload }),
       })
       const data = await res.json()
@@ -300,9 +301,8 @@ export default function CreditRiskPage() {
         reader.onerror = reject
         reader.readAsDataURL(imageFile)
       })
-      const res = await fetch('/api/extract-from-image', {
+      const res = await apiFetch('/api/extract-from-image', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ imageBase64: base64, mimeType: imageFile.type, module: 'credit' }),
       })
       const data = await res.json()

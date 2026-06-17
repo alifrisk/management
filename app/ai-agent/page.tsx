@@ -1,6 +1,7 @@
 'use client'
 import { useState, useRef, useEffect, useCallback } from 'react'
 import { supabase } from '@/supabase/client'
+import { apiFetch } from '@/lib/api-fetch'
 import { Send, Bot, User, Loader2, Copy, Check, Paperclip, X, FileText, Plus, History, ChevronDown, Edit2, BookOpen, Trash2, Zap } from 'lucide-react'
 
 interface Message { id: string; role: 'user' | 'assistant'; content: string }
@@ -240,9 +241,8 @@ export default function RiskovikPage() {
     setEditId(null); setEditText('')
     setLoading(true)
     try {
-      const res = await fetch('/api/ai-agent', {
+      const res = await apiFetch('/api/ai-agent', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ messages: updatedMsgs.map(m => ({ role: m.role, content: m.content })), context, live_data: liveData || undefined }),
       })
       const data = await res.json()
@@ -278,9 +278,8 @@ export default function RiskovikPage() {
 
     try {
       const docCtx = docs.length > 0 ? docs.map(d => `=== ${d.name} ===\n${d.content}`).join('\n\n') : undefined
-      const res = await fetch('/api/ai-agent', {
+      const res = await apiFetch('/api/ai-agent', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           messages: [...messages, userMsg].map(m => ({ role: m.role, content: m.content })),
           context,

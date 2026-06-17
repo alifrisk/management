@@ -1,6 +1,7 @@
 'use client'
 import { useState, useEffect, useCallback } from 'react'
 import { supabase } from '@/supabase/client'
+import { apiFetch } from '@/lib/api-fetch'
 import { Plus, Eye, Trash2, X, Loader2, CheckCircle2, AlertCircle, Download, Filter, Upload, FileText } from 'lucide-react'
 
 const MONTHS = ['Январь','Февраль','Март','Апрель','Май','Июнь','Июль','Август','Сентябрь','Октябрь','Ноябрь','Декабрь']
@@ -199,9 +200,8 @@ export default function FinancialAnalysisPage() {
         reader.onerror = reject
         reader.readAsDataURL(imageFile)
       })
-      const res = await fetch('/api/extract-from-image', {
+      const res = await apiFetch('/api/extract-from-image', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ imageBase64: base64, mimeType: imageFile.type, module: 'financial' }),
       })
       const data = await res.json()
@@ -238,9 +238,8 @@ export default function FinancialAnalysisPage() {
     if (!form.code.trim()) { setError('Введите код контрагента'); return }
     setGenerating(true); setError(null)
     try {
-      const res = await fetch('/api/market-risk/financial-analysis', {
+      const res = await apiFetch('/api/market-risk/financial-analysis', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           code: form.code, counterparty_type: form.counterparty_type || 'Банк', p1_label: p1, p2_label: p2,
           currency: form.currency, p1_usd_rate: p1_rate, p2_usd_rate: p2_rate,
