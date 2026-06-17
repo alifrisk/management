@@ -1,6 +1,5 @@
 import { NextResponse } from 'next/server'
 import { aiExtractFromImage } from '@/lib/ai-provider'
-import { requireAuth } from '@/lib/auth-check'
 
 export const dynamic = 'force-dynamic'
 
@@ -80,9 +79,6 @@ const FINANCIAL_PROMPT = `Ты финансовый аналитик. На ск�
 \`\`\``
 
 export async function POST(request: Request) {
-  const auth = await requireAuth(request)
-  if (auth instanceof NextResponse) return auth
-
   try {
     const { imageBase64, mimeType, module } = await request.json()
     if (!imageBase64 || !mimeType) {
