@@ -56,6 +56,7 @@ export default function RiskovikPage() {
   const [kbContent, setKbContent] = useState('')
   const [kbSaving,  setKbSaving]  = useState(false)
   const [isAdmin,   setIsAdmin]   = useState(false)
+  const kbFileRef = useRef<HTMLInputElement>(null)
 
   // Live data from Supabase
   const [liveData,  setLiveData]  = useState('')
@@ -215,6 +216,24 @@ export default function RiskovikPage() {
     await supabase.from('ai_chats').delete().eq('id', id)
     if (chatId === id) { setChatId(null); setMessages([]) }
     loadChats()
+  }
+
+  async function handleKBFile(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0]
+    if (!file) return
+    if (kbFileRef.current) kbFileRef.current.value = ''
+
+    const ext = file.name.split('.').pop()?.toLowerCase()
+    const supported = ['txt', 'md', 'csv', 'json']
+    if (!supported.includes(ext || '')) {
+      alert('Поддерживаются форматы: TXT, MD, CSV, JSON. Для PDF и Word скопируйте текст вручную.')
+      return
+    }
+
+    const text = await file.text()
+    const title = file.name.replace(/\.[^.]+$/, '')
+    setKbTitle(title)
+    setKbContent(text.slice(0, 15000))
   }
 
   async function addKBDoc() {
@@ -384,7 +403,14 @@ export default function RiskovikPage() {
                 </div>
                 {isAdmin && (
                   <div className="p-3 border-t border-gray-100 space-y-2 bg-gray-50">
-                    <p className="text-[10px] text-gray-500 font-medium">Добавить документ</p>
+                    <div className="flex items-center justify-between">
+                      <p className="text-[10px] text-gray-500 font-medium">Добавить документ</p>
+                      <button onClick={() => kbFileRef.current?.click()}
+                        className="flex items-center gap-1 text-[10px] text-[#1B8A4C] hover:underline">
+                        <Paperclip className="w-3 h-3" /> Загрузить файл
+                      </button>
+                    </div>
+                    <input ref={kbFileRef} type="file" accept=".txt,.md,.csv,.json" onChange={handleKBFile} className="hidden" />
                     <input value={kbTitle} onChange={e => setKbTitle(e.target.value)}
                       placeholder="Название (напр. «Политика ОР 2024»)"
                       className="w-full px-2.5 py-1.5 text-xs border border-gray-200 rounded-lg focus:outline-none focus:ring-1 focus:ring-[#1B8A4C] bg-white" />
