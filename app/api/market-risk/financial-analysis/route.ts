@@ -37,6 +37,7 @@ export async function POST(request: Request) {
 Обязательства:       ${f(d.p1_total_liab)} → ${f(d.p2_total_liab)}${trend(d.p1_total_liab, d.p2_total_liab)}
 Собственный капитал: ${f(d.p1_equity)} → ${f(d.p2_equity)}${trend(d.p1_equity, d.p2_equity)}
   из них: Денежные средства: ${f(d.p1_cash_usd || 0)} → ${f(d.p2_cash_usd || 0)}
+          Средства в банках:    ${f(d.p1_receivables_usd || 0)} → ${f(d.p2_receivables_usd || 0)}
           Инвест. ценные бумаги: ${f(d.p1_investments_usd || 0)} → ${f(d.p2_investments_usd || 0)}
 
 ═══ ОПУ (тыс. USD) ═══
@@ -56,9 +57,10 @@ export async function POST(request: Request) {
    П1: ${f(d.p1_net_profit)} / ${f(d.p1_equity)} × 100% = ${pct(d.p1_roe)} ${d.p1_roe >= 10 ? '✓ норма' : '✗ ниже нормы'} (норма ≥10%)
    П2: ${f(d.p2_net_profit)} / ${f(d.p2_equity)} × 100% = ${pct(d.p2_roe)} ${d.p2_roe >= 10 ? '✓ норма' : '✗ ниже нормы'}
 
-3. Ликвидность = (Денежные средства + Инвест. ценные бумаги) / Общие активы × 100%
-   П1: (${f(d.p1_cash_usd || 0)} + ${f(d.p1_investments_usd || 0)}) / ${f(d.p1_total_assets)} × 100% = ${pct(d.p1_liquidity || 0)} ${(d.p1_liquidity || 0) >= 30 ? '✓ норма' : '✗ ниже нормы'} (норма НБТ ≥30%)
-   П2: (${f(d.p2_cash_usd || 0)} + ${f(d.p2_investments_usd || 0)}) / ${f(d.p2_total_assets)} × 100% = ${pct(d.p2_liquidity || 0)} ${(d.p2_liquidity || 0) >= 30 ? '✓ норма' : '✗ ниже нормы'}
+3. Ликвидность (коэфф. текущей ликвидности НБТ) = Ликвидные активы / Обязательства × 100%
+   где Ликвидные активы = Денежные средства + Средства в банках + Инвест. ценные бумаги
+   П1: (${f(d.p1_cash_usd || 0)} + ${f(d.p1_receivables_usd || 0)} + ${f(d.p1_investments_usd || 0)}) / ${f(d.p1_total_liab)} × 100% = ${pct(d.p1_liquidity || 0)} ${(d.p1_liquidity || 0) >= 30 ? '✓ норма' : '✗ ниже нормы'} (норма НБТ ≥30%)
+   П2: (${f(d.p2_cash_usd || 0)} + ${f(d.p2_receivables_usd || 0)} + ${f(d.p2_investments_usd || 0)}) / ${f(d.p2_total_liab)} × 100% = ${pct(d.p2_liquidity || 0)} ${(d.p2_liquidity || 0) >= 30 ? '✓ норма' : '✗ ниже нормы'}
 
 4. NIM% = Чистый процентный доход / Общие активы × 100%
    П1: ${f(d.p1_nim)} / ${f(d.p1_total_assets)} × 100% = ${pct(p1_nim_pct)}
