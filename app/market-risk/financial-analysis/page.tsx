@@ -189,6 +189,10 @@ export default function FinancialAnalysisPage() {
   const p2_car = p2_total_assets_usd > 0 ? (toUSD2(n('p2_equity')) / p2_total_assets_usd * 100) : 0
   const p1_roe = toUSD1(n('p1_equity')) > 0 ? (toUSD1(n('p1_net_profit')) / toUSD1(n('p1_equity')) * 100) : 0
   const p2_roe = toUSD2(n('p2_equity')) > 0 ? (toUSD2(n('p2_net_profit')) / toUSD2(n('p2_equity')) * 100) : 0
+  const p1_liq_num = toUSD1(n('p1_cash')) + toUSD1(n('p1_investments'))
+  const p2_liq_num = toUSD2(n('p2_cash')) + toUSD2(n('p2_investments'))
+  const p1_liquidity = p1_total_assets_usd > 0 ? (p1_liq_num / p1_total_assets_usd * 100) : 0
+  const p2_liquidity = p2_total_assets_usd > 0 ? (p2_liq_num / p2_total_assets_usd * 100) : 0
 
   async function handleExtract() {
     if (!imageFile) return
@@ -253,6 +257,9 @@ export default function FinancialAnalysisPage() {
           p1_net_profit: toUSD1(n('p1_net_profit')), p2_net_profit: toUSD2(n('p2_net_profit')),
           p1_car: Math.round(p1_car * 10) / 10, p2_car: Math.round(p2_car * 10) / 10,
           p1_roe: Math.round(p1_roe * 10) / 10, p2_roe: Math.round(p2_roe * 10) / 10,
+          p1_liquidity: Math.round(p1_liquidity * 10) / 10, p2_liquidity: Math.round(p2_liquidity * 10) / 10,
+          p1_cash_usd: toUSD1(n('p1_cash')), p2_cash_usd: toUSD2(n('p2_cash')),
+          p1_investments_usd: toUSD1(n('p1_investments')), p2_investments_usd: toUSD2(n('p2_investments')),
           p1_provisions: toUSD1(n('p1_provisions')), p2_provisions: toUSD2(n('p2_provisions')),
         }),
       })
@@ -619,14 +626,21 @@ export default function FinancialAnalysisPage() {
                   )}
 
                   {(p1_car > 0 || p2_car > 0) && (
-                    <div className="grid grid-cols-2 gap-3">
+                    <div className="grid grid-cols-3 gap-3">
                       <div className={`p-3 rounded-lg ${p2_car >= 13 ? 'bg-green-50' : p2_car >= 10 ? 'bg-yellow-50' : 'bg-red-50'}`}>
-                        <p className="text-xs text-gray-500">CAR П1 → П2</p>
+                        <p className="text-xs text-gray-500">CAR (капитал/активы)</p>
                         <p className={`text-xl font-bold ${p2_car >= 13 ? 'text-green-600' : p2_car >= 10 ? 'text-yellow-600' : 'text-red-600'}`}>{p1_car.toFixed(1)}% → {p2_car.toFixed(1)}%</p>
+                        <p className="text-[10px] text-gray-400 mt-0.5">норма НБТ ≥13%</p>
                       </div>
                       <div className={`p-3 rounded-lg ${p2_roe >= 10 ? 'bg-green-50' : p2_roe >= 5 ? 'bg-yellow-50' : 'bg-red-50'}`}>
-                        <p className="text-xs text-gray-500">ROE П1 → П2</p>
+                        <p className="text-xs text-gray-500">ROE (прибыль/капитал)</p>
                         <p className={`text-xl font-bold ${p2_roe >= 10 ? 'text-green-600' : p2_roe >= 5 ? 'text-yellow-600' : 'text-red-600'}`}>{p1_roe.toFixed(1)}% → {p2_roe.toFixed(1)}%</p>
+                        <p className="text-[10px] text-gray-400 mt-0.5">норма ≥10%</p>
+                      </div>
+                      <div className={`p-3 rounded-lg ${p2_liquidity >= 30 ? 'bg-green-50' : p2_liquidity >= 20 ? 'bg-yellow-50' : 'bg-red-50'}`}>
+                        <p className="text-xs text-gray-500">Ликвидность (касса+инвест./активы)</p>
+                        <p className={`text-xl font-bold ${p2_liquidity >= 30 ? 'text-green-600' : p2_liquidity >= 20 ? 'text-yellow-600' : 'text-red-600'}`}>{p1_liquidity.toFixed(1)}% → {p2_liquidity.toFixed(1)}%</p>
+                        <p className="text-[10px] text-gray-400 mt-0.5">норма НБТ ≥30%</p>
                       </div>
                     </div>
                   )}
