@@ -230,7 +230,7 @@ export default function RiskovikPage() {
     if (ext === 'docx') {
       try {
         const ab = await file.arrayBuffer()
-        const base64 = btoa(String.fromCharCode(...new Uint8Array(ab)))
+        const base64 = btoa(Array.from(new Uint8Array(ab), b => String.fromCharCode(b)).join(''))
         const res = await fetch('/api/extract-docx', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
@@ -348,7 +348,7 @@ export default function RiskovikPage() {
     if (ext === 'docx') {
       try {
         const ab = await file.arrayBuffer()
-        const base64 = btoa(String.fromCharCode(...new Uint8Array(ab)))
+        const base64 = btoa(Array.from(new Uint8Array(ab), b => String.fromCharCode(b)).join(''))
         const res = await fetch('/api/extract-docx', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
