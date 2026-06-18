@@ -254,7 +254,7 @@ export default function MarketRiskPage() {
       bank_name: fin.code,
       counterparty_type: fin.counterparty_type || 'Банк',
       total_assets: fmtN(totalAssets),
-      liquid_assets: fmtN(toUSD(fin.p2_cash + fin.p2_investments)),
+      liquid_assets: fmtN(toUSD(fin.p2_cash + fin.p2_receivables + fin.p2_investments)),
       total_capital: fmtN(toUSD(fin.p2_equity)),
       short_term_liabilities: fmtN(toUSD(fin.p2_deposits)),
       total_liabilities: fmtN(totalLiab),
