@@ -307,9 +307,12 @@ export default function CreditRiskPage() {
       })
       const data = await res.json()
       if (data.error) throw new Error(data.error)
+      const STRING_KEYS = ['p1_label', 'p2_label']
       const extracted: Record<string, string> = {}
       for (const [k, v] of Object.entries(data.data)) {
-        if (v !== null && v !== undefined && v !== 0) extracted[k] = String(v)
+        if (v !== null && v !== undefined && v !== 0) {
+          extracted[k] = STRING_KEYS.includes(k) ? String(v) : String(Math.round(Number(v)))
+        }
       }
       setForm(prev => ({ ...prev, ...extracted }))
       setInputMode('manual')
