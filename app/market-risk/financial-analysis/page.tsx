@@ -212,7 +212,7 @@ export default function FinancialAnalysisPage() {
   const setF = (k: string, v: string) => setForm(p => ({ ...p, [k]: v }))
   const n = (k: string) => parseN(form[k] || '')
   const p1_rate = Number(form.p1_usd_rate) || 1
-  const p2_rate = Number(form.p2_usd_rate) || 1
+  const p2_rate = sameRate ? p1_rate : (Number(form.p2_usd_rate) || p1_rate)
   const isUSD = form.currency === 'USD'
   const toUSD1 = (v: number) => isUSD ? v : v / p1_rate
   const toUSD2 = (v: number) => isUSD ? v : v / p2_rate
@@ -331,6 +331,10 @@ export default function FinancialAnalysisPage() {
   // ── GENERATE ─────────────────────────────────────────────────────────────────
   async function handleGenerate() {
     if (!form.code.trim()) { setError('Введите код контрагента'); return }
+    if (!isUSD) {
+      if (!Number(form.p1_usd_rate)) { setError(`Введите курс П1: 1 USD = ? ${form.currency}`); setTab(1); return }
+      if (!sameRate && !Number(form.p2_usd_rate)) { setError(`Введите курс П2: 1 USD = ? ${form.currency}`); setTab(1); return }
+    }
     setGenerating(true); setError(null)
     try {
       const res = await apiFetch('/api/market-risk/financial-analysis', {
@@ -680,7 +684,12 @@ export default function FinancialAnalysisPage() {
                     <div><label className={lbl}>Период 2 (напр. 31.12.2025)</label><input type="text" value={form.p2_label} onChange={e => setF('p2_label', e.target.value)} placeholder="31.12.2025" className={inp} /></div>
                     <div>
                       <label className={lbl}>Валюта отчётности</label>
-                      <select value={form.currency} onChange={e => { setF('currency', e.target.value); if (e.target.value === 'USD') { setF('p1_usd_rate', '1'); setF('p2_usd_rate', '1') } }} className={inp}>
+                      <select value={form.currency} onChange={e => {
+                          const cur = e.target.value
+                          setF('currency', cur)
+                          if (cur === 'USD') { setF('p1_usd_rate', '1'); setF('p2_usd_rate', '1') }
+                          else { setF('p1_usd_rate', ''); setF('p2_usd_rate', ''); setSameRate(false) }
+                        }} className={inp}>
                         {CURRENCIES.map(c => <option key={c.code} value={c.code}>{c.symbol} {c.name} ({c.code})</option>)}
                       </select>
                     </div>
@@ -698,14 +707,15 @@ export default function FinancialAnalysisPage() {
                         <div>
                           {!sameRate && form.currency !== 'USD' && <p className="text-xs text-gray-400 mb-1">Период 1</p>}
                           <input type="text" inputMode="decimal" value={form.p1_usd_rate}
-                            onChange={e => { setF('p1_usd_rate', e.target.value); if (sameRate) setF('p2_usd_rate', e.target.value) }}
+                            onChange={e => { const v = e.target.value.replace(',', '.'); setF('p1_usd_rate', v); if (sameRate) setF('p2_usd_rate', v) }}
                             disabled={form.currency === 'USD'} placeholder={form.currency === 'USD' ? '1' : 'Напр. 10.92'}
-                            className={`${inp} ${form.currency === 'USD' ? 'bg-gray-50 text-gray-400' : ''}`} />
+                            className={`${inp} ${form.currency === 'USD' ? 'bg-gray-50 text-gray-400' : !form.p1_usd_rate || !Number(form.p1_usd_rate) ? 'border-red-300 focus:ring-red-400' : ''}`} />
                         </div>
                         {!sameRate && form.currency !== 'USD' && (
                           <div>
                             <p className="text-xs text-gray-400 mb-1">Период 2</p>
-                            <input type="text" inputMode="decimal" value={form.p2_usd_rate} onChange={e => setF('p2_usd_rate', e.target.value)} placeholder="Напр. 10.85" className={inp} />
+                            <input type="text" inputMode="decimal" value={form.p2_usd_rate} onChange={e => setF('p2_usd_rate', e.target.value.replace(',', '.'))} placeholder="Напр. 10.85"
+                              className={`${inp} ${!form.p2_usd_rate || !Number(form.p2_usd_rate) ? 'border-red-300 focus:ring-red-400' : ''}`} />
                           </div>
                         )}
                       </div>
