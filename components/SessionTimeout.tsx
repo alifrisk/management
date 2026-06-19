@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState, useCallback } from 'react'
 import { useRouter, usePathname } from 'next/navigation'
-import { supabase } from '@/supabase/client'
+import { supabase } from '@/supabase/client'  // kept for getSession check
 import { LogOut, Clock } from 'lucide-react'
 
 const IDLE_MINUTES = 15
@@ -31,11 +31,10 @@ export function SessionTimeout() {
     if (countdownRef.current) clearInterval(countdownRef.current)
   }
 
-  const doLogout = useCallback(async () => {
+  const doLogout = useCallback(() => {
     clearTimers()
     setShowWarning(false)
     sessionStorage.removeItem('alif_user')
-    await supabase.auth.signOut()
     router.replace('/auth/login')
   }, [router])
 
