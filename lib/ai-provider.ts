@@ -22,6 +22,12 @@ export async function aiExtractFromPDF(pdfBase64: string, maxTokens = 4000): Pro
     : claudePDF(pdfBase64, maxTokens)
 }
 
+export async function aiExtractFromPDFWithPrompt(pdfBase64: string, prompt: string, maxTokens = 4000): Promise<string> {
+  return PROVIDER === 'gemini'
+    ? geminiVisionPDF(pdfBase64, prompt, maxTokens)
+    : claudeVisionPDF(pdfBase64, prompt, maxTokens)
+}
+
 // ── Claude ──────────────────────────────────────────────────────────────────
 const CLAUDE_MODEL = process.env.CLAUDE_MODEL || 'claude-sonnet-4-6'
 const ANTHROPIC_KEY = () => process.env.ANTHROPIC_API_KEY || ''
@@ -76,6 +82,50 @@ async function claudePDF(pdfBase64: string, maxTokens: number) {
     }),
   })
   return parseClaude(res)
+}
+
+async function claudeVisionPDF(pdfBase64: string, prompt: string, maxTokens: number) {
+  const res = await fetch('https://api.anthropic.com/v1/messages', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'x-api-key': ANTHROPIC_KEY(),
+      'anthropic-version': '2023-06-01',
+      'anthropic-beta': 'pdfs-2024-09-25',
+    },
+    body: JSON.stringify({
+      model: CLAUDE_MODEL,
+      max_tokens: maxTokens,
+      messages: [{
+        role: 'user',
+        content: [
+          { type: 'document', source: { type: 'base64', media_type: 'application/pdf', data: pdfBase64 } },
+          { type: 'text', text: prompt },
+        ],
+      }],
+    }),
+  })
+  return parseClaude(res)
+}
+
+async function geminiVisionPDF(pdfBase64: string, prompt: string, maxTokens: number) {
+  const res = await fetch(
+    `https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL()}:generateContent?key=${GEMINI_KEY()}`,
+    {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        contents: [{
+          parts: [
+            { inline_data: { mime_type: 'application/pdf', data: pdfBase64 } },
+            { text: prompt },
+          ],
+        }],
+        generationConfig: { maxOutputTokens: maxTokens },
+      }),
+    }
+  )
+  return parseGemini(res)
 }
 
 async function parseClaude(res: Response): Promise<string> {

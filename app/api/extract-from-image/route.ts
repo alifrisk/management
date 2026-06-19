@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server'
-import { aiExtractFromImage } from '@/lib/ai-provider'
+import { aiExtractFromImage, aiExtractFromPDFWithPrompt } from '@/lib/ai-provider'
 
 export const dynamic = 'force-dynamic'
 
@@ -156,16 +156,14 @@ export async function POST(request: Request) {
   try {
     const { imageBase64, mimeType, module } = await request.json()
     if (!imageBase64 || !mimeType) {
-      return NextResponse.json({ error: 'Изображение не передано' }, { status: 400 })
+      return NextResponse.json({ error: 'Файл не передан' }, { status: 400 })
     }
 
     const prompt = module === 'credit' ? CREDIT_PROMPT : FINANCIAL_PROMPT
-    const text = await aiExtractFromImage(
-      imageBase64,
-      mimeType as 'image/jpeg' | 'image/png' | 'image/webp',
-      prompt,
-      3000
-    )
+    const isPDF = mimeType === 'application/pdf'
+    const text = isPDF
+      ? await aiExtractFromPDFWithPrompt(imageBase64, prompt, 4000)
+      : await aiExtractFromImage(imageBase64, mimeType as 'image/jpeg' | 'image/png' | 'image/webp', prompt, 3000)
 
     // Extract JSON block from response
     const jsonBlock = text.match(/```json\n?([\s\S]*?)\n?```/)

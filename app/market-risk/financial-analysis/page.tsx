@@ -199,6 +199,23 @@ export default function FinancialAnalysisPage() {
   const [extractMsg, setExtractMsg] = useState<string | null>(null)
   const [extractWarn, setExtractWarn] = useState<string[]>([])
   const [sameRate, setSameRate] = useState(false)
+  const [fetchingRate, setFetchingRate] = useState(false)
+
+  async function fetchRate() {
+    if (form.currency === 'USD') return
+    setFetchingRate(true)
+    try {
+      const res = await fetch(`https://open.er-api.com/v6/latest/USD`)
+      const json = await res.json()
+      const rate = json?.rates?.[form.currency]
+      if (rate) {
+        const rateStr = rate.toFixed(4)
+        setF('p1_usd_rate', rateStr)
+        if (sameRate) setF('p2_usd_rate', rateStr)
+      }
+    } catch { /* silently fail */ }
+    setFetchingRate(false)
+  }
 
   const fetch_ = useCallback(async () => {
     setLoading(true)
@@ -618,12 +635,12 @@ export default function FinancialAnalysisPage() {
 
             <div className="flex-1 overflow-y-auto p-5">
 
-              {/* ─── Image upload ─── */}
+              {/* ─── Image/PDF upload ─── */}
               {inputMode === 'image' && (
                 <div className="space-y-4">
                   <div className="bg-blue-50 border border-blue-100 rounded-lg p-3">
-                    <p className="text-xs text-blue-800 font-medium">📄 Загрузите скриншот аудированной МСФО отчётности банка</p>
-                    <p className="text-xs text-blue-700 mt-1">AI автоматически извлечёт: Баланс (IFRS 9, IFRS 16), ОПУ / Отчёт о совокупном доходе</p>
+                    <p className="text-xs text-blue-800 font-medium">📄 Загрузите скриншот или PDF аудированной МСФО отчётности банка</p>
+                    <p className="text-xs text-blue-700 mt-1">AI автоматически извлечёт: Баланс (IFRS 9, IFRS 16), ОПУ · Поддерживаются: PNG, JPG, PDF</p>
                   </div>
                   <label className="block cursor-pointer">
                     <div className={`border-2 border-dashed rounded-xl p-10 text-center transition-colors ${imageFile ? 'border-[#1B8A4C] bg-green-50' : 'border-gray-200 hover:border-[#1B8A4C] hover:bg-gray-50'}`}>
@@ -631,17 +648,17 @@ export default function FinancialAnalysisPage() {
                         <div className="space-y-2">
                           <CheckCircle2 className="w-10 h-10 text-green-500 mx-auto" />
                           <p className="text-sm font-medium text-gray-800">{imageFile.name}</p>
-                          <p className="text-xs text-gray-400">{(imageFile.size / 1024).toFixed(0)} KB · Готово к извлечению</p>
+                          <p className="text-xs text-gray-400">{(imageFile.size / 1024 / 1024).toFixed(1)} МБ · {imageFile.type === 'application/pdf' ? 'PDF документ' : 'Изображение'} · Готово</p>
                         </div>
                       ) : (
                         <div className="space-y-2">
                           <Upload className="w-10 h-10 text-gray-300 mx-auto" />
-                          <p className="text-sm font-medium text-gray-500">Нажмите или перетащите скрин МСФО отчёта</p>
-                          <p className="text-xs text-gray-400">PNG, JPG, WEBP · до 5 МБ</p>
+                          <p className="text-sm font-medium text-gray-500">Нажмите или перетащите МСФО отчёт</p>
+                          <p className="text-xs text-gray-400">PNG, JPG, WEBP или PDF · до 20 МБ</p>
                         </div>
                       )}
                     </div>
-                    <input type="file" accept="image/png,image/jpeg,image/webp" className="hidden"
+                    <input type="file" accept="image/png,image/jpeg,image/webp,application/pdf" className="hidden"
                       onChange={e => { setImageFile(e.target.files?.[0] || null); setExtractMsg(null) }} />
                   </label>
                   {extractMsg && (
@@ -700,12 +717,20 @@ export default function FinancialAnalysisPage() {
                     <div className="lg:col-span-2">
                       <div className="flex items-center justify-between mb-1">
                         <label className={lbl + ' mb-0'}>{form.currency === 'USD' ? 'Курс (USD — основная валюта)' : `Курс: 1 USD = ? ${form.currency}`}</label>
-                        {form.currency !== 'USD' && (
-                          <label className="flex items-center gap-1.5 cursor-pointer">
-                            <input type="checkbox" checked={sameRate} onChange={e => { setSameRate(e.target.checked); if (e.target.checked) setF('p2_usd_rate', form.p1_usd_rate) }} className="rounded" />
-                            <span className="text-xs text-gray-500">Одинаковый для П1 и П2</span>
-                          </label>
-                        )}
+                        <div className="flex items-center gap-3">
+                          {form.currency !== 'USD' && (
+                            <button type="button" onClick={fetchRate} disabled={fetchingRate}
+                              className="text-xs text-[#1B8A4C] hover:text-[#177040] font-medium flex items-center gap-1 disabled:opacity-50">
+                              {fetchingRate ? <><Loader2 className="w-3 h-3 animate-spin" /> Загрузка...</> : '↻ Текущий курс'}
+                            </button>
+                          )}
+                          {form.currency !== 'USD' && (
+                            <label className="flex items-center gap-1.5 cursor-pointer">
+                              <input type="checkbox" checked={sameRate} onChange={e => { setSameRate(e.target.checked); if (e.target.checked) setF('p2_usd_rate', form.p1_usd_rate) }} className="rounded" />
+                              <span className="text-xs text-gray-500">Одинаковый для П1 и П2</span>
+                            </label>
+                          )}
+                        </div>
                       </div>
                       <div className={`grid gap-3 ${sameRate || form.currency === 'USD' ? 'grid-cols-1' : 'grid-cols-2'}`}>
                         <div>
