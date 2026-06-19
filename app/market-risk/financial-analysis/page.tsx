@@ -44,6 +44,7 @@ const EMPTY: Record<string, string> = {
   counterparty_type: 'Банк', currency: 'USD', p1_usd_rate: '1', p2_usd_rate: '1',
   // ASSETS
   p1_cash_cb: '', p2_cash_cb: '',
+  p1_restricted: '', p2_restricted: '',    // Средства с ограниченным доступом (обяз. резервы НБТ)
   p1_due_banks: '', p2_due_banks: '',
   p1_fvtpl: '', p2_fvtpl: '',
   p1_fvoci: '', p2_fvoci: '',
@@ -53,6 +54,7 @@ const EMPTY: Record<string, string> = {
   p1_ppe: '', p2_ppe: '',
   p1_intangibles: '', p2_intangibles: '',
   p1_rou: '', p2_rou: '',
+  p1_assets_held_sale: '', p2_assets_held_sale: '', // Долгосрочные активы для продажи
   p1_other_assets: '', p2_other_assets: '',
   // LIABILITIES
   p1_due_cb: '', p2_due_cb: '',
@@ -74,6 +76,7 @@ const EMPTY: Record<string, string> = {
   p1_trading: '', p2_trading: '',
   p1_fx_income: '', p2_fx_income: '',
   p1_other_income: '', p2_other_income: '',
+  p1_other_expense: '', p2_other_expense: '', // Прочие расходы (отдельная строка)
   p1_ecl_charge: '', p2_ecl_charge: '',
   p1_personnel: '', p2_personnel: '',
   p1_depreciation: '', p2_depreciation: '',
@@ -226,8 +229,8 @@ export default function FinancialAnalysisPage() {
   const p1_total_sec = n('p1_fvtpl') + n('p1_fvoci') + n('p1_inv_ac')
   const p2_total_sec = n('p2_fvtpl') + n('p2_fvoci') + n('p2_inv_ac')
 
-  const p1_total_assets = n('p1_cash_cb') + n('p1_due_banks') + p1_total_sec + p1_net_loans + n('p1_ppe') + n('p1_intangibles') + n('p1_rou') + n('p1_other_assets')
-  const p2_total_assets = n('p2_cash_cb') + n('p2_due_banks') + p2_total_sec + p2_net_loans + n('p2_ppe') + n('p2_intangibles') + n('p2_rou') + n('p2_other_assets')
+  const p1_total_assets = n('p1_cash_cb') + n('p1_restricted') + n('p1_due_banks') + p1_total_sec + p1_net_loans + n('p1_ppe') + n('p1_intangibles') + n('p1_rou') + n('p1_assets_held_sale') + n('p1_other_assets')
+  const p2_total_assets = n('p2_cash_cb') + n('p2_restricted') + n('p2_due_banks') + p2_total_sec + p2_net_loans + n('p2_ppe') + n('p2_intangibles') + n('p2_rou') + n('p2_assets_held_sale') + n('p2_other_assets')
 
   const p1_total_liab = n('p1_due_cb') + n('p1_ibl') + n('p1_cust_dep') + n('p1_debt_issued') + n('p1_subord') + n('p1_lease_liab') + n('p1_other_liab')
   const p2_total_liab = n('p2_due_cb') + n('p2_ibl') + n('p2_cust_dep') + n('p2_debt_issued') + n('p2_subord') + n('p2_lease_liab') + n('p2_other_liab')
@@ -246,8 +249,8 @@ export default function FinancialAnalysisPage() {
   const p2_op_income = p2_nim + p2_net_fee + n('p2_trading') + n('p2_fx_income') + n('p2_other_income')
   const p1_after_ecl = p1_op_income - n('p1_ecl_charge')
   const p2_after_ecl = p2_op_income - n('p2_ecl_charge')
-  const p1_total_opex = n('p1_personnel') + n('p1_depreciation') + n('p1_admin')
-  const p2_total_opex = n('p2_personnel') + n('p2_depreciation') + n('p2_admin')
+  const p1_total_opex = n('p1_personnel') + n('p1_depreciation') + n('p1_admin') + n('p1_other_expense')
+  const p2_total_opex = n('p2_personnel') + n('p2_depreciation') + n('p2_admin') + n('p2_other_expense')
   const p1_pbt = p1_after_ecl - p1_total_opex
   const p2_pbt = p2_after_ecl - p2_total_opex
   const p1_net_profit = p1_pbt - n('p1_tax')
@@ -349,6 +352,7 @@ export default function FinancialAnalysisPage() {
           p1_equity: p1e_usd, p2_equity: p2e_usd,
           // Liquid assets breakdown
           p1_cash_cb: toUSD1(n('p1_cash_cb')), p2_cash_cb: toUSD2(n('p2_cash_cb')),
+          p1_restricted: toUSD1(n('p1_restricted')), p2_restricted: toUSD2(n('p2_restricted')),
           p1_due_banks: toUSD1(n('p1_due_banks')), p2_due_banks: toUSD2(n('p2_due_banks')),
           p1_fvtpl: toUSD1(n('p1_fvtpl')), p2_fvtpl: toUSD2(n('p2_fvtpl')),
           p1_fvoci: toUSD1(n('p1_fvoci')), p2_fvoci: toUSD2(n('p2_fvoci')),
@@ -388,13 +392,13 @@ export default function FinancialAnalysisPage() {
         currency: form.currency, p1_usd_rate: p1_rate, p2_usd_rate: p2_rate,
         // Map to legacy DB columns (aggregated)
         p1_cash: parseN(form.p1_cash_cb || ''), p2_cash: parseN(form.p2_cash_cb || ''),
-        p1_receivables: parseN(form.p1_due_banks || ''), p2_receivables: parseN(form.p2_due_banks || ''),
+        p1_receivables: n('p1_restricted') + n('p1_due_banks'), p2_receivables: n('p2_restricted') + n('p2_due_banks'),
         p1_investments: n('p1_fvtpl') + n('p1_fvoci') + n('p1_inv_ac'),
         p2_investments: n('p2_fvtpl') + n('p2_fvoci') + n('p2_inv_ac'),
         p1_loans_issued: p1_net_loans, p2_loans_issued: p2_net_loans,
         p1_fixed_assets: n('p1_ppe') + n('p1_intangibles') + n('p1_rou'),
         p2_fixed_assets: n('p2_ppe') + n('p2_intangibles') + n('p2_rou'),
-        p1_other_assets: n('p1_other_assets'), p2_other_assets: n('p2_other_assets'),
+        p1_other_assets: n('p1_assets_held_sale') + n('p1_other_assets'), p2_other_assets: n('p2_assets_held_sale') + n('p2_other_assets'),
         p1_deposits: n('p1_cust_dep'), p2_deposits: n('p2_cust_dep'),
         p1_borrowings: n('p1_due_cb') + n('p1_ibl') + n('p1_debt_issued') + n('p1_subord') + n('p1_lease_liab'),
         p2_borrowings: n('p2_due_cb') + n('p2_ibl') + n('p2_debt_issued') + n('p2_subord') + n('p2_lease_liab'),
@@ -730,22 +734,24 @@ export default function FinancialAnalysisPage() {
                 {tab === 2 && (
                   <FT title="ОТЧЁТ О ФИНАНСОВОМ ПОЛОЖЕНИИ — АКТИВЫ (МСФО IAS 1 / IFRS 9 / IFRS 16)" p1={p1lbl} p2={p2lbl} currency={form.currency}>
                     <SectionRow title="Денежные средства и эквиваленты" />
-                    <FR label="Денежные средства и счета в ЦБ / НБТ" f1="p1_cash_cb" f2="p2_cash_cb" {...frProps} />
-                    <FR label="Средства в банках / МБК размещённые" f1="p1_due_banks" f2="p2_due_banks" {...frProps} />
-                    <SectionRow title="Портфель ценных бумаг (IFRS 9)" />
-                    <FR label="Фин. активы по СС через ОПУ (FVTPL)" f1="p1_fvtpl" f2="p2_fvtpl" indent {...frProps} />
-                    <FR label="Фин. активы по СС через ПСД (FVOCI)" f1="p1_fvoci" f2="p2_fvoci" indent {...frProps} />
-                    <FR label="Фин. активы по амортизир. стоимости / HTM" f1="p1_inv_ac" f2="p2_inv_ac" indent {...frProps} />
-                    <FR label="▶ Итого портфель ценных бумаг" bold auto v1={p1_total_sec} v2={p2_total_sec} f1="" f2="" {...frProps} />
+                    <FR label="Денежные средства и их эквиваленты" f1="p1_cash_cb" f2="p2_cash_cb" {...frProps} />
+                    <FR label="Средства с ограниченным доступом (обяз. резервы НБТ)" f1="p1_restricted" f2="p2_restricted" indent {...frProps} />
+                    <FR label="Средства в банках (МБК размещённые / ностро)" f1="p1_due_banks" f2="p2_due_banks" {...frProps} />
+                    <SectionRow title="Финансовые инструменты (IFRS 9)" />
+                    <FR label="Фин. инструменты по СС через ОПУ (FVTPL)" f1="p1_fvtpl" f2="p2_fvtpl" indent {...frProps} />
+                    <FR label="Фин. инструменты по СС через ПСД (FVOCI)" f1="p1_fvoci" f2="p2_fvoci" indent {...frProps} />
+                    <FR label="Инвестиции по амортизир. стоимости / ГЦБ" f1="p1_inv_ac" f2="p2_inv_ac" indent {...frProps} />
+                    <FR label="▶ Итого финансовые инструменты" bold auto v1={p1_total_sec} v2={p2_total_sec} f1="" f2="" {...frProps} />
                     <SectionRow title="Кредитный портфель (IFRS 9 — ECL)" />
-                    <FR label="Кредиты клиентам, валовые (gross)" f1="p1_gross_loans" f2="p2_gross_loans" indent {...frProps} />
-                    <FR label="Минус: резерв под ОКУ (ECL allowance)" f1="p1_ecl_reserve" f2="p2_ecl_reserve" indent deduction {...frProps} />
-                    <FR label="▶ Кредиты клиентам, нетто (net)" bold auto v1={p1_net_loans} v2={p2_net_loans} f1="" f2="" {...frProps} />
+                    <FR label="Кредиты клиентам, валовые" f1="p1_gross_loans" f2="p2_gross_loans" {...frProps} />
+                    <FR label="Минус: резерв под ОКУ (ECL / РППУ)" f1="p1_ecl_reserve" f2="p2_ecl_reserve" indent deduction {...frProps} />
+                    <FR label="▶ Кредиты клиентам, нетто" bold auto v1={p1_net_loans} v2={p2_net_loans} f1="" f2="" {...frProps} />
                     <SectionRow title="Долгосрочные активы" />
-                    <FR label="Основные средства (PP&E)" f1="p1_ppe" f2="p2_ppe" indent {...frProps} />
-                    <FR label="НМА + гудвил (Intangibles + goodwill)" f1="p1_intangibles" f2="p2_intangibles" indent {...frProps} />
-                    <FR label="Активы ПП МСФО 16 (ROU assets IFRS 16)" f1="p1_rou" f2="p2_rou" indent {...frProps} />
-                    <FR label="Прочие активы (отлож. налоги и др.)" f1="p1_other_assets" f2="p2_other_assets" {...frProps} />
+                    <FR label="Основные средства (здания, оборудование, ТС)" f1="p1_ppe" f2="p2_ppe" indent {...frProps} />
+                    <FR label="Нематериальные активы (НМА, гудвил, ПО)" f1="p1_intangibles" f2="p2_intangibles" indent {...frProps} />
+                    <FR label="Активы в форме права пользования (МСФО 16)" f1="p1_rou" f2="p2_rou" indent {...frProps} />
+                    <FR label="Долгосрочные активы для продажи" f1="p1_assets_held_sale" f2="p2_assets_held_sale" indent {...frProps} />
+                    <FR label="Прочие активы (налоги, дебиторы и др.)" f1="p1_other_assets" f2="p2_other_assets" {...frProps} />
                     <FR label="══ ИТОГО АКТИВЫ" bold auto v1={p1_total_assets} v2={p2_total_assets} f1="" f2="" highlight="green" {...frProps} />
                   </FT>
                 )}
@@ -755,20 +761,20 @@ export default function FinancialAnalysisPage() {
                   <div className="space-y-3">
                     <FT title="ОБЯЗАТЕЛЬСТВА (МСФО IAS 1 / IFRS 16)" p1={p1lbl} p2={p2lbl} currency={form.currency}>
                       <SectionRow title="Привлечённые средства" />
-                      <FR label="Средства ЦБ / НБТ (Due to central bank)" f1="p1_due_cb" f2="p2_due_cb" indent {...frProps} />
-                      <FR label="МБК привлечённые (Due to banks)" f1="p1_ibl" f2="p2_ibl" indent {...frProps} />
-                      <FR label="Средства клиентов / депозиты (Customer accounts)" f1="p1_cust_dep" f2="p2_cust_dep" {...frProps} />
-                      <SectionRow title="Рыночные заимствования" />
-                      <FR label="Выпущенные долговые ЦБ (Debt securities issued)" f1="p1_debt_issued" f2="p2_debt_issued" indent {...frProps} />
-                      <FR label="Субординированный долг (Subordinated debt)" f1="p1_subord" f2="p2_subord" indent {...frProps} />
-                      <FR label="Обязательства по аренде МСФО 16 (Lease liabilities)" f1="p1_lease_liab" f2="p2_lease_liab" indent {...frProps} />
-                      <FR label="Прочие обязательства (отлож. налоги и др.)" f1="p1_other_liab" f2="p2_other_liab" {...frProps} />
+                      <FR label="Обязательства перед ЦБ / НБТ" f1="p1_due_cb" f2="p2_due_cb" indent {...frProps} />
+                      <FR label="Средства банков и финансовых организаций (МБК)" f1="p1_ibl" f2="p2_ibl" indent {...frProps} />
+                      <FR label="Счета клиентов (депозиты физ. и юрлиц)" f1="p1_cust_dep" f2="p2_cust_dep" {...frProps} />
+                      <SectionRow title="Займы и рыночные заимствования" />
+                      <FR label="Займы к оплате / выпущенные облигации" f1="p1_debt_issued" f2="p2_debt_issued" indent {...frProps} />
+                      <FR label="Субординированный долг" f1="p1_subord" f2="p2_subord" indent {...frProps} />
+                      <FR label="Обязательства по аренде (МСФО 16)" f1="p1_lease_liab" f2="p2_lease_liab" indent {...frProps} />
+                      <FR label="Прочие обязательства (кред. убытки по гарантиям и др.)" f1="p1_other_liab" f2="p2_other_liab" {...frProps} />
                       <FR label="══ ИТОГО ОБЯЗАТЕЛЬСТВА" bold auto v1={p1_total_liab} v2={p2_total_liab} f1="" f2="" highlight="blue" {...frProps} />
                     </FT>
                     <FT title="КАПИТАЛ (МСФО IAS 1)" p1={p1lbl} p2={p2lbl} currency={form.currency}>
-                      <FR label="Акционерный капитал + эмиссионный доход" f1="p1_share_cap" f2="p2_share_cap" {...frProps} />
-                      <FR label="Нераспределённая прибыль (Retained earnings)" f1="p1_retained" f2="p2_retained" {...frProps} />
-                      <FR label="ПСД + прочие резервы (OCI reserves + funds)" f1="p1_oci_eq" f2="p2_oci_eq" {...frProps} />
+                      <FR label="Акционерный капитал (уставный + эмиссионный доход)" f1="p1_share_cap" f2="p2_share_cap" {...frProps} />
+                      <FR label="Нераспределённая прибыль" f1="p1_retained" f2="p2_retained" {...frProps} />
+                      <FR label="Прочие резервы (переоценка ОС, ПСД, фонды)" f1="p1_oci_eq" f2="p2_oci_eq" {...frProps} />
                       <FR label="══ ИТОГО КАПИТАЛ" bold auto v1={p1_equity} v2={p2_equity} f1="" f2="" highlight="green" {...frProps} />
                       <FR label="══ ИТОГО ОБЯЗАТЕЛЬСТВА И КАПИТАЛ" bold auto v1={p1_total_passiv} v2={p2_total_passiv} f1="" f2="" highlight="green" {...frProps} />
                     </FT>
@@ -801,33 +807,33 @@ export default function FinancialAnalysisPage() {
 
                 {/* TAB 4: P&L / OCI */}
                 {tab === 4 && (
-                  <FT title="ОТЧЁТ О СОВОКУПНОМ ДОХОДЕ (МСФО IAS 1 / IFRS 9)" p1={p1lbl} p2={p2lbl} currency={form.currency}>
-                    <SectionRow title="Процентный доход (Effective Interest Rate — IFRS 9)" />
-                    <FR label="Процентные доходы (ЭПС / EIR)" f1="p1_int_income" f2="p2_int_income" {...frProps} />
-                    <FR label="Процентные расходы" f1="p1_int_expense" f2="p2_int_expense" {...frProps} />
-                    <FR label="▶ Чистый процентный доход (NIM)" bold auto v1={p1_nim} v2={p2_nim} f1="" f2="" highlight="green" {...frProps} />
-                    <SectionRow title="Комиссионный доход" />
+                  <FT title="ОТЧЁТ О ПРИБЫЛЯХ И УБЫТКАХ И ПРОЧЕМ СОВОКУПНОМ ДОХОДЕ (МСФО IAS 1 / IFRS 9)" p1={p1lbl} p2={p2lbl} currency={form.currency}>
+                    <SectionRow title="Процентные доходы (метод ЭПС — IFRS 9)" />
+                    <FR label="Процентные доходы (кредиты, размещения, инвестиции)" f1="p1_int_income" f2="p2_int_income" {...frProps} />
+                    <FR label="Процентные расходы (депозиты, займы, аренда)" f1="p1_int_expense" f2="p2_int_expense" {...frProps} />
+                    <FR label="▶ Чистый процентный доход" bold auto v1={p1_nim} v2={p2_nim} f1="" f2="" highlight="green" {...frProps} />
+                    <SectionRow title="Формирование резервов (IFRS 9 — ECL)" />
+                    <FR label="Формирование резерва под ОКУ (ECL / РППУ)" f1="p1_ecl_charge" f2="p2_ecl_charge" {...frProps} />
+                    <FR label="▶ Чистый процентный доход после резервов" bold auto v1={p1_after_ecl} v2={p2_after_ecl} f1="" f2="" {...frProps} />
+                    <SectionRow title="Непроцентные доходы" />
                     <FR label="Комиссионные доходы" f1="p1_fee_income" f2="p2_fee_income" indent {...frProps} />
                     <FR label="Комиссионные расходы" f1="p1_fee_expense" f2="p2_fee_expense" indent {...frProps} />
                     <FR label="▶ Чистый комиссионный доход" bold auto v1={p1_net_fee} v2={p2_net_fee} f1="" f2="" {...frProps} />
-                    <SectionRow title="Прочие операционные доходы" />
-                    <FR label="Торговый доход / изменение СС FVTPL" f1="p1_trading" f2="p2_trading" indent {...frProps} />
-                    <FR label="Доходы от операций с иностр. валютой (FX)" f1="p1_fx_income" f2="p2_fx_income" indent {...frProps} />
-                    <FR label="Прочие операционные доходы" f1="p1_other_income" f2="p2_other_income" indent {...frProps} />
+                    <FR label="Чистый доход от операций с иностр. валютой" f1="p1_fx_income" f2="p2_fx_income" indent {...frProps} />
+                    <FR label="Торговый доход / изменение СС фин. инструментов" f1="p1_trading" f2="p2_trading" indent {...frProps} />
+                    <FR label="Прочие доходы" f1="p1_other_income" f2="p2_other_income" indent {...frProps} />
                     <FR label="══ ИТОГО ОПЕРАЦИОННЫЙ ДОХОД" bold auto v1={p1_op_income} v2={p2_op_income} f1="" f2="" highlight="green" {...frProps} />
-                    <SectionRow title="Кредитные убытки (IFRS 9 — ECL)" />
-                    <FR label="Расходы на обесценение / ОКУ (ECL charge)" f1="p1_ecl_charge" f2="p2_ecl_charge" {...frProps} />
-                    <FR label="▶ Доход после ОКУ" bold auto v1={p1_after_ecl} v2={p2_after_ecl} f1="" f2="" {...frProps} />
                     <SectionRow title="Операционные расходы" />
-                    <FR label="Расходы на персонал (Personnel expenses)" f1="p1_personnel" f2="p2_personnel" indent {...frProps} />
-                    <FR label="Амортизация ОС, НМА, ПП (D&A)" f1="p1_depreciation" f2="p2_depreciation" indent {...frProps} />
-                    <FR label="Административные и прочие расходы" f1="p1_admin" f2="p2_admin" indent {...frProps} />
+                    <FR label="Расходы на персонал (зарплата, бонусы, ФСЗН)" f1="p1_personnel" f2="p2_personnel" indent {...frProps} />
+                    <FR label="Амортизация ОС, НМА и активов ПП (МСФО 16)" f1="p1_depreciation" f2="p2_depreciation" indent {...frProps} />
+                    <FR label="Административные расходы (аренда, IT, связь)" f1="p1_admin" f2="p2_admin" indent {...frProps} />
+                    <FR label="Прочие расходы" f1="p1_other_expense" f2="p2_other_expense" indent {...frProps} />
                     <FR label="▶ Итого операционные расходы" bold auto v1={p1_total_opex} v2={p2_total_opex} f1="" f2="" {...frProps} />
-                    <FR label="▶ Прибыль до налогообложения (PBT)" bold auto v1={p1_pbt} v2={p2_pbt} f1="" f2="" highlight="blue" {...frProps} />
-                    <FR label="Налог на прибыль (Income tax)" f1="p1_tax" f2="p2_tax" {...frProps} />
-                    <FR label="══ ЧИСТАЯ ПРИБЫЛЬ (Net profit)" bold auto v1={p1_net_profit} v2={p2_net_profit} f1="" f2="" highlight="green" {...frProps} />
-                    <SectionRow title="Прочий совокупный доход (OCI)" />
-                    <FR label="Прочий совокупный доход (FVOCI, переводы, хеджи)" f1="p1_oci" f2="p2_oci" {...frProps} />
+                    <FR label="▶ Прибыль до налогообложения" bold auto v1={p1_pbt} v2={p2_pbt} f1="" f2="" highlight="blue" {...frProps} />
+                    <FR label="Расходы по налогу на прибыль" f1="p1_tax" f2="p2_tax" {...frProps} />
+                    <FR label="══ ЧИСТАЯ ПРИБЫЛЬ" bold auto v1={p1_net_profit} v2={p2_net_profit} f1="" f2="" highlight="green" {...frProps} />
+                    <SectionRow title="Прочий совокупный доход (ПСД)" />
+                    <FR label="ПСД (переоценка ОС, FVOCI, курсовые разницы)" f1="p1_oci" f2="p2_oci" {...frProps} />
                     <FR label="══ ИТОГО СОВОКУПНЫЙ ДОХОД" bold auto v1={p1_total_ci} v2={p2_total_ci} f1="" f2="" highlight="green" {...frProps} />
                   </FT>
                 )}

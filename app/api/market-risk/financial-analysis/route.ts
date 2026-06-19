@@ -85,7 +85,8 @@ export async function POST(request: Request) {
 
 ═══ БАЛАНС МСФО (тыс. USD) ═══
 Итого активы:              П1: ${f(d.p1_total_assets)}  →  П2: ${f(d.p2_total_assets)}${trend(d.p1_total_assets, d.p2_total_assets)}
-  Денежные ср-ва и ЦБ:    П1: ${f(d.p1_cash_cb)}  →  П2: ${f(d.p2_cash_cb)}
+  Денежные ср-ва (своб.):  П1: ${f(d.p1_cash_cb)}  →  П2: ${f(d.p2_cash_cb)}
+${(d.p1_restricted || 0) + (d.p2_restricted || 0) > 0 ? `  Огр. доступ (обяз. рез.): П1: ${f(d.p1_restricted)}  →  П2: ${f(d.p2_restricted)}` : ''}
   МБК размещённые:         П1: ${f(d.p1_due_banks)}  →  П2: ${f(d.p2_due_banks)}
   FVTPL (торг. ценные бум.): П1: ${f(d.p1_fvtpl)}  →  П2: ${f(d.p2_fvtpl)}
   FVOCI (цен. бум. по ПСД): П1: ${f(d.p1_fvoci)}  →  П2: ${f(d.p2_fvoci)}
