@@ -1,7 +1,7 @@
 'use client'
 import { useState, useEffect, useCallback } from 'react'
 import { supabase } from '@/supabase/client'
-import { Plus, Download, Eye, Trash2, X, Loader2, CheckCircle2, AlertCircle, Filter, Link2 } from 'lucide-react'
+import { Plus, Download, Eye, Trash2, X, Loader2, CheckCircle2, AlertCircle, Filter, Link2, Edit2 } from 'lucide-react'
 
 interface Assessment {
   id: string
@@ -219,6 +219,7 @@ export default function MarketRiskPage() {
   const [filterMonth, setFilterMonth] = useState('')
   const [tab, setTab] = useState(1)
   const [linkedFinId, setLinkedFinId] = useState('')
+  const [editingId, setEditingId] = useState<string | null>(null)
 
   const fetch_ = useCallback(async () => {
     setLoading(true)
@@ -254,11 +255,13 @@ export default function MarketRiskPage() {
     const toUSD = (v: number) => Math.round(v / rate)
     const totalAssets = toUSD(fin.p2_cash + fin.p2_receivables + fin.p2_investments + fin.p2_loans_issued + fin.p2_fixed_assets + fin.p2_other_assets)
     const totalLiab = toUSD(fin.p2_deposits + fin.p2_borrowings + fin.p2_other_liab)
-    // Use stored IFRS liquid assets (cash_cb + due_banks + fvtpl + fvoci) if available,
-    // otherwise fallback to legacy aggregated columns
-    const liquidAssetsUsd = (fin.p2_liquid_assets_usd != null && fin.p2_liquid_assets_usd > 0)
-      ? Math.round(fin.p2_liquid_assets_usd)
+    // If IFRS-correct liquid assets stored — use total_liab as denominator so
+    // LCR in assessment matches the liquidity metric from financial analysis
+    const hasStoredLiq = fin.p2_liquid_assets_usd != null && fin.p2_liquid_assets_usd > 0
+    const liquidAssetsUsd = hasStoredLiq
+      ? Math.round(fin.p2_liquid_assets_usd!)
       : toUSD(fin.p2_cash + fin.p2_receivables + fin.p2_investments)
+    const shortTermLiabUsd = hasStoredLiq ? totalLiab : toUSD(fin.p2_deposits)
     setForm(p => ({
       ...p,
       bank_name: fin.code,
@@ -266,7 +269,7 @@ export default function MarketRiskPage() {
       total_assets: fmtN(totalAssets),
       liquid_assets: fmtN(liquidAssetsUsd),
       total_capital: fmtN(toUSD(fin.p2_equity)),
-      short_term_liabilities: fmtN(toUSD(fin.p2_deposits)),
+      short_term_liabilities: fmtN(shortTermLiabUsd),
       total_liabilities: fmtN(totalLiab),
       net_profit: fmtN(toUSD(fin.p2_net_profit)),
       equity: fmtN(toUSD(fin.p2_equity)),
@@ -284,9 +287,8 @@ export default function MarketRiskPage() {
       })
       const data = await res.json()
       if (data.error) throw new Error(data.error)
-      const { error: dbErr } = await supabase.from('counterparty_assessments').insert({
+      const dbRow = {
         bank_name: form.bank_name, country: form.country, analyst_name: form.analyst_name,
-        assessment_date: new Date().toISOString().split('T')[0],
         intl_rating_value: form.intl_rating_value, national_rating_value: form.national_rating_value,
         bank_history_years: n('bank_history_years'),
         ownership_type: form.ownership_type,
@@ -305,10 +307,20 @@ export default function MarketRiskPage() {
         limit_recommendation: category.limit,
         ai_conclusion: data.conclusion,
         recommendation: data.recommendation,
-      })
-      if (dbErr) throw new Error(dbErr.message)
-      await supabase.from('counterparties').upsert({ code: form.bank_name, updated_at: new Date().toISOString() }, { onConflict: 'code', ignoreDuplicates: true })
-      setShowModal(false); setForm(EMPTY); setLinkedFinId(''); setTab(1); fetch_()
+      }
+
+      if (editingId) {
+        const { error: dbErr } = await supabase.from('counterparty_assessments').update(dbRow).eq('id', editingId)
+        if (dbErr) throw new Error(dbErr.message)
+      } else {
+        const { error: dbErr } = await supabase.from('counterparty_assessments').insert({
+          ...dbRow, assessment_date: new Date().toISOString().split('T')[0],
+        })
+        if (dbErr) throw new Error(dbErr.message)
+        await supabase.from('counterparties').upsert({ code: form.bank_name, updated_at: new Date().toISOString() }, { onConflict: 'code', ignoreDuplicates: true })
+      }
+      closeModal()
+      fetch_()
     } catch (err: unknown) {
       setError('Ошибка: ' + (err instanceof Error ? err.message : String(err)))
     } finally { setGenerating(false) }
@@ -335,6 +347,46 @@ export default function MarketRiskPage() {
     fetch_()
   }
 
+  function closeModal() {
+    setShowModal(false)
+    setForm(EMPTY)
+    setLinkedFinId('')
+    setTab(1)
+    setError(null)
+    setEditingId(null)
+  }
+
+  function handleEdit(a: Assessment) {
+    const fmt = (v: number | null | undefined) => v ? new Intl.NumberFormat('ru-RU').format(Math.round(v)) : ''
+    setForm({
+      bank_name: a.bank_name || '',
+      country: a.country || '',
+      analyst_name: a.analyst_name || '',
+      intl_rating_value: a.intl_rating_value || '',
+      national_rating_value: a.national_rating_value || '',
+      bank_history_years: a.bank_history_years ? String(a.bank_history_years) : '',
+      ownership_type: a.ownership_type || '',
+      license_revocation_status: a.license_revocation_status || '',
+      rating_revocation_status: a.rating_revocation_status || '',
+      sanctions_status: a.sanctions_status || '',
+      negative_media_status: a.negative_media_status || '',
+      total_assets: fmt(a.total_assets),
+      liquid_assets: fmt(a.liquid_assets),
+      total_capital: fmt(a.total_capital),
+      risk_weighted_assets: fmt(a.risk_weighted_assets),
+      short_term_liabilities: fmt(a.short_term_liabilities),
+      total_liabilities: fmt(a.total_liabilities),
+      net_outflow_30d: fmt(a.net_outflow_30d),
+      net_profit: fmt(a.net_profit),
+      equity: fmt(a.equity),
+    })
+    setLinkedFinId('')
+    setEditingId(a.id)
+    setTab(1)
+    setError(null)
+    setShowModal(true)
+  }
+
   const scoreColor = (s: number) => s >= 50 ? 'text-green-600' : s >= 40 ? 'text-blue-600' : s >= 25 ? 'text-yellow-600' : 'text-red-600'
   const catBg = (s: number) => s >= 50 ? 'bg-green-100 text-green-800' : s >= 40 ? 'bg-blue-100 text-blue-800' : s >= 25 ? 'bg-yellow-100 text-yellow-800' : 'bg-red-100 text-red-800'
   const inp = "w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#1B8A4C] bg-white"
@@ -349,7 +401,7 @@ export default function MarketRiskPage() {
             <h1 className="text-xl font-semibold text-gray-900">Рыночный риск — Оценка контрагентов</h1>
             <p className="text-sm text-gray-500 mt-0.5">Матрица оценки надёжности банков-контрагентов</p>
           </div>
-          <button onClick={() => { setForm(EMPTY); setLinkedFinId(''); setTab(1); setError(null); setShowModal(true) }}
+          <button onClick={() => { closeModal(); setShowModal(true) }}
             className="flex items-center gap-2 px-4 py-2 bg-[#1B8A4C] text-white rounded-lg text-sm font-medium hover:bg-[#177040]">
             <Plus className="w-4 h-4" /> Новая оценка
           </button>
@@ -416,6 +468,7 @@ export default function MarketRiskPage() {
                     <td className="px-4 py-3 text-sm font-medium text-gray-700">{a.limit_recommendation}</td>
                     <td className="px-4 py-3">
                       <div className="flex items-center gap-1">
+                        <button onClick={() => handleEdit(a)} title="Изменить и перегенерировать" className="p-1.5 text-gray-400 hover:text-amber-600 hover:bg-amber-50 rounded-lg"><Edit2 className="w-3.5 h-3.5" /></button>
                         <button onClick={() => setViewing(a)} className="p-1.5 text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg"><Eye className="w-3.5 h-3.5" /></button>
                         <button onClick={() => downloadWord(a)} className="p-1.5 text-gray-400 hover:text-[#1B8A4C] hover:bg-green-50 rounded-lg"><Download className="w-3.5 h-3.5" /></button>
                         <button onClick={() => handleDelete(a.id)} className="p-1.5 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg"><Trash2 className="w-3.5 h-3.5" /></button>
@@ -494,8 +547,10 @@ export default function MarketRiskPage() {
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50">
           <div className="bg-white rounded-2xl shadow-2xl w-full max-w-4xl max-h-[95vh] flex flex-col">
             <div className="flex items-center justify-between p-5 border-b border-gray-100">
-              <h2 className="text-base font-semibold">Оценка надёжности банка-контрагента</h2>
-              <button onClick={() => setShowModal(false)} className="text-gray-400 hover:text-gray-600"><X className="w-5 h-5" /></button>
+              <h2 className="text-base font-semibold">
+                {editingId ? `Изменить оценку: ${form.bank_name || ''}` : 'Оценка надёжности банка-контрагента'}
+              </h2>
+              <button onClick={closeModal} className="text-gray-400 hover:text-gray-600"><X className="w-5 h-5" /></button>
             </div>
             <div className="flex border-b border-gray-100 px-4">
               {[{n:1,t:'Общее'},{n:2,t:'Баланс'},{n:3,t:'ОПУ'},{n:4,t:'Качество'}].map(({n:tn,t}) => (
@@ -661,12 +716,12 @@ export default function MarketRiskPage() {
             <div className="flex items-center justify-between p-5 border-t border-gray-100">
               <div>{tab > 1 && <button onClick={() => setTab(tab-1)} className="px-4 py-2 border border-gray-200 rounded-lg text-sm text-gray-600 hover:bg-gray-50">← Назад</button>}</div>
               <div className="flex gap-2">
-                <button onClick={() => setShowModal(false)} className="px-4 py-2 border border-gray-200 rounded-lg text-sm text-gray-600 hover:bg-gray-50">Отмена</button>
+                <button onClick={closeModal} className="px-4 py-2 border border-gray-200 rounded-lg text-sm text-gray-600 hover:bg-gray-50">Отмена</button>
                 {tab < 4
                   ? <button onClick={() => setTab(tab+1)} className="px-4 py-2 bg-[#1B8A4C] text-white rounded-lg text-sm font-medium hover:bg-[#177040]">Далее →</button>
                   : <button onClick={handleGenerate} disabled={generating}
                       className="flex items-center gap-2 px-4 py-2 bg-[#1B8A4C] text-white rounded-lg text-sm font-medium hover:bg-[#177040] disabled:opacity-50">
-                      {generating ? <><Loader2 className="w-4 h-4 animate-spin" /> Генерация...</> : <><CheckCircle2 className="w-4 h-4" /> Сгенерировать</>}
+                      {generating ? <><Loader2 className="w-4 h-4 animate-spin" /> Генерация...</> : <><CheckCircle2 className="w-4 h-4" /> {editingId ? 'Перегенерировать' : 'Сгенерировать'}</>}
                     </button>}
               </div>
             </div>
