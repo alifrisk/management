@@ -2,7 +2,7 @@
 import { useState, useEffect, useCallback } from 'react'
 import { supabase } from '@/supabase/client'
 import { apiFetch } from '@/lib/api-fetch'
-import { Plus, Eye, Trash2, X, Loader2, CheckCircle2, AlertCircle, Download, Filter, Upload, FileText } from 'lucide-react'
+import { Plus, Eye, Trash2, X, Loader2, CheckCircle2, AlertCircle, Download, Filter, Upload, FileText, Edit2 } from 'lucide-react'
 
 const MONTHS = ['Январь','Февраль','Март','Апрель','Май','Июнь','Июль','Август','Сентябрь','Октябрь','Ноябрь','Декабрь']
 
@@ -35,6 +35,14 @@ interface FinAnalysis {
   p1_other_liab: number; p2_other_liab: number
   p1_equity: number; p2_equity: number
   p1_net_profit: number; p2_net_profit: number
+  // Extended P&L columns stored in DB
+  p1_interest_income?: number; p2_interest_income?: number
+  p1_interest_expense?: number; p2_interest_expense?: number
+  p1_fee_income?: number; p2_fee_income?: number
+  p1_fx_income?: number; p2_fx_income?: number
+  p1_other_income?: number; p2_other_income?: number
+  p1_operating_expense?: number; p2_operating_expense?: number
+  p1_provisions?: number; p2_provisions?: number
   counterparty_type: string; ai_conclusion: string; created_at: string
 }
 
@@ -200,6 +208,7 @@ export default function FinancialAnalysisPage() {
   const [extractWarn, setExtractWarn] = useState<string[]>([])
   const [sameRate, setSameRate] = useState(false)
   const [fetchingRate, setFetchingRate] = useState(false)
+  const [editingId, setEditingId] = useState<string | null>(null)
 
   async function fetchRate() {
     if (form.currency === 'USD') return
@@ -408,13 +417,12 @@ export default function FinancialAnalysisPage() {
       const data = await res.json()
       if (data.error) throw new Error(data.error)
 
-      // Save to DB — map IFRS fields to existing DB schema columns
-      const { error: dbErr } = await supabase.from('counterparty_financials').insert({
+      // Map IFRS form fields to DB schema columns (aggregated legacy)
+      const dbRow = {
         code: form.code, analyst_name: form.analyst_name,
         counterparty_type: form.counterparty_type || 'Банк',
         p1_label: p1lbl, p2_label: p2lbl,
         currency: form.currency, p1_usd_rate: p1_rate, p2_usd_rate: p2_rate,
-        // Map to legacy DB columns (aggregated)
         p1_cash: parseN(form.p1_cash_cb || ''), p2_cash: parseN(form.p2_cash_cb || ''),
         p1_receivables: n('p1_restricted') + n('p1_due_banks'), p2_receivables: n('p2_restricted') + n('p2_due_banks'),
         p1_investments: n('p1_fvtpl') + n('p1_fvoci') + n('p1_inv_ac'),
@@ -437,10 +445,18 @@ export default function FinancialAnalysisPage() {
         p1_provisions: n('p1_ecl_charge'), p2_provisions: n('p2_ecl_charge'),
         p1_net_profit: p1_net_profit, p2_net_profit: p2_net_profit,
         ai_conclusion: data.conclusion,
-      })
-      if (dbErr) throw new Error(dbErr.message)
-      await supabase.from('counterparties').upsert({ code: form.code, updated_at: new Date().toISOString() }, { onConflict: 'code', ignoreDuplicates: true })
-      setShowModal(false); setForm(EMPTY); setTab(1); fetch_()
+      }
+
+      if (editingId) {
+        const { error: dbErr } = await supabase.from('counterparty_financials').update(dbRow).eq('id', editingId)
+        if (dbErr) throw new Error(dbErr.message)
+      } else {
+        const { error: dbErr } = await supabase.from('counterparty_financials').insert(dbRow)
+        if (dbErr) throw new Error(dbErr.message)
+        await supabase.from('counterparties').upsert({ code: form.code, updated_at: new Date().toISOString() }, { onConflict: 'code', ignoreDuplicates: true })
+      }
+      closeModal()
+      fetch_()
     } catch (err: unknown) {
       setError('Ошибка: ' + (err instanceof Error ? err.message : String(err)))
     } finally { setGenerating(false) }
@@ -467,6 +483,82 @@ export default function FinancialAnalysisPage() {
     fetch_()
   }
 
+  function closeModal() {
+    setShowModal(false)
+    setForm(EMPTY)
+    setTab(1)
+    setInputMode('manual')
+    setImageFiles([])
+    setExtractMsg(null)
+    setExtractWarn([])
+    setError(null)
+    setEditingId(null)
+  }
+
+  function handleEdit(a: FinAnalysis) {
+    const s = (v: number | null | undefined) => (v != null && v !== 0) ? String(Math.round(v)) : ''
+    setForm({
+      code: a.code || '',
+      analyst_name: a.analyst_name || '',
+      counterparty_type: a.counterparty_type || 'Банк',
+      p1_label: a.p1_label || '',
+      p2_label: a.p2_label || '',
+      currency: a.currency || 'USD',
+      p1_usd_rate: a.p1_usd_rate ? String(a.p1_usd_rate) : '1',
+      p2_usd_rate: a.p2_usd_rate ? String(a.p2_usd_rate) : '1',
+      // Активы — маппинг из агрегированных DB колонок в МСФО поля
+      p1_cash_cb: s(a.p1_cash), p2_cash_cb: s(a.p2_cash),
+      p1_restricted: '', p2_restricted: '',
+      p1_due_banks: s(a.p1_receivables), p2_due_banks: s(a.p2_receivables),
+      p1_fvtpl: s(a.p1_investments), p2_fvtpl: s(a.p2_investments),
+      p1_fvoci: '', p2_fvoci: '',
+      p1_inv_ac: '', p2_inv_ac: '',
+      p1_gross_loans: s(a.p1_loans_issued), p2_gross_loans: s(a.p2_loans_issued),
+      p1_ecl_reserve: '', p2_ecl_reserve: '',
+      p1_ppe: s(a.p1_fixed_assets), p2_ppe: s(a.p2_fixed_assets),
+      p1_intangibles: '', p2_intangibles: '',
+      p1_rou: '', p2_rou: '',
+      p1_assets_held_sale: '', p2_assets_held_sale: '',
+      p1_other_assets: s(a.p1_other_assets), p2_other_assets: s(a.p2_other_assets),
+      // Пассивы
+      p1_due_cb: '', p2_due_cb: '',
+      p1_ibl: s(a.p1_borrowings), p2_ibl: s(a.p2_borrowings),
+      p1_cust_dep: s(a.p1_deposits), p2_cust_dep: s(a.p2_deposits),
+      p1_debt_issued: '', p2_debt_issued: '',
+      p1_subord: '', p2_subord: '',
+      p1_lease_liab: '', p2_lease_liab: '',
+      p1_other_liab: s(a.p1_other_liab), p2_other_liab: s(a.p2_other_liab),
+      // Капитал
+      p1_share_cap: s(a.p1_equity), p2_share_cap: s(a.p2_equity),
+      p1_retained: '', p2_retained: '',
+      p1_oci_eq: '', p2_oci_eq: '',
+      // ОПУ
+      p1_int_income: s(a.p1_interest_income), p2_int_income: s(a.p2_interest_income),
+      p1_int_expense: s(a.p1_interest_expense), p2_int_expense: s(a.p2_interest_expense),
+      p1_fee_income: s(a.p1_fee_income), p2_fee_income: s(a.p2_fee_income),
+      p1_fee_expense: '', p2_fee_expense: '',
+      p1_trading: '', p2_trading: '',
+      p1_fx_income: s(a.p1_fx_income), p2_fx_income: s(a.p2_fx_income),
+      p1_other_income: s(a.p1_other_income), p2_other_income: s(a.p2_other_income),
+      p1_other_expense: '', p2_other_expense: '',
+      p1_ecl_charge: s(a.p1_provisions), p2_ecl_charge: s(a.p2_provisions),
+      p1_personnel: s(a.p1_operating_expense), p2_personnel: s(a.p2_operating_expense),
+      p1_depreciation: '', p2_depreciation: '',
+      p1_admin: '', p2_admin: '',
+      p1_tax: '', p2_tax: '',
+      p1_oci: '', p2_oci: '',
+    })
+    setSameRate(a.p1_usd_rate === a.p2_usd_rate)
+    setEditingId(a.id)
+    setTab(1)
+    setInputMode('manual')
+    setImageFiles([])
+    setExtractMsg(null)
+    setExtractWarn([])
+    setError(null)
+    setShowModal(true)
+  }
+
   const inp = "w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#1B8A4C] bg-white"
   const lbl = "block text-xs font-medium text-gray-600 mb-1"
   const frProps = { form, setF, p1rate: p1_rate, p2rate: p2_rate, currSymbol, notUSD: !isUSD }
@@ -478,7 +570,7 @@ export default function FinancialAnalysisPage() {
           <h1 className="text-xl font-semibold text-gray-900">Финансовый анализ контрагента — МСФО</h1>
           <p className="text-sm text-gray-500 mt-0.5">Анализ аудированной МСФО-отчётности банков и финансовых организаций</p>
         </div>
-        <button onClick={() => { setForm(EMPTY); setTab(1); setError(null); setInputMode('manual'); setImageFiles([]); setExtractMsg(null); setShowModal(true) }}
+        <button onClick={() => { closeModal(); setShowModal(true) }}
           className="flex items-center gap-2 px-4 py-2 bg-[#1B8A4C] text-white rounded-lg text-sm font-medium hover:bg-[#177040]">
           <Plus className="w-4 h-4" /> Новый анализ
         </button>
@@ -548,6 +640,7 @@ export default function FinancialAnalysisPage() {
                     <td className="px-4 py-3 text-xs text-gray-400">{new Date(a.created_at).toLocaleDateString('ru-RU')}</td>
                     <td className="px-4 py-3">
                       <div className="flex items-center gap-1">
+                        <button onClick={() => handleEdit(a)} title="Изменить и перегенерировать" className="p-1.5 text-gray-400 hover:text-amber-600 hover:bg-amber-50 rounded-lg"><Edit2 className="w-3.5 h-3.5" /></button>
                         <button onClick={() => setViewing(a)} className="p-1.5 text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg"><Eye className="w-3.5 h-3.5" /></button>
                         <button onClick={() => downloadWord(a)} className="p-1.5 text-gray-400 hover:text-[#1B8A4C] hover:bg-green-50 rounded-lg"><Download className="w-3.5 h-3.5" /></button>
                         <button onClick={() => handleDelete(a.id)} className="p-1.5 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg"><Trash2 className="w-3.5 h-3.5" /></button>
@@ -610,10 +703,14 @@ export default function FinancialAnalysisPage() {
           <div className="bg-white rounded-2xl shadow-2xl w-full max-w-4xl max-h-[95vh] flex flex-col">
             <div className="flex items-center justify-between p-5 border-b border-gray-100">
               <div>
-                <h2 className="text-base font-semibold">Финансовый анализ контрагента — МСФО</h2>
-                <p className="text-xs text-gray-400 mt-0.5">Стандарт: МСФО (IFRS 9, IFRS 16, IAS 1)</p>
+                <h2 className="text-base font-semibold">
+                  {editingId ? `Изменить анализ: ${form.code || ''}` : 'Финансовый анализ контрагента — МСФО'}
+                </h2>
+                <p className="text-xs text-gray-400 mt-0.5">
+                  {editingId ? 'Скорректируйте данные и перегенерируйте AI анализ' : 'Стандарт: МСФО (IFRS 9, IFRS 16, IAS 1)'}
+                </p>
               </div>
-              <button onClick={() => setShowModal(false)} className="text-gray-400 hover:text-gray-600"><X className="w-5 h-5" /></button>
+              <button onClick={closeModal} className="text-gray-400 hover:text-gray-600"><X className="w-5 h-5" /></button>
             </div>
 
             {/* Mode switcher */}
@@ -888,7 +985,7 @@ export default function FinancialAnalysisPage() {
                 <>
                   <div />
                   <div className="flex gap-2">
-                    <button onClick={() => { setShowModal(false); setInputMode('manual'); setImageFiles([]); setExtractMsg(null) }} className="px-4 py-2 border border-gray-200 rounded-lg text-sm text-gray-600 hover:bg-gray-50">Отмена</button>
+                    <button onClick={closeModal} className="px-4 py-2 border border-gray-200 rounded-lg text-sm text-gray-600 hover:bg-gray-50">Отмена</button>
                     <button onClick={handleExtract} disabled={imageFiles.length === 0 || extracting}
                       className="flex items-center gap-2 px-4 py-2 bg-[#1B8A4C] text-white rounded-lg text-sm font-medium hover:bg-[#177040] disabled:opacity-50">
                       {extracting
@@ -901,12 +998,12 @@ export default function FinancialAnalysisPage() {
                 <>
                   <div>{tab > 1 && <button onClick={() => setTab(tab-1)} className="px-4 py-2 border border-gray-200 rounded-lg text-sm text-gray-600 hover:bg-gray-50">← Назад</button>}</div>
                   <div className="flex gap-2">
-                    <button onClick={() => { setShowModal(false); setInputMode('manual'); setImageFiles([]); setExtractMsg(null) }} className="px-4 py-2 border border-gray-200 rounded-lg text-sm text-gray-600 hover:bg-gray-50">Отмена</button>
+                    <button onClick={closeModal} className="px-4 py-2 border border-gray-200 rounded-lg text-sm text-gray-600 hover:bg-gray-50">Отмена</button>
                     {tab < 4
                       ? <button onClick={() => setTab(tab+1)} className="px-4 py-2 bg-[#1B8A4C] text-white rounded-lg text-sm font-medium hover:bg-[#177040]">Далее →</button>
                       : <button onClick={handleGenerate} disabled={generating}
                           className="flex items-center gap-2 px-4 py-2 bg-[#1B8A4C] text-white rounded-lg text-sm font-medium hover:bg-[#177040] disabled:opacity-50">
-                          {generating ? <><Loader2 className="w-4 h-4 animate-spin" /> AI анализирует...</> : <><CheckCircle2 className="w-4 h-4" /> Сгенерировать анализ</>}
+                          {generating ? <><Loader2 className="w-4 h-4 animate-spin" /> AI анализирует...</> : <><CheckCircle2 className="w-4 h-4" /> {editingId ? 'Перегенерировать' : 'Сгенерировать анализ'}</>}
                         </button>}
                   </div>
                 </>
