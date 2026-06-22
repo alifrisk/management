@@ -17,22 +17,50 @@ interface CreditConclusion {
   loan_purpose: string; credit_history: string; analyst_name: string
   existing_loan_balance: number
   p1_label: string; p2_label: string
-  p1_revenue: number; p1_cogs: number; p1_gross_profit: number
-  p1_sales_expense: number; p1_admin_expense: number; p1_other_op_income: number
-  p1_non_op: number; p1_tax: number; p1_net_profit: number
-  p2_revenue: number; p2_cogs: number; p2_gross_profit: number
-  p2_sales_expense: number; p2_admin_expense: number; p2_other_op_income: number
-  p2_non_op: number; p2_tax: number; p2_net_profit: number
-  p1_cash: number; p1_receivables: number; p1_inventory: number; p1_fixed_assets: number; p1_other_assets: number
-  p1_supplier_debt: number; p1_bank_debt: number; p1_other_liabilities: number
-  p1_equity_capital: number; p1_reserves: number; p1_retained_earnings: number
-  p2_cash: number; p2_receivables: number; p2_inventory: number; p2_fixed_assets: number; p2_other_assets: number
-  p2_supplier_debt: number; p2_bank_debt: number; p2_other_liabilities: number
-  p2_equity_capital: number; p2_reserves: number; p2_retained_earnings: number
-  p1_cash_begin: number; p1_op_inflow: number; p1_op_outflow: number
-  p1_fin_inflow: number; p1_fin_outflow: number; p1_inv_inflow: number; p1_inv_outflow: number; p1_cash_end: number
-  p2_cash_begin: number; p2_op_inflow: number; p2_op_outflow: number
-  p2_fin_inflow: number; p2_fin_outflow: number; p2_inv_inflow: number; p2_inv_outflow: number; p2_cash_end: number
+  // ОПУ — старые поля (обратная совместимость, могут быть null у новых записей)
+  p1_revenue?: number; p1_cogs?: number; p1_gross_profit?: number
+  p1_sales_expense?: number; p1_admin_expense?: number; p1_other_op_income?: number
+  p1_non_op?: number; p1_tax?: number; p1_net_profit?: number
+  p2_revenue?: number; p2_cogs?: number; p2_gross_profit?: number
+  p2_sales_expense?: number; p2_admin_expense?: number; p2_other_op_income?: number
+  p2_non_op?: number; p2_tax?: number; p2_net_profit?: number
+  // Баланс — старые поля
+  p1_cash?: number; p1_receivables?: number; p1_inventory?: number; p1_fixed_assets?: number; p1_other_assets?: number
+  p1_supplier_debt?: number; p1_bank_debt?: number; p1_other_liabilities?: number
+  p1_equity_capital?: number; p1_reserves?: number; p1_retained_earnings?: number
+  p2_cash?: number; p2_receivables?: number; p2_inventory?: number; p2_fixed_assets?: number; p2_other_assets?: number
+  p2_supplier_debt?: number; p2_bank_debt?: number; p2_other_liabilities?: number
+  p2_equity_capital?: number; p2_reserves?: number; p2_retained_earnings?: number
+  // ОДДС — старые поля
+  p1_cash_begin?: number; p1_op_inflow?: number; p1_op_outflow?: number
+  p1_fin_inflow?: number; p1_fin_outflow?: number; p1_inv_inflow?: number; p1_inv_outflow?: number; p1_cash_end?: number
+  p2_cash_begin?: number; p2_op_inflow?: number; p2_op_outflow?: number
+  p2_fin_inflow?: number; p2_fin_outflow?: number; p2_inv_inflow?: number; p2_inv_outflow?: number; p2_cash_end?: number
+  // Баланс Форма №1 — новые поля МФ РТ
+  p1_cash_desk?: number; p1_cash_bank?: number; p1_st_invest?: number; p1_trade_rec?: number; p1_other_rec?: number; p1_founder_rec?: number; p1_prepaid?: number; p1_nca_sale?: number
+  p1_ppe?: number; p1_nat_res?: number; p1_intangibles?: number; p1_bio_assets?: number; p1_invest_prop?: number; p1_lt_invest?: number; p1_def_tax_asset?: number; p1_lt_rec?: number
+  p1_trade_pay?: number; p1_st_debt?: number; p1_accrued?: number; p1_taxes_pay?: number; p1_exp_reserves?: number; p1_other_st_liab?: number
+  p1_lt_debt?: number; p1_def_income?: number; p1_def_tax_liab?: number
+  p1_charter_cap?: number; p1_add_cap?: number; p1_retained?: number; p1_reserve_cap?: number; p1_minority?: number
+  p2_cash_desk?: number; p2_cash_bank?: number; p2_st_invest?: number; p2_trade_rec?: number; p2_other_rec?: number; p2_founder_rec?: number; p2_prepaid?: number; p2_nca_sale?: number
+  p2_ppe?: number; p2_nat_res?: number; p2_intangibles?: number; p2_bio_assets?: number; p2_invest_prop?: number; p2_lt_invest?: number; p2_def_tax_asset?: number; p2_lt_rec?: number
+  p2_trade_pay?: number; p2_st_debt?: number; p2_accrued?: number; p2_taxes_pay?: number; p2_exp_reserves?: number; p2_other_st_liab?: number
+  p2_lt_debt?: number; p2_def_income?: number; p2_def_tax_liab?: number
+  p2_charter_cap?: number; p2_add_cap?: number; p2_retained?: number; p2_reserve_cap?: number; p2_minority?: number
+  // ОПУ Форма №2 — новые поля
+  p1_net_rev?: number; p1_sell_exp?: number; p1_admin_exp?: number; p1_other_op?: number
+  p1_interest_exp?: number; p1_invest_inc?: number; p1_fx_diff?: number; p1_currency_ex?: number; p1_asset_disp?: number; p1_impairment?: number; p1_other_nonop?: number; p1_assoc_profit?: number; p1_discont?: number
+  p2_net_rev?: number; p2_sell_exp?: number; p2_admin_exp?: number; p2_other_op?: number
+  p2_interest_exp?: number; p2_invest_inc?: number; p2_fx_diff?: number; p2_currency_ex?: number; p2_asset_disp?: number; p2_impairment?: number; p2_other_nonop?: number; p2_assoc_profit?: number; p2_discont?: number
+  // ОДДС Форма №5 — новые поля
+  p1_cf_sales?: number; p1_cf_other_op_in?: number; p1_cf_cogs_paid?: number; p1_cf_salary?: number; p1_cf_services?: number; p1_cf_interest?: number; p1_cf_income_tax?: number; p1_cf_other_taxes?: number; p1_cf_other_op_out?: number
+  p1_cf_asset_sold?: number; p1_cf_intang_sold?: number; p1_cf_sec_sold?: number; p1_cf_loan_ret?: number; p1_cf_other_inv_in?: number; p1_cf_asset_buy?: number; p1_cf_intang_buy?: number; p1_cf_sec_buy?: number; p1_cf_loans_given?: number; p1_cf_other_inv_out?: number
+  p1_cf_shares?: number; p1_cf_bonds?: number; p1_cf_founders?: number; p1_cf_loans_in?: number; p1_cf_other_fin_in?: number; p1_cf_dividends?: number; p1_cf_loans_out?: number; p1_cf_buyback?: number; p1_cf_other_fin_out?: number
+  p1_cf_fx?: number; p1_cf_cash_begin?: number
+  p2_cf_sales?: number; p2_cf_other_op_in?: number; p2_cf_cogs_paid?: number; p2_cf_salary?: number; p2_cf_services?: number; p2_cf_interest?: number; p2_cf_income_tax?: number; p2_cf_other_taxes?: number; p2_cf_other_op_out?: number
+  p2_cf_asset_sold?: number; p2_cf_intang_sold?: number; p2_cf_sec_sold?: number; p2_cf_loan_ret?: number; p2_cf_other_inv_in?: number; p2_cf_asset_buy?: number; p2_cf_intang_buy?: number; p2_cf_sec_buy?: number; p2_cf_loans_given?: number; p2_cf_other_inv_out?: number
+  p2_cf_shares?: number; p2_cf_bonds?: number; p2_cf_founders?: number; p2_cf_loans_in?: number; p2_cf_other_fin_in?: number; p2_cf_dividends?: number; p2_cf_loans_out?: number; p2_cf_buyback?: number; p2_cf_other_fin_out?: number
+  p2_cf_fx?: number; p2_cf_cash_begin?: number
   sector?: string
   collaterals: Collateral[]
   guarantors?: { name: string; inn: string; relation: string }[]
@@ -52,19 +80,38 @@ const EMPTY: Record<string, string> = {
   loan_amount: '', loan_currency: 'TJS', loan_term_months: '', interest_rate: '',
   loan_purpose: '', credit_history: 'Положительная', analyst_name: '', sector: '',
   p1_label: '', p2_label: '',
-  // Баланс
-  p1_cash: '', p1_receivables: '', p1_inventory: '', p1_fixed_assets: '', p1_other_assets: '',
-  p1_supplier_debt: '', p1_bank_debt: '', p1_other_liabilities: '',
-  p1_equity_capital: '', p1_reserves: '', p1_retained_earnings: '',
-  p2_cash: '', p2_receivables: '', p2_inventory: '', p2_fixed_assets: '', p2_other_assets: '',
-  p2_supplier_debt: '', p2_bank_debt: '', p2_other_liabilities: '',
-  p2_equity_capital: '', p2_reserves: '', p2_retained_earnings: '',
-  // ОПУ
-  p1_revenue: '', p1_cogs: '', p1_sales_expense: '', p1_admin_expense: '', p1_other_op_income: '', p1_non_op: '', p1_tax: '',
-  p2_revenue: '', p2_cogs: '', p2_sales_expense: '', p2_admin_expense: '', p2_other_op_income: '', p2_non_op: '', p2_tax: '',
-  // КешФлоу
-  p1_cash_begin: '', p1_op_inflow: '', p1_op_outflow: '', p1_fin_inflow: '', p1_fin_outflow: '', p1_inv_inflow: '', p1_inv_outflow: '',
-  p2_cash_begin: '', p2_op_inflow: '', p2_op_outflow: '', p2_fin_inflow: '', p2_fin_outflow: '', p2_inv_inflow: '', p2_inv_outflow: '',
+  // Баланс Форма №1 — Краткосрочные активы
+  p1_cash_desk: '', p1_cash_bank: '', p1_st_invest: '', p1_trade_rec: '', p1_other_rec: '', p1_founder_rec: '', p1_inventory: '', p1_prepaid: '', p1_nca_sale: '',
+  // Баланс — Долгосрочные активы
+  p1_ppe: '', p1_nat_res: '', p1_intangibles: '', p1_bio_assets: '', p1_invest_prop: '', p1_lt_invest: '', p1_def_tax_asset: '', p1_lt_rec: '',
+  // Баланс — Краткосрочные обязательства
+  p1_trade_pay: '', p1_st_debt: '', p1_accrued: '', p1_taxes_pay: '', p1_exp_reserves: '', p1_other_st_liab: '',
+  // Баланс — Долгосрочные обязательства
+  p1_lt_debt: '', p1_def_income: '', p1_def_tax_liab: '',
+  // Баланс — Капитал
+  p1_charter_cap: '', p1_add_cap: '', p1_retained: '', p1_reserve_cap: '', p1_minority: '',
+  // p2 variants
+  p2_cash_desk: '', p2_cash_bank: '', p2_st_invest: '', p2_trade_rec: '', p2_other_rec: '', p2_founder_rec: '', p2_inventory: '', p2_prepaid: '', p2_nca_sale: '',
+  p2_ppe: '', p2_nat_res: '', p2_intangibles: '', p2_bio_assets: '', p2_invest_prop: '', p2_lt_invest: '', p2_def_tax_asset: '', p2_lt_rec: '',
+  p2_trade_pay: '', p2_st_debt: '', p2_accrued: '', p2_taxes_pay: '', p2_exp_reserves: '', p2_other_st_liab: '',
+  p2_lt_debt: '', p2_def_income: '', p2_def_tax_liab: '',
+  p2_charter_cap: '', p2_add_cap: '', p2_retained: '', p2_reserve_cap: '', p2_minority: '',
+  // ОПУ Форма №2
+  p1_net_rev: '', p1_cogs: '', p1_sell_exp: '', p1_admin_exp: '', p1_other_op: '',
+  p1_interest_exp: '', p1_invest_inc: '', p1_fx_diff: '', p1_currency_ex: '', p1_asset_disp: '', p1_impairment: '', p1_other_nonop: '', p1_assoc_profit: '', p1_tax: '', p1_discont: '',
+  p2_net_rev: '', p2_cogs: '', p2_sell_exp: '', p2_admin_exp: '', p2_other_op: '',
+  p2_interest_exp: '', p2_invest_inc: '', p2_fx_diff: '', p2_currency_ex: '', p2_asset_disp: '', p2_impairment: '', p2_other_nonop: '', p2_assoc_profit: '', p2_tax: '', p2_discont: '',
+  // ОДДС Форма №5 — Операционная
+  p1_cf_sales: '', p1_cf_other_op_in: '', p1_cf_cogs_paid: '', p1_cf_salary: '', p1_cf_services: '', p1_cf_interest: '', p1_cf_income_tax: '', p1_cf_other_taxes: '', p1_cf_other_op_out: '',
+  p2_cf_sales: '', p2_cf_other_op_in: '', p2_cf_cogs_paid: '', p2_cf_salary: '', p2_cf_services: '', p2_cf_interest: '', p2_cf_income_tax: '', p2_cf_other_taxes: '', p2_cf_other_op_out: '',
+  // ОДДС — Инвестиционная
+  p1_cf_asset_sold: '', p1_cf_intang_sold: '', p1_cf_sec_sold: '', p1_cf_loan_ret: '', p1_cf_other_inv_in: '', p1_cf_asset_buy: '', p1_cf_intang_buy: '', p1_cf_sec_buy: '', p1_cf_loans_given: '', p1_cf_other_inv_out: '',
+  p2_cf_asset_sold: '', p2_cf_intang_sold: '', p2_cf_sec_sold: '', p2_cf_loan_ret: '', p2_cf_other_inv_in: '', p2_cf_asset_buy: '', p2_cf_intang_buy: '', p2_cf_sec_buy: '', p2_cf_loans_given: '', p2_cf_other_inv_out: '',
+  // ОДДС — Финансовая
+  p1_cf_shares: '', p1_cf_bonds: '', p1_cf_founders: '', p1_cf_loans_in: '', p1_cf_other_fin_in: '', p1_cf_dividends: '', p1_cf_loans_out: '', p1_cf_buyback: '', p1_cf_other_fin_out: '',
+  p2_cf_shares: '', p2_cf_bonds: '', p2_cf_founders: '', p2_cf_loans_in: '', p2_cf_other_fin_in: '', p2_cf_dividends: '', p2_cf_loans_out: '', p2_cf_buyback: '', p2_cf_other_fin_out: '',
+  p1_cf_fx: '', p1_cf_cash_begin: '',
+  p2_cf_fx: '', p2_cf_cash_begin: '',
 }
 
 const COLLATERAL_TYPES = ['Недвижимость', 'Автотранспорт', 'Оборудование', 'Товары в обороте', 'Депозит', 'Другое']
@@ -196,37 +243,69 @@ export default function CreditRiskPage() {
   const p1 = form.p1_label || 'Период 1'
   const p2 = form.p2_label || 'Период 2'
 
-  // Баланс
-  const p1_total_assets = n('p1_cash') + n('p1_receivables') + n('p1_inventory') + n('p1_fixed_assets') + n('p1_other_assets')
-  const p2_total_assets = n('p2_cash') + n('p2_receivables') + n('p2_inventory') + n('p2_fixed_assets') + n('p2_other_assets')
-  const p1_total_liab = n('p1_supplier_debt') + n('p1_bank_debt') + n('p1_other_liabilities')
-  const p2_total_liab = n('p2_supplier_debt') + n('p2_bank_debt') + n('p2_other_liabilities')
-  const p1_total_equity = n('p1_equity_capital') + n('p1_reserves') + n('p1_retained_earnings')
-  const p2_total_equity = n('p2_equity_capital') + n('p2_reserves') + n('p2_retained_earnings')
+  // Баланс Форма №1 — Краткосрочные активы
+  const p1_total_ca = n('p1_cash_desk') + n('p1_cash_bank') + n('p1_st_invest') + n('p1_trade_rec') + n('p1_other_rec') + n('p1_founder_rec') + n('p1_inventory') + n('p1_prepaid') + n('p1_nca_sale')
+  const p2_total_ca = n('p2_cash_desk') + n('p2_cash_bank') + n('p2_st_invest') + n('p2_trade_rec') + n('p2_other_rec') + n('p2_founder_rec') + n('p2_inventory') + n('p2_prepaid') + n('p2_nca_sale')
+  // Долгосрочные активы
+  const p1_total_nca = n('p1_ppe') + n('p1_nat_res') + n('p1_intangibles') + n('p1_bio_assets') + n('p1_invest_prop') + n('p1_lt_invest') + n('p1_def_tax_asset') + n('p1_lt_rec')
+  const p2_total_nca = n('p2_ppe') + n('p2_nat_res') + n('p2_intangibles') + n('p2_bio_assets') + n('p2_invest_prop') + n('p2_lt_invest') + n('p2_def_tax_asset') + n('p2_lt_rec')
+  const p1_total_assets = p1_total_ca + p1_total_nca
+  const p2_total_assets = p2_total_ca + p2_total_nca
+  // Краткосрочные обязательства
+  const p1_total_cl = n('p1_trade_pay') + n('p1_st_debt') + n('p1_accrued') + n('p1_taxes_pay') + n('p1_exp_reserves') + n('p1_other_st_liab')
+  const p2_total_cl = n('p2_trade_pay') + n('p2_st_debt') + n('p2_accrued') + n('p2_taxes_pay') + n('p2_exp_reserves') + n('p2_other_st_liab')
+  // Долгосрочные обязательства
+  const p1_total_ll = n('p1_lt_debt') + n('p1_def_income') + n('p1_def_tax_liab')
+  const p2_total_ll = n('p2_lt_debt') + n('p2_def_income') + n('p2_def_tax_liab')
+  const p1_total_liab = p1_total_cl + p1_total_ll
+  const p2_total_liab = p2_total_cl + p2_total_ll
+  // Собственный капитал
+  const p1_total_equity = n('p1_charter_cap') + n('p1_add_cap') + n('p1_retained') + n('p1_reserve_cap') + n('p1_minority')
+  const p2_total_equity = n('p2_charter_cap') + n('p2_add_cap') + n('p2_retained') + n('p2_reserve_cap') + n('p2_minority')
   const p1_total_passiv = p1_total_liab + p1_total_equity
   const p2_total_passiv = p2_total_liab + p2_total_equity
   const p1_balance_diff = p1_total_assets - p1_total_passiv
   const p2_balance_diff = p2_total_assets - p2_total_passiv
 
-  // ОПУ
-  const p1_gross = n('p1_revenue') - n('p1_cogs')
-  const p2_gross = n('p2_revenue') - n('p2_cogs')
-  const p1_op_profit = p1_gross - n('p1_sales_expense') - n('p1_admin_expense') + n('p1_other_op_income')
-  const p2_op_profit = p2_gross - n('p2_sales_expense') - n('p2_admin_expense') + n('p2_other_op_income')
-  const p1_ebt = p1_op_profit + n('p1_non_op')
-  const p2_ebt = p2_op_profit + n('p2_non_op')
-  const p1_net = p1_ebt - n('p1_tax')
-  const p2_net = p2_ebt - n('p2_tax')
+  // ОПУ Форма №2
+  const p1_gross = n('p1_net_rev') - n('p1_cogs')
+  const p2_gross = n('p2_net_rev') - n('p2_cogs')
+  const p1_total_op_exp = n('p1_sell_exp') + n('p1_admin_exp')
+  const p2_total_op_exp = n('p2_sell_exp') + n('p2_admin_exp')
+  const p1_op_profit = p1_gross - p1_total_op_exp + n('p1_other_op')
+  const p2_op_profit = p2_gross - p2_total_op_exp + n('p2_other_op')
+  const p1_total_nonop = n('p1_interest_exp') + n('p1_invest_inc') + n('p1_fx_diff') + n('p1_currency_ex') + n('p1_asset_disp') - n('p1_impairment') + n('p1_other_nonop')
+  const p2_total_nonop = n('p2_interest_exp') + n('p2_invest_inc') + n('p2_fx_diff') + n('p2_currency_ex') + n('p2_asset_disp') - n('p2_impairment') + n('p2_other_nonop')
+  const p1_ebt = p1_op_profit + p1_total_nonop + n('p1_assoc_profit')
+  const p2_ebt = p2_op_profit + p2_total_nonop + n('p2_assoc_profit')
+  const p1_continuing = p1_ebt - n('p1_tax')
+  const p2_continuing = p2_ebt - n('p2_tax')
+  const p1_net = p1_continuing + n('p1_discont')
+  const p2_net = p2_continuing + n('p2_discont')
 
-  // КешФлоу
-  const p1_op_result = n('p1_op_inflow') - n('p1_op_outflow')
-  const p2_op_result = n('p2_op_inflow') - n('p2_op_outflow')
-  const p1_fin_result = n('p1_fin_inflow') - n('p1_fin_outflow')
-  const p2_fin_result = n('p2_fin_inflow') - n('p2_fin_outflow')
-  const p1_inv_result = n('p1_inv_inflow') - n('p1_inv_outflow')
-  const p2_inv_result = n('p2_inv_inflow') - n('p2_inv_outflow')
-  const p1_cash_end = n('p1_cash_begin') + p1_op_result + p1_fin_result + p1_inv_result
-  const p2_cash_end = n('p2_cash_begin') + p2_op_result + p2_fin_result + p2_inv_result
+  // ОДДС Форма №5
+  const p1_cf_total_op_in = n('p1_cf_sales') + n('p1_cf_other_op_in')
+  const p2_cf_total_op_in = n('p2_cf_sales') + n('p2_cf_other_op_in')
+  const p1_cf_total_op_out = n('p1_cf_cogs_paid') + n('p1_cf_salary') + n('p1_cf_services') + n('p1_cf_interest') + n('p1_cf_income_tax') + n('p1_cf_other_taxes') + n('p1_cf_other_op_out')
+  const p2_cf_total_op_out = n('p2_cf_cogs_paid') + n('p2_cf_salary') + n('p2_cf_services') + n('p2_cf_interest') + n('p2_cf_income_tax') + n('p2_cf_other_taxes') + n('p2_cf_other_op_out')
+  const p1_cf_net_op = p1_cf_total_op_in - p1_cf_total_op_out
+  const p2_cf_net_op = p2_cf_total_op_in - p2_cf_total_op_out
+  const p1_cf_total_inv_in = n('p1_cf_asset_sold') + n('p1_cf_intang_sold') + n('p1_cf_sec_sold') + n('p1_cf_loan_ret') + n('p1_cf_other_inv_in')
+  const p2_cf_total_inv_in = n('p2_cf_asset_sold') + n('p2_cf_intang_sold') + n('p2_cf_sec_sold') + n('p2_cf_loan_ret') + n('p2_cf_other_inv_in')
+  const p1_cf_total_inv_out = n('p1_cf_asset_buy') + n('p1_cf_intang_buy') + n('p1_cf_sec_buy') + n('p1_cf_loans_given') + n('p1_cf_other_inv_out')
+  const p2_cf_total_inv_out = n('p2_cf_asset_buy') + n('p2_cf_intang_buy') + n('p2_cf_sec_buy') + n('p2_cf_loans_given') + n('p2_cf_other_inv_out')
+  const p1_cf_net_inv = p1_cf_total_inv_in - p1_cf_total_inv_out
+  const p2_cf_net_inv = p2_cf_total_inv_in - p2_cf_total_inv_out
+  const p1_cf_total_fin_in = n('p1_cf_shares') + n('p1_cf_bonds') + n('p1_cf_founders') + n('p1_cf_loans_in') + n('p1_cf_other_fin_in')
+  const p2_cf_total_fin_in = n('p2_cf_shares') + n('p2_cf_bonds') + n('p2_cf_founders') + n('p2_cf_loans_in') + n('p2_cf_other_fin_in')
+  const p1_cf_total_fin_out = n('p1_cf_dividends') + n('p1_cf_loans_out') + n('p1_cf_buyback') + n('p1_cf_other_fin_out')
+  const p2_cf_total_fin_out = n('p2_cf_dividends') + n('p2_cf_loans_out') + n('p2_cf_buyback') + n('p2_cf_other_fin_out')
+  const p1_cf_net_fin = p1_cf_total_fin_in - p1_cf_total_fin_out
+  const p2_cf_net_fin = p2_cf_total_fin_in - p2_cf_total_fin_out
+  const p1_cf_net_change = p1_cf_net_op + p1_cf_net_inv + p1_cf_net_fin + n('p1_cf_fx')
+  const p2_cf_net_change = p2_cf_net_op + p2_cf_net_inv + p2_cf_net_fin + n('p2_cf_fx')
+  const p1_cash_end = n('p1_cf_cash_begin') + p1_cf_net_change
+  const p2_cash_end = n('p2_cf_cash_begin') + p2_cf_net_change
 
   // Аннуитет
   const loanAmt = n('loan_amount')
@@ -261,29 +340,77 @@ export default function CreditRiskPage() {
       analyst_name: c.analyst_name || '',
       p1_label: c.p1_label || '',
       p2_label: c.p2_label || '',
-      // Баланс
-      p1_cash: s(c.p1_cash), p1_receivables: s(c.p1_receivables), p1_inventory: s(c.p1_inventory),
-      p1_fixed_assets: s(c.p1_fixed_assets), p1_other_assets: s(c.p1_other_assets),
-      p1_supplier_debt: s(c.p1_supplier_debt), p1_bank_debt: s(c.p1_bank_debt), p1_other_liabilities: s(c.p1_other_liabilities),
-      p1_equity_capital: s(c.p1_equity_capital), p1_reserves: s(c.p1_reserves), p1_retained_earnings: s(c.p1_retained_earnings),
-      p2_cash: s(c.p2_cash), p2_receivables: s(c.p2_receivables), p2_inventory: s(c.p2_inventory),
-      p2_fixed_assets: s(c.p2_fixed_assets), p2_other_assets: s(c.p2_other_assets),
-      p2_supplier_debt: s(c.p2_supplier_debt), p2_bank_debt: s(c.p2_bank_debt), p2_other_liabilities: s(c.p2_other_liabilities),
-      p2_equity_capital: s(c.p2_equity_capital), p2_reserves: s(c.p2_reserves), p2_retained_earnings: s(c.p2_retained_earnings),
-      // ОПУ
-      p1_revenue: s(c.p1_revenue), p1_cogs: s(c.p1_cogs),
-      p1_sales_expense: s(c.p1_sales_expense), p1_admin_expense: s(c.p1_admin_expense),
-      p1_other_op_income: s(c.p1_other_op_income), p1_non_op: s(c.p1_non_op), p1_tax: s(c.p1_tax),
-      p2_revenue: s(c.p2_revenue), p2_cogs: s(c.p2_cogs),
-      p2_sales_expense: s(c.p2_sales_expense), p2_admin_expense: s(c.p2_admin_expense),
-      p2_other_op_income: s(c.p2_other_op_income), p2_non_op: s(c.p2_non_op), p2_tax: s(c.p2_tax),
-      // КешФлоу
-      p1_cash_begin: s(c.p1_cash_begin), p1_op_inflow: s(c.p1_op_inflow), p1_op_outflow: s(c.p1_op_outflow),
-      p1_fin_inflow: s(c.p1_fin_inflow), p1_fin_outflow: s(c.p1_fin_outflow),
-      p1_inv_inflow: s(c.p1_inv_inflow), p1_inv_outflow: s(c.p1_inv_outflow),
-      p2_cash_begin: s(c.p2_cash_begin), p2_op_inflow: s(c.p2_op_inflow), p2_op_outflow: s(c.p2_op_outflow),
-      p2_fin_inflow: s(c.p2_fin_inflow), p2_fin_outflow: s(c.p2_fin_outflow),
-      p2_inv_inflow: s(c.p2_inv_inflow), p2_inv_outflow: s(c.p2_inv_outflow),
+      // Баланс Форма №1 — новые поля с фолбэком на старые для старых записей
+      p1_cash_desk: s(c.p1_cash_desk), p1_cash_bank: s(c.p1_cash_bank) || s(c.p1_cash),
+      p1_st_invest: s(c.p1_st_invest), p1_trade_rec: s(c.p1_trade_rec) || s(c.p1_receivables),
+      p1_other_rec: s(c.p1_other_rec), p1_founder_rec: s(c.p1_founder_rec),
+      p1_inventory: s(c.p1_inventory), p1_prepaid: s(c.p1_prepaid), p1_nca_sale: s(c.p1_nca_sale),
+      p1_ppe: s(c.p1_ppe) || s(c.p1_fixed_assets), p1_nat_res: s(c.p1_nat_res), p1_intangibles: s(c.p1_intangibles),
+      p1_bio_assets: s(c.p1_bio_assets), p1_invest_prop: s(c.p1_invest_prop), p1_lt_invest: s(c.p1_lt_invest),
+      p1_def_tax_asset: s(c.p1_def_tax_asset), p1_lt_rec: s(c.p1_lt_rec),
+      p1_trade_pay: s(c.p1_trade_pay) || s(c.p1_supplier_debt), p1_st_debt: s(c.p1_st_debt) || s(c.p1_bank_debt),
+      p1_accrued: s(c.p1_accrued), p1_taxes_pay: s(c.p1_taxes_pay),
+      p1_exp_reserves: s(c.p1_exp_reserves), p1_other_st_liab: s(c.p1_other_st_liab) || s(c.p1_other_liabilities),
+      p1_lt_debt: s(c.p1_lt_debt), p1_def_income: s(c.p1_def_income), p1_def_tax_liab: s(c.p1_def_tax_liab),
+      p1_charter_cap: s(c.p1_charter_cap) || s(c.p1_equity_capital), p1_add_cap: s(c.p1_add_cap),
+      p1_retained: s(c.p1_retained) || s(c.p1_retained_earnings),
+      p1_reserve_cap: s(c.p1_reserve_cap) || s(c.p1_reserves), p1_minority: s(c.p1_minority),
+      p2_cash_desk: s(c.p2_cash_desk), p2_cash_bank: s(c.p2_cash_bank) || s(c.p2_cash),
+      p2_st_invest: s(c.p2_st_invest), p2_trade_rec: s(c.p2_trade_rec) || s(c.p2_receivables),
+      p2_other_rec: s(c.p2_other_rec), p2_founder_rec: s(c.p2_founder_rec),
+      p2_inventory: s(c.p2_inventory), p2_prepaid: s(c.p2_prepaid), p2_nca_sale: s(c.p2_nca_sale),
+      p2_ppe: s(c.p2_ppe) || s(c.p2_fixed_assets), p2_nat_res: s(c.p2_nat_res), p2_intangibles: s(c.p2_intangibles),
+      p2_bio_assets: s(c.p2_bio_assets), p2_invest_prop: s(c.p2_invest_prop), p2_lt_invest: s(c.p2_lt_invest),
+      p2_def_tax_asset: s(c.p2_def_tax_asset), p2_lt_rec: s(c.p2_lt_rec),
+      p2_trade_pay: s(c.p2_trade_pay) || s(c.p2_supplier_debt), p2_st_debt: s(c.p2_st_debt) || s(c.p2_bank_debt),
+      p2_accrued: s(c.p2_accrued), p2_taxes_pay: s(c.p2_taxes_pay),
+      p2_exp_reserves: s(c.p2_exp_reserves), p2_other_st_liab: s(c.p2_other_st_liab) || s(c.p2_other_liabilities),
+      p2_lt_debt: s(c.p2_lt_debt), p2_def_income: s(c.p2_def_income), p2_def_tax_liab: s(c.p2_def_tax_liab),
+      p2_charter_cap: s(c.p2_charter_cap) || s(c.p2_equity_capital), p2_add_cap: s(c.p2_add_cap),
+      p2_retained: s(c.p2_retained) || s(c.p2_retained_earnings),
+      p2_reserve_cap: s(c.p2_reserve_cap) || s(c.p2_reserves), p2_minority: s(c.p2_minority),
+      // ОПУ Форма №2
+      p1_net_rev: s(c.p1_net_rev) || s(c.p1_revenue), p1_cogs: s(c.p1_cogs),
+      p1_sell_exp: s(c.p1_sell_exp) || s(c.p1_sales_expense), p1_admin_exp: s(c.p1_admin_exp) || s(c.p1_admin_expense),
+      p1_other_op: s(c.p1_other_op) || s(c.p1_other_op_income),
+      p1_interest_exp: s(c.p1_interest_exp), p1_invest_inc: s(c.p1_invest_inc),
+      p1_fx_diff: s(c.p1_fx_diff), p1_currency_ex: s(c.p1_currency_ex), p1_asset_disp: s(c.p1_asset_disp),
+      p1_impairment: s(c.p1_impairment), p1_other_nonop: s(c.p1_other_nonop) || s(c.p1_non_op),
+      p1_assoc_profit: s(c.p1_assoc_profit), p1_tax: s(c.p1_tax), p1_discont: s(c.p1_discont),
+      p2_net_rev: s(c.p2_net_rev) || s(c.p2_revenue), p2_cogs: s(c.p2_cogs),
+      p2_sell_exp: s(c.p2_sell_exp) || s(c.p2_sales_expense), p2_admin_exp: s(c.p2_admin_exp) || s(c.p2_admin_expense),
+      p2_other_op: s(c.p2_other_op) || s(c.p2_other_op_income),
+      p2_interest_exp: s(c.p2_interest_exp), p2_invest_inc: s(c.p2_invest_inc),
+      p2_fx_diff: s(c.p2_fx_diff), p2_currency_ex: s(c.p2_currency_ex), p2_asset_disp: s(c.p2_asset_disp),
+      p2_impairment: s(c.p2_impairment), p2_other_nonop: s(c.p2_other_nonop) || s(c.p2_non_op),
+      p2_assoc_profit: s(c.p2_assoc_profit), p2_tax: s(c.p2_tax), p2_discont: s(c.p2_discont),
+      // ОДДС Форма №5
+      p1_cf_sales: s(c.p1_cf_sales) || s(c.p1_op_inflow), p1_cf_other_op_in: s(c.p1_cf_other_op_in),
+      p1_cf_cogs_paid: s(c.p1_cf_cogs_paid) || s(c.p1_op_outflow), p1_cf_salary: s(c.p1_cf_salary),
+      p1_cf_services: s(c.p1_cf_services), p1_cf_interest: s(c.p1_cf_interest),
+      p1_cf_income_tax: s(c.p1_cf_income_tax), p1_cf_other_taxes: s(c.p1_cf_other_taxes), p1_cf_other_op_out: s(c.p1_cf_other_op_out),
+      p1_cf_asset_sold: s(c.p1_cf_asset_sold) || s(c.p1_inv_inflow), p1_cf_intang_sold: s(c.p1_cf_intang_sold),
+      p1_cf_sec_sold: s(c.p1_cf_sec_sold), p1_cf_loan_ret: s(c.p1_cf_loan_ret), p1_cf_other_inv_in: s(c.p1_cf_other_inv_in),
+      p1_cf_asset_buy: s(c.p1_cf_asset_buy) || s(c.p1_inv_outflow), p1_cf_intang_buy: s(c.p1_cf_intang_buy),
+      p1_cf_sec_buy: s(c.p1_cf_sec_buy), p1_cf_loans_given: s(c.p1_cf_loans_given), p1_cf_other_inv_out: s(c.p1_cf_other_inv_out),
+      p1_cf_shares: s(c.p1_cf_shares), p1_cf_bonds: s(c.p1_cf_bonds), p1_cf_founders: s(c.p1_cf_founders),
+      p1_cf_loans_in: s(c.p1_cf_loans_in) || s(c.p1_fin_inflow), p1_cf_other_fin_in: s(c.p1_cf_other_fin_in),
+      p1_cf_dividends: s(c.p1_cf_dividends), p1_cf_loans_out: s(c.p1_cf_loans_out) || s(c.p1_fin_outflow),
+      p1_cf_buyback: s(c.p1_cf_buyback), p1_cf_other_fin_out: s(c.p1_cf_other_fin_out),
+      p1_cf_fx: s(c.p1_cf_fx), p1_cf_cash_begin: s(c.p1_cf_cash_begin) || s(c.p1_cash_begin),
+      p2_cf_sales: s(c.p2_cf_sales) || s(c.p2_op_inflow), p2_cf_other_op_in: s(c.p2_cf_other_op_in),
+      p2_cf_cogs_paid: s(c.p2_cf_cogs_paid) || s(c.p2_op_outflow), p2_cf_salary: s(c.p2_cf_salary),
+      p2_cf_services: s(c.p2_cf_services), p2_cf_interest: s(c.p2_cf_interest),
+      p2_cf_income_tax: s(c.p2_cf_income_tax), p2_cf_other_taxes: s(c.p2_cf_other_taxes), p2_cf_other_op_out: s(c.p2_cf_other_op_out),
+      p2_cf_asset_sold: s(c.p2_cf_asset_sold) || s(c.p2_inv_inflow), p2_cf_intang_sold: s(c.p2_cf_intang_sold),
+      p2_cf_sec_sold: s(c.p2_cf_sec_sold), p2_cf_loan_ret: s(c.p2_cf_loan_ret), p2_cf_other_inv_in: s(c.p2_cf_other_inv_in),
+      p2_cf_asset_buy: s(c.p2_cf_asset_buy) || s(c.p2_inv_outflow), p2_cf_intang_buy: s(c.p2_cf_intang_buy),
+      p2_cf_sec_buy: s(c.p2_cf_sec_buy), p2_cf_loans_given: s(c.p2_cf_loans_given), p2_cf_other_inv_out: s(c.p2_cf_other_inv_out),
+      p2_cf_shares: s(c.p2_cf_shares), p2_cf_bonds: s(c.p2_cf_bonds), p2_cf_founders: s(c.p2_cf_founders),
+      p2_cf_loans_in: s(c.p2_cf_loans_in) || s(c.p2_fin_inflow), p2_cf_other_fin_in: s(c.p2_cf_other_fin_in),
+      p2_cf_dividends: s(c.p2_cf_dividends), p2_cf_loans_out: s(c.p2_cf_loans_out) || s(c.p2_fin_outflow),
+      p2_cf_buyback: s(c.p2_cf_buyback), p2_cf_other_fin_out: s(c.p2_cf_other_fin_out),
+      p2_cf_fx: s(c.p2_cf_fx), p2_cf_cash_begin: s(c.p2_cf_cash_begin) || s(c.p2_cash_begin),
     })
     setCollaterals(c.collaterals?.length ? c.collaterals : [{ type: 'Недвижимость', description: '', value: 0 }])
     setGuarantors(c.guarantors || [])
@@ -327,7 +454,12 @@ export default function CreditRiskPage() {
         p1_ebt, p2_ebt, p1_net, p2_net,
         p1_total_assets, p2_total_assets,
         p1_total_liabilities: p1_total_liab, p2_total_liabilities: p2_total_liab,
-        p1_cash_end, p2_cash_end, monthly_payment: monthlyPayment,
+        p1_total_ca, p2_total_ca,
+        p1_total_cl, p2_total_cl,
+        p1_total_equity, p2_total_equity,
+        p1_cf_net_op, p2_cf_net_op,
+        p1_cf_cash_end: p1_cash_end, p2_cf_cash_end: p2_cash_end,
+        monthly_payment: monthlyPayment,
         collateral_total, collateral_coverage_pct,
       }
       const res = await apiFetch('/api/credit-risk/generate', {
@@ -347,29 +479,72 @@ export default function CreditRiskPage() {
         credit_history: form.credit_history, analyst_name: form.analyst_name,
         existing_loan_balance: n('existing_loan_balance'),
         p1_label: form.p1_label || 'Период 1', p2_label: form.p2_label || 'Период 2',
-        // Баланс
-        p1_cash: n('p1_cash'), p1_receivables: n('p1_receivables'), p1_inventory: n('p1_inventory'),
-        p1_fixed_assets: n('p1_fixed_assets'), p1_other_assets: n('p1_other_assets'),
-        p1_supplier_debt: n('p1_supplier_debt'), p1_bank_debt: n('p1_bank_debt'), p1_other_liabilities: n('p1_other_liabilities'),
-        p1_equity_capital: n('p1_equity_capital'), p1_reserves: n('p1_reserves'), p1_retained_earnings: n('p1_retained_earnings'),
-        p2_cash: n('p2_cash'), p2_receivables: n('p2_receivables'), p2_inventory: n('p2_inventory'),
-        p2_fixed_assets: n('p2_fixed_assets'), p2_other_assets: n('p2_other_assets'),
-        p2_supplier_debt: n('p2_supplier_debt'), p2_bank_debt: n('p2_bank_debt'), p2_other_liabilities: n('p2_other_liabilities'),
-        p2_equity_capital: n('p2_equity_capital'), p2_reserves: n('p2_reserves'), p2_retained_earnings: n('p2_retained_earnings'),
-        // ОПУ
-        p1_revenue: n('p1_revenue'), p1_cogs: n('p1_cogs'), p1_gross_profit: p1_gross,
-        p1_sales_expense: n('p1_sales_expense'), p1_admin_expense: n('p1_admin_expense'),
-        p1_other_op_income: n('p1_other_op_income'), p1_non_op: n('p1_non_op'), p1_tax: n('p1_tax'), p1_net_profit: p1_net,
-        p2_revenue: n('p2_revenue'), p2_cogs: n('p2_cogs'), p2_gross_profit: p2_gross,
-        p2_sales_expense: n('p2_sales_expense'), p2_admin_expense: n('p2_admin_expense'),
-        p2_other_op_income: n('p2_other_op_income'), p2_non_op: n('p2_non_op'), p2_tax: n('p2_tax'), p2_net_profit: p2_net,
-        // КешФлоу
-        p1_cash_begin: n('p1_cash_begin'), p1_op_inflow: n('p1_op_inflow'), p1_op_outflow: n('p1_op_outflow'),
-        p1_fin_inflow: n('p1_fin_inflow'), p1_fin_outflow: n('p1_fin_outflow'),
-        p1_inv_inflow: n('p1_inv_inflow'), p1_inv_outflow: n('p1_inv_outflow'), p1_cash_end,
-        p2_cash_begin: n('p2_cash_begin'), p2_op_inflow: n('p2_op_inflow'), p2_op_outflow: n('p2_op_outflow'),
-        p2_fin_inflow: n('p2_fin_inflow'), p2_fin_outflow: n('p2_fin_outflow'),
-        p2_inv_inflow: n('p2_inv_inflow'), p2_inv_outflow: n('p2_inv_outflow'), p2_cash_end,
+        // Баланс Форма №1 — Краткосрочные активы
+        p1_cash_desk: n('p1_cash_desk'), p1_cash_bank: n('p1_cash_bank'), p1_st_invest: n('p1_st_invest'),
+        p1_trade_rec: n('p1_trade_rec'), p1_other_rec: n('p1_other_rec'), p1_founder_rec: n('p1_founder_rec'),
+        p1_inventory: n('p1_inventory'), p1_prepaid: n('p1_prepaid'), p1_nca_sale: n('p1_nca_sale'),
+        // Долгосрочные активы
+        p1_ppe: n('p1_ppe'), p1_nat_res: n('p1_nat_res'), p1_intangibles: n('p1_intangibles'),
+        p1_bio_assets: n('p1_bio_assets'), p1_invest_prop: n('p1_invest_prop'), p1_lt_invest: n('p1_lt_invest'),
+        p1_def_tax_asset: n('p1_def_tax_asset'), p1_lt_rec: n('p1_lt_rec'),
+        // Краткосрочные обязательства
+        p1_trade_pay: n('p1_trade_pay'), p1_st_debt: n('p1_st_debt'), p1_accrued: n('p1_accrued'),
+        p1_taxes_pay: n('p1_taxes_pay'), p1_exp_reserves: n('p1_exp_reserves'), p1_other_st_liab: n('p1_other_st_liab'),
+        // Долгосрочные обязательства
+        p1_lt_debt: n('p1_lt_debt'), p1_def_income: n('p1_def_income'), p1_def_tax_liab: n('p1_def_tax_liab'),
+        // Капитал
+        p1_charter_cap: n('p1_charter_cap'), p1_add_cap: n('p1_add_cap'), p1_retained: n('p1_retained'),
+        p1_reserve_cap: n('p1_reserve_cap'), p1_minority: n('p1_minority'),
+        // p2 variants
+        p2_cash_desk: n('p2_cash_desk'), p2_cash_bank: n('p2_cash_bank'), p2_st_invest: n('p2_st_invest'),
+        p2_trade_rec: n('p2_trade_rec'), p2_other_rec: n('p2_other_rec'), p2_founder_rec: n('p2_founder_rec'),
+        p2_inventory: n('p2_inventory'), p2_prepaid: n('p2_prepaid'), p2_nca_sale: n('p2_nca_sale'),
+        p2_ppe: n('p2_ppe'), p2_nat_res: n('p2_nat_res'), p2_intangibles: n('p2_intangibles'),
+        p2_bio_assets: n('p2_bio_assets'), p2_invest_prop: n('p2_invest_prop'), p2_lt_invest: n('p2_lt_invest'),
+        p2_def_tax_asset: n('p2_def_tax_asset'), p2_lt_rec: n('p2_lt_rec'),
+        p2_trade_pay: n('p2_trade_pay'), p2_st_debt: n('p2_st_debt'), p2_accrued: n('p2_accrued'),
+        p2_taxes_pay: n('p2_taxes_pay'), p2_exp_reserves: n('p2_exp_reserves'), p2_other_st_liab: n('p2_other_st_liab'),
+        p2_lt_debt: n('p2_lt_debt'), p2_def_income: n('p2_def_income'), p2_def_tax_liab: n('p2_def_tax_liab'),
+        p2_charter_cap: n('p2_charter_cap'), p2_add_cap: n('p2_add_cap'), p2_retained: n('p2_retained'),
+        p2_reserve_cap: n('p2_reserve_cap'), p2_minority: n('p2_minority'),
+        // ОПУ Форма №2
+        p1_net_rev: n('p1_net_rev'), p1_cogs: n('p1_cogs'), p1_gross_profit: p1_gross,
+        p1_sell_exp: n('p1_sell_exp'), p1_admin_exp: n('p1_admin_exp'), p1_other_op: n('p1_other_op'),
+        p1_interest_exp: n('p1_interest_exp'), p1_invest_inc: n('p1_invest_inc'), p1_fx_diff: n('p1_fx_diff'),
+        p1_currency_ex: n('p1_currency_ex'), p1_asset_disp: n('p1_asset_disp'), p1_impairment: n('p1_impairment'),
+        p1_other_nonop: n('p1_other_nonop'), p1_assoc_profit: n('p1_assoc_profit'), p1_tax: n('p1_tax'),
+        p1_discont: n('p1_discont'), p1_net_profit: p1_net,
+        p2_net_rev: n('p2_net_rev'), p2_cogs: n('p2_cogs'), p2_gross_profit: p2_gross,
+        p2_sell_exp: n('p2_sell_exp'), p2_admin_exp: n('p2_admin_exp'), p2_other_op: n('p2_other_op'),
+        p2_interest_exp: n('p2_interest_exp'), p2_invest_inc: n('p2_invest_inc'), p2_fx_diff: n('p2_fx_diff'),
+        p2_currency_ex: n('p2_currency_ex'), p2_asset_disp: n('p2_asset_disp'), p2_impairment: n('p2_impairment'),
+        p2_other_nonop: n('p2_other_nonop'), p2_assoc_profit: n('p2_assoc_profit'), p2_tax: n('p2_tax'),
+        p2_discont: n('p2_discont'), p2_net_profit: p2_net,
+        // ОДДС Форма №5
+        p1_cf_sales: n('p1_cf_sales'), p1_cf_other_op_in: n('p1_cf_other_op_in'), p1_cf_cogs_paid: n('p1_cf_cogs_paid'),
+        p1_cf_salary: n('p1_cf_salary'), p1_cf_services: n('p1_cf_services'), p1_cf_interest: n('p1_cf_interest'),
+        p1_cf_income_tax: n('p1_cf_income_tax'), p1_cf_other_taxes: n('p1_cf_other_taxes'), p1_cf_other_op_out: n('p1_cf_other_op_out'),
+        p1_cf_asset_sold: n('p1_cf_asset_sold'), p1_cf_intang_sold: n('p1_cf_intang_sold'), p1_cf_sec_sold: n('p1_cf_sec_sold'),
+        p1_cf_loan_ret: n('p1_cf_loan_ret'), p1_cf_other_inv_in: n('p1_cf_other_inv_in'),
+        p1_cf_asset_buy: n('p1_cf_asset_buy'), p1_cf_intang_buy: n('p1_cf_intang_buy'), p1_cf_sec_buy: n('p1_cf_sec_buy'),
+        p1_cf_loans_given: n('p1_cf_loans_given'), p1_cf_other_inv_out: n('p1_cf_other_inv_out'),
+        p1_cf_shares: n('p1_cf_shares'), p1_cf_bonds: n('p1_cf_bonds'), p1_cf_founders: n('p1_cf_founders'),
+        p1_cf_loans_in: n('p1_cf_loans_in'), p1_cf_other_fin_in: n('p1_cf_other_fin_in'),
+        p1_cf_dividends: n('p1_cf_dividends'), p1_cf_loans_out: n('p1_cf_loans_out'), p1_cf_buyback: n('p1_cf_buyback'),
+        p1_cf_other_fin_out: n('p1_cf_other_fin_out'), p1_cf_fx: n('p1_cf_fx'), p1_cf_cash_begin: n('p1_cf_cash_begin'),
+        p1_cash_end,
+        p2_cf_sales: n('p2_cf_sales'), p2_cf_other_op_in: n('p2_cf_other_op_in'), p2_cf_cogs_paid: n('p2_cf_cogs_paid'),
+        p2_cf_salary: n('p2_cf_salary'), p2_cf_services: n('p2_cf_services'), p2_cf_interest: n('p2_cf_interest'),
+        p2_cf_income_tax: n('p2_cf_income_tax'), p2_cf_other_taxes: n('p2_cf_other_taxes'), p2_cf_other_op_out: n('p2_cf_other_op_out'),
+        p2_cf_asset_sold: n('p2_cf_asset_sold'), p2_cf_intang_sold: n('p2_cf_intang_sold'), p2_cf_sec_sold: n('p2_cf_sec_sold'),
+        p2_cf_loan_ret: n('p2_cf_loan_ret'), p2_cf_other_inv_in: n('p2_cf_other_inv_in'),
+        p2_cf_asset_buy: n('p2_cf_asset_buy'), p2_cf_intang_buy: n('p2_cf_intang_buy'), p2_cf_sec_buy: n('p2_cf_sec_buy'),
+        p2_cf_loans_given: n('p2_cf_loans_given'), p2_cf_other_inv_out: n('p2_cf_other_inv_out'),
+        p2_cf_shares: n('p2_cf_shares'), p2_cf_bonds: n('p2_cf_bonds'), p2_cf_founders: n('p2_cf_founders'),
+        p2_cf_loans_in: n('p2_cf_loans_in'), p2_cf_other_fin_in: n('p2_cf_other_fin_in'),
+        p2_cf_dividends: n('p2_cf_dividends'), p2_cf_loans_out: n('p2_cf_loans_out'), p2_cf_buyback: n('p2_cf_buyback'),
+        p2_cf_other_fin_out: n('p2_cf_other_fin_out'), p2_cf_fx: n('p2_cf_fx'), p2_cf_cash_begin: n('p2_cf_cash_begin'),
+        p2_cash_end,
         collaterals, guarantors, ai_conclusion: data.conclusion,
         recommendation: data.recommendation, risk_level: data.risk_level,
       }
@@ -822,29 +997,57 @@ export default function CreditRiskPage() {
                 </div>
               )}
 
-              {/* Tab 2: Баланс */}
+              {/* Tab 2: Баланс — Форма №1 (МФ РТ Приказ №42) */}
               {tab === 2 && (
                 <div className="space-y-2">
-                  <FT title="АКТИВ" p1={p1} p2={p2}>
-                    <FR label="Денежные средства" f1="p1_cash" f2="p2_cash" formData={form} setF={setF} />
-                    <FR label="Дебиторская задолженность" f1="p1_receivables" f2="p2_receivables" formData={form} setF={setF} />
-                    <FR label="ТМЗ (запасы)" f1="p1_inventory" f2="p2_inventory" formData={form} setF={setF} />
-                    <FR label="Основные средства" f1="p1_fixed_assets" f2="p2_fixed_assets" formData={form} setF={setF} />
-                    <FR label="Прочие активы" f1="p1_other_assets" f2="p2_other_assets" formData={form} setF={setF} />
-                    <FR label="ИТОГО АКТИВ" bold auto v1={p1_total_assets} v2={p2_total_assets} formData={form} setF={setF} />
+                  <FT title="РАЗДЕЛ 1. КРАТКОСРОЧНЫЕ АКТИВЫ" p1={p1} p2={p2}>
+                    <FR label="Денежные средства в кассе (10100)" f1="p1_cash_desk" f2="p2_cash_desk" formData={form} setF={setF} />
+                    <FR label="Денежные средства в банках (10200)" f1="p1_cash_bank" f2="p2_cash_bank" formData={form} setF={setF} />
+                    <FR label="Краткосрочные инвестиции (10300)" f1="p1_st_invest" f2="p2_st_invest" formData={form} setF={setF} />
+                    <FR label="Торговая дебиторская задолженность (10400)" f1="p1_trade_rec" f2="p2_trade_rec" formData={form} setF={setF} />
+                    <FR label="Прочая дебиторская задолженность (10500)" f1="p1_other_rec" f2="p2_other_rec" formData={form} setF={setF} />
+                    <FR label="Задолженность учредителей (10600)" f1="p1_founder_rec" f2="p2_founder_rec" formData={form} setF={setF} />
+                    <FR label="Товарно-материальные запасы (10700)" f1="p1_inventory" f2="p2_inventory" formData={form} setF={setF} />
+                    <FR label="Расходы будущих периодов (10800)" f1="p1_prepaid" f2="p2_prepaid" formData={form} setF={setF} />
+                    <FR label="Долгосрочные активы для продажи (10900)" f1="p1_nca_sale" f2="p2_nca_sale" formData={form} setF={setF} />
+                    <FR label="Итого краткосрочных активов" bold auto v1={p1_total_ca} v2={p2_total_ca} formData={form} setF={setF} />
                   </FT>
-                  <FT title="ПАССИВ — Обязательства" p1={p1} p2={p2}>
-                    <FR label="Долги перед поставщиками" f1="p1_supplier_debt" f2="p2_supplier_debt" formData={form} setF={setF} />
-                    <FR label="Долги перед банками" f1="p1_bank_debt" f2="p2_bank_debt" formData={form} setF={setF} />
-                    <FR label="Прочие обязательства" f1="p1_other_liabilities" f2="p2_other_liabilities" formData={form} setF={setF} />
-                    <FR label="Итого обязательства" bold auto v1={p1_total_liab} v2={p2_total_liab} formData={form} setF={setF} />
+                  <FT title="РАЗДЕЛ 2. ДОЛГОСРОЧНЫЕ АКТИВЫ" p1={p1} p2={p2}>
+                    <FR label="Основные средства (11000)" f1="p1_ppe" f2="p2_ppe" formData={form} setF={setF} />
+                    <FR label="Природные ресурсы (11200)" f1="p1_nat_res" f2="p2_nat_res" formData={form} setF={setF} />
+                    <FR label="Нематериальные активы (11300)" f1="p1_intangibles" f2="p2_intangibles" formData={form} setF={setF} />
+                    <FR label="Биологические активы (11400)" f1="p1_bio_assets" f2="p2_bio_assets" formData={form} setF={setF} />
+                    <FR label="Инвестиционное имущество (11500)" f1="p1_invest_prop" f2="p2_invest_prop" formData={form} setF={setF} />
+                    <FR label="Долгосрочные инвестиции (11600)" f1="p1_lt_invest" f2="p2_lt_invest" formData={form} setF={setF} />
+                    <FR label="Отложенные налоговые активы (11700)" f1="p1_def_tax_asset" f2="p2_def_tax_asset" formData={form} setF={setF} />
+                    <FR label="Долгосрочная дебиторская задолженность (11800)" f1="p1_lt_rec" f2="p2_lt_rec" formData={form} setF={setF} />
+                    <FR label="Итого долгосрочных активов" bold auto v1={p1_total_nca} v2={p2_total_nca} formData={form} setF={setF} />
+                    <FR label="ИТОГО АКТИВЫ" bold auto v1={p1_total_assets} v2={p2_total_assets} formData={form} setF={setF} />
                   </FT>
-                  <FT title="ПАССИВ — Капитал" p1={p1} p2={p2}>
-                    <FR label="Основной капитал" f1="p1_equity_capital" f2="p2_equity_capital" formData={form} setF={setF} />
-                    <FR label="Резерв" f1="p1_reserves" f2="p2_reserves" formData={form} setF={setF} />
-                    <FR label="Нераспределённая прибыль" f1="p1_retained_earnings" f2="p2_retained_earnings" formData={form} setF={setF} />
-                    <FR label="Итого капитал" bold auto v1={p1_total_equity} v2={p2_total_equity} formData={form} setF={setF} />
-                    <FR label="ИТОГО ПАССИВ" bold auto v1={p1_total_passiv} v2={p2_total_passiv} formData={form} setF={setF} />
+                  <FT title="РАЗДЕЛ 3. КРАТКОСРОЧНЫЕ ОБЯЗАТЕЛЬСТВА" p1={p1} p2={p2}>
+                    <FR label="Торговая кредиторская задолженность (22000)" f1="p1_trade_pay" f2="p2_trade_pay" formData={form} setF={setF} />
+                    <FR label="Краткосрочные долговые обязательства (22100)" f1="p1_st_debt" f2="p2_st_debt" formData={form} setF={setF} />
+                    <FR label="Начисленные краткосрочные обязательства (22200)" f1="p1_accrued" f2="p2_accrued" formData={form} setF={setF} />
+                    <FR label="Налоговые обязательства (22300)" f1="p1_taxes_pay" f2="p2_taxes_pay" formData={form} setF={setF} />
+                    <FR label="Резервы на расходы (22400)" f1="p1_exp_reserves" f2="p2_exp_reserves" formData={form} setF={setF} />
+                    <FR label="Прочие краткосрочные обязательства (22500)" f1="p1_other_st_liab" f2="p2_other_st_liab" formData={form} setF={setF} />
+                    <FR label="Итого краткосрочных обязательств" bold auto v1={p1_total_cl} v2={p2_total_cl} formData={form} setF={setF} />
+                  </FT>
+                  <FT title="РАЗДЕЛ 4. ДОЛГОСРОЧНЫЕ ОБЯЗАТЕЛЬСТВА" p1={p1} p2={p2}>
+                    <FR label="Долгосрочные долговые обязательства (22600)" f1="p1_lt_debt" f2="p2_lt_debt" formData={form} setF={setF} />
+                    <FR label="Доходы будущих периодов (22700)" f1="p1_def_income" f2="p2_def_income" formData={form} setF={setF} />
+                    <FR label="Отложенные налоговые обязательства (22800)" f1="p1_def_tax_liab" f2="p2_def_tax_liab" formData={form} setF={setF} />
+                    <FR label="Итого долгосрочных обязательств" bold auto v1={p1_total_ll} v2={p2_total_ll} formData={form} setF={setF} />
+                    <FR label="ИТОГО ОБЯЗАТЕЛЬСТВА" bold auto v1={p1_total_liab} v2={p2_total_liab} formData={form} setF={setF} />
+                  </FT>
+                  <FT title="РАЗДЕЛ 5. СОБСТВЕННЫЙ КАПИТАЛ" p1={p1} p2={p2}>
+                    <FR label="Уставный капитал (33000)" f1="p1_charter_cap" f2="p2_charter_cap" formData={form} setF={setF} />
+                    <FR label="Дополнительный капитал (33100)" f1="p1_add_cap" f2="p2_add_cap" formData={form} setF={setF} />
+                    <FR label="Нераспределённая прибыль (33200)" f1="p1_retained" f2="p2_retained" formData={form} setF={setF} />
+                    <FR label="Резервный капитал (33300)" f1="p1_reserve_cap" f2="p2_reserve_cap" formData={form} setF={setF} />
+                    <FR label="Доля меньшинства (33400)" f1="p1_minority" f2="p2_minority" formData={form} setF={setF} />
+                    <FR label="Итого собственный капитал" bold auto v1={p1_total_equity} v2={p2_total_equity} formData={form} setF={setF} />
+                    <FR label="ИТОГО ПАССИВЫ" bold auto v1={p1_total_passiv} v2={p2_total_passiv} formData={form} setF={setF} />
                   </FT>
                   {(p1_total_assets > 0 || p2_total_assets > 0) && (
                     <div className="grid grid-cols-2 gap-3">
@@ -858,38 +1061,87 @@ export default function CreditRiskPage() {
                 </div>
               )}
 
-              {/* Tab 3: ОПУ */}
+              {/* Tab 3: ОПУ — Форма №2 (МФ РТ Приказ №42) */}
               {tab === 3 && (
-                <FT title="ОТЧЁТ О ПРИБЫЛЯХ И УБЫТКАХ (ОПУ)" p1={p1} p2={p2}>
-                  <FR label="Выручка от реализации" f1="p1_revenue" f2="p2_revenue" formData={form} setF={setF} />
-                  <FR label="Себестоимость" f1="p1_cogs" f2="p2_cogs" formData={form} setF={setF} />
-                  <FR label="▶ Валовая прибыль" bold auto v1={p1_gross} v2={p2_gross} formData={form} setF={setF} />
-                  <FR label="Торговые расходы" f1="p1_sales_expense" f2="p2_sales_expense" formData={form} setF={setF} />
-                  <FR label="Административные расходы" f1="p1_admin_expense" f2="p2_admin_expense" formData={form} setF={setF} />
-                  <FR label="Прочие операционные доходы" f1="p1_other_op_income" f2="p2_other_op_income" formData={form} setF={setF} />
-                  <FR label="▶ Операционная прибыль" bold auto v1={p1_op_profit} v2={p2_op_profit} formData={form} setF={setF} />
-                  <FR label="Прочие внеоперац. доходы/(расходы)" f1="p1_non_op" f2="p2_non_op" formData={form} setF={setF} />
-                  <FR label="▶ Прибыль до налогообложения" bold auto v1={p1_ebt} v2={p2_ebt} formData={form} setF={setF} />
-                  <FR label="Налог на прибыль" f1="p1_tax" f2="p2_tax" formData={form} setF={setF} />
-                  <FR label="▶ Чистая прибыль" bold auto v1={p1_net} v2={p2_net} formData={form} setF={setF} />
+                <FT title="ОТЧЁТ О ПРИБЫЛЯХ И УБЫТКАХ — Форма №2" p1={p1} p2={p2}>
+                  <FR label="Чистый доход от продаж (010)" f1="p1_net_rev" f2="p2_net_rev" formData={form} setF={setF} />
+                  <FR label="Себестоимость продаж (020)" f1="p1_cogs" f2="p2_cogs" formData={form} setF={setF} />
+                  <FR label="▶ Валовая прибыль (030)" bold auto v1={p1_gross} v2={p2_gross} formData={form} setF={setF} />
+                  <FR label="Расходы на продажу (040)" f1="p1_sell_exp" f2="p2_sell_exp" formData={form} setF={setF} />
+                  <FR label="Административные расходы (050)" f1="p1_admin_exp" f2="p2_admin_exp" formData={form} setF={setF} />
+                  <FR label="▶ Итого операционные расходы (060)" bold auto v1={p1_total_op_exp} v2={p2_total_op_exp} formData={form} setF={setF} />
+                  <FR label="Прочие операционные доходы/(расходы) (070)" f1="p1_other_op" f2="p2_other_op" formData={form} setF={setF} />
+                  <FR label="▶ Операционная прибыль/(убыток) (080)" bold auto v1={p1_op_profit} v2={p2_op_profit} formData={form} setF={setF} />
+                  <FR label="Доходы/(расходы) по процентам (100)" f1="p1_interest_exp" f2="p2_interest_exp" formData={form} setF={setF} />
+                  <FR label="Доходы/(убыток) от инвестиций (110)" f1="p1_invest_inc" f2="p2_invest_inc" formData={form} setF={setF} />
+                  <FR label="Доходы/(убыток) от курсовых разниц (120)" f1="p1_fx_diff" f2="p2_fx_diff" formData={form} setF={setF} />
+                  <FR label="Доходы/(убыток) от обмена валюты (130)" f1="p1_currency_ex" f2="p2_currency_ex" formData={form} setF={setF} />
+                  <FR label="Доходы/(убыток) от выбытия активов (140)" f1="p1_asset_disp" f2="p2_asset_disp" formData={form} setF={setF} />
+                  <FR label="Убыток от обесценения (150)" f1="p1_impairment" f2="p2_impairment" formData={form} setF={setF} />
+                  <FR label="Прочие неоперационные доходы/(расходы) (160)" f1="p1_other_nonop" f2="p2_other_nonop" formData={form} setF={setF} />
+                  <FR label="▶ Итого неоперационных (170)" bold auto v1={p1_total_nonop} v2={p2_total_nonop} formData={form} setF={setF} />
+                  <FR label="Доля прибыли ассоц. компаний (180)" f1="p1_assoc_profit" f2="p2_assoc_profit" formData={form} setF={setF} />
+                  <FR label="▶ Прибыль до налогообложения (190)" bold auto v1={p1_ebt} v2={p2_ebt} formData={form} setF={setF} />
+                  <FR label="Налог на прибыль (200)" f1="p1_tax" f2="p2_tax" formData={form} setF={setF} />
+                  <FR label="▶ Прибыль от продолжаемой деятельности (210)" bold auto v1={p1_continuing} v2={p2_continuing} formData={form} setF={setF} />
+                  <FR label="Прибыль/(убыток) от прекращённой деятельности (220)" f1="p1_discont" f2="p2_discont" formData={form} setF={setF} />
+                  <FR label="▶ ЧИСТАЯ ПРИБЫЛЬ/(УБЫТОК) (230)" bold auto v1={p1_net} v2={p2_net} formData={form} setF={setF} />
                 </FT>
               )}
 
               {/* Tab 4: КешФлоу */}
               {tab === 4 && (
-                <FT title="ОТЧЁТ О ДВИЖЕНИИ ДЕНЕЖНЫХ СРЕДСТВ (ОДДС)" p1={p1} p2={p2}>
-                  <FR label="Остаток на начало периода" bold f1="p1_cash_begin" f2="p2_cash_begin" formData={form} setF={setF} />
-                  <FR label="Операционная: Приток (продажи)" f1="p1_op_inflow" f2="p2_op_inflow" formData={form} setF={setF} />
-                  <FR label="Операционная: Отток (покупки/расходы)" f1="p1_op_outflow" f2="p2_op_outflow" formData={form} setF={setF} />
-                  <FR label="▶ Результат операционной деятельности" bold auto v1={p1_op_result} v2={p2_op_result} formData={form} setF={setF} />
-                  <FR label="Финансовая: Приток (займы/кредиты)" f1="p1_fin_inflow" f2="p2_fin_inflow" formData={form} setF={setF} />
-                  <FR label="Финансовая: Отток (погашение)" f1="p1_fin_outflow" f2="p2_fin_outflow" formData={form} setF={setF} />
-                  <FR label="▶ Результат финансовой деятельности" bold auto v1={p1_fin_result} v2={p2_fin_result} formData={form} setF={setF} />
-                  <FR label="Инвестиционная: Приток" f1="p1_inv_inflow" f2="p2_inv_inflow" formData={form} setF={setF} />
-                  <FR label="Инвестиционная: Отток" f1="p1_inv_outflow" f2="p2_inv_outflow" formData={form} setF={setF} />
-                  <FR label="▶ Результат инвестиционной деятельности" bold auto v1={p1_inv_result} v2={p2_inv_result} formData={form} setF={setF} />
-                  <FR label="▶ Остаток на конец периода" bold auto v1={p1_cash_end} v2={p2_cash_end} formData={form} setF={setF} />
-                </FT>
+                <div className="space-y-2">
+                  <FT title="ОДДС — ОПЕРАЦИОННАЯ ДЕЯТЕЛЬНОСТЬ (Форма №5)" p1={p1} p2={p2}>
+                    <FR label="Поступления от продаж (010) [+]" f1="p1_cf_sales" f2="p2_cf_sales" formData={form} setF={setF} />
+                    <FR label="Прочие операционные поступления (020) [+]" f1="p1_cf_other_op_in" f2="p2_cf_other_op_in" formData={form} setF={setF} />
+                    <FR label="Итого поступлений (030)" bold auto v1={p1_cf_total_op_in} v2={p2_cf_total_op_in} formData={form} setF={setF} />
+                    <FR label="Оплата себестоимости продаж (050) [−]" f1="p1_cf_cogs_paid" f2="p2_cf_cogs_paid" formData={form} setF={setF} />
+                    <FR label="Оплата труда и отчисления (060) [−]" f1="p1_cf_salary" f2="p2_cf_salary" formData={form} setF={setF} />
+                    <FR label="Оплата прочих услуг (070) [−]" f1="p1_cf_services" f2="p2_cf_services" formData={form} setF={setF} />
+                    <FR label="Выплата процентов (080) [−]" f1="p1_cf_interest" f2="p2_cf_interest" formData={form} setF={setF} />
+                    <FR label="Уплата налога на прибыль (090) [−]" f1="p1_cf_income_tax" f2="p2_cf_income_tax" formData={form} setF={setF} />
+                    <FR label="Уплата прочих налогов (100) [−]" f1="p1_cf_other_taxes" f2="p2_cf_other_taxes" formData={form} setF={setF} />
+                    <FR label="Прочие операционные выплаты (110) [−]" f1="p1_cf_other_op_out" f2="p2_cf_other_op_out" formData={form} setF={setF} />
+                    <FR label="Итого выплат (190)" bold auto v1={p1_cf_total_op_out} v2={p2_cf_total_op_out} formData={form} setF={setF} />
+                    <FR label="▶ Чистый поток — операционная (200)" bold auto v1={p1_cf_net_op} v2={p2_cf_net_op} formData={form} setF={setF} />
+                  </FT>
+                  <FT title="ОДДС — ИНВЕСТИЦИОННАЯ ДЕЯТЕЛЬНОСТЬ" p1={p1} p2={p2}>
+                    <FR label="Продажа основных средств (210) [+]" f1="p1_cf_asset_sold" f2="p2_cf_asset_sold" formData={form} setF={setF} />
+                    <FR label="Продажа нематериальных активов (220) [+]" f1="p1_cf_intang_sold" f2="p2_cf_intang_sold" formData={form} setF={setF} />
+                    <FR label="Продажа ценных бумаг (230) [+]" f1="p1_cf_sec_sold" f2="p2_cf_sec_sold" formData={form} setF={setF} />
+                    <FR label="Возврат займов (240) [+]" f1="p1_cf_loan_ret" f2="p2_cf_loan_ret" formData={form} setF={setF} />
+                    <FR label="Прочие инвест. поступления (250) [+]" f1="p1_cf_other_inv_in" f2="p2_cf_other_inv_in" formData={form} setF={setF} />
+                    <FR label="Итого инвест. поступлений (260)" bold auto v1={p1_cf_total_inv_in} v2={p2_cf_total_inv_in} formData={form} setF={setF} />
+                    <FR label="Приобретение основных средств (270) [−]" f1="p1_cf_asset_buy" f2="p2_cf_asset_buy" formData={form} setF={setF} />
+                    <FR label="Приобретение нематериальных активов (280) [−]" f1="p1_cf_intang_buy" f2="p2_cf_intang_buy" formData={form} setF={setF} />
+                    <FR label="Приобретение ценных бумаг (290) [−]" f1="p1_cf_sec_buy" f2="p2_cf_sec_buy" formData={form} setF={setF} />
+                    <FR label="Предоставление займов (300) [−]" f1="p1_cf_loans_given" f2="p2_cf_loans_given" formData={form} setF={setF} />
+                    <FR label="Прочие инвест. выплаты (310) [−]" f1="p1_cf_other_inv_out" f2="p2_cf_other_inv_out" formData={form} setF={setF} />
+                    <FR label="Итого инвест. выплат (320)" bold auto v1={p1_cf_total_inv_out} v2={p2_cf_total_inv_out} formData={form} setF={setF} />
+                    <FR label="▶ Чистый поток — инвестиционная (330)" bold auto v1={p1_cf_net_inv} v2={p2_cf_net_inv} formData={form} setF={setF} />
+                  </FT>
+                  <FT title="ОДДС — ФИНАНСОВАЯ ДЕЯТЕЛЬНОСТЬ" p1={p1} p2={p2}>
+                    <FR label="Эмиссия акций (410) [+]" f1="p1_cf_shares" f2="p2_cf_shares" formData={form} setF={setF} />
+                    <FR label="Эмиссия облигаций (420) [+]" f1="p1_cf_bonds" f2="p2_cf_bonds" formData={form} setF={setF} />
+                    <FR label="Вклады учредителей (430) [+]" f1="p1_cf_founders" f2="p2_cf_founders" formData={form} setF={setF} />
+                    <FR label="Полученные займы и кредиты (440) [+]" f1="p1_cf_loans_in" f2="p2_cf_loans_in" formData={form} setF={setF} />
+                    <FR label="Прочие фин. поступления (450) [+]" f1="p1_cf_other_fin_in" f2="p2_cf_other_fin_in" formData={form} setF={setF} />
+                    <FR label="Итого фин. поступлений (460)" bold auto v1={p1_cf_total_fin_in} v2={p2_cf_total_fin_in} formData={form} setF={setF} />
+                    <FR label="Выплата дивидендов (470) [−]" f1="p1_cf_dividends" f2="p2_cf_dividends" formData={form} setF={setF} />
+                    <FR label="Погашение займов и кредитов (480) [−]" f1="p1_cf_loans_out" f2="p2_cf_loans_out" formData={form} setF={setF} />
+                    <FR label="Выкуп собственных акций (490) [−]" f1="p1_cf_buyback" f2="p2_cf_buyback" formData={form} setF={setF} />
+                    <FR label="Прочие фин. выплаты (500) [−]" f1="p1_cf_other_fin_out" f2="p2_cf_other_fin_out" formData={form} setF={setF} />
+                    <FR label="Итого фин. выплат (510)" bold auto v1={p1_cf_total_fin_out} v2={p2_cf_total_fin_out} formData={form} setF={setF} />
+                    <FR label="▶ Чистый поток — финансовая (520)" bold auto v1={p1_cf_net_fin} v2={p2_cf_net_fin} formData={form} setF={setF} />
+                  </FT>
+                  <FT title="ОДДС — ИТОГО" p1={p1} p2={p2}>
+                    <FR label="Влияние курсовых разниц (600)" f1="p1_cf_fx" f2="p2_cf_fx" formData={form} setF={setF} />
+                    <FR label="▶ Нетто изменение денежных средств" bold auto v1={p1_cf_net_change} v2={p2_cf_net_change} formData={form} setF={setF} />
+                    <FR label="Остаток на начало периода" bold f1="p1_cf_cash_begin" f2="p2_cf_cash_begin" formData={form} setF={setF} />
+                    <FR label="▶ Остаток на конец периода" bold auto v1={p1_cash_end} v2={p2_cash_end} formData={form} setF={setF} />
+                  </FT>
+                </div>
               )}
 
               {/* Tab 5: Залог */}

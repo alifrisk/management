@@ -15,31 +15,28 @@ export async function POST(request: Request) {
       return chg > 0 ? ` (+${chg.toFixed(1)}%)` : ` (${chg.toFixed(1)}%)`
     }
 
-    // Balance components (sent from frontend via ...form spread)
-    const p1_cash       = Number(fd.p1_cash       || 0)
-    const p1_recv       = Number(fd.p1_receivables || 0)
-    const p1_inv        = Number(fd.p1_inventory   || 0)
-    const p2_cash       = Number(fd.p2_cash       || 0)
-    const p2_recv       = Number(fd.p2_receivables || 0)
-    const p2_inv        = Number(fd.p2_inventory   || 0)
-
-    // Liquid (current) assets = Cash + Receivables + Inventory
-    const p1_liquid = p1_cash + p1_recv + p1_inv
-    const p2_liquid = p2_cash + p2_recv + p2_inv
-
-    const p1_assets  = Number(fd.p1_total_assets      || 0)
-    const p2_assets  = Number(fd.p2_total_assets      || 0)
+    // Агрегированные данные из баланса (Форма №1 МФ РТ)
+    const p1_cash    = Number(fd.p1_cash_desk || 0) + Number(fd.p1_cash_bank || 0)
+    const p2_cash    = Number(fd.p2_cash_desk || 0) + Number(fd.p2_cash_bank || 0)
+    const p1_liquid  = Number(fd.p1_total_ca || 0)   // краткосрочные активы итого
+    const p2_liquid  = Number(fd.p2_total_ca || 0)
+    const p1_nca     = Number(fd.p1_total_assets || 0) - p1_liquid  // долгосрочные активы
+    const p2_nca     = Number(fd.p2_total_assets || 0) - p2_liquid
+    const p1_cl      = Number(fd.p1_total_cl || 0)   // краткосрочные обязательства
+    const p2_cl      = Number(fd.p2_total_cl || 0)
+    const p1_assets  = Number(fd.p1_total_assets || 0)
+    const p2_assets  = Number(fd.p2_total_assets || 0)
     const p1_liab    = Number(fd.p1_total_liabilities || 0)
     const p2_liab    = Number(fd.p2_total_liabilities || 0)
-    const p1_equity  = Number(fd.p1_equity_capital || 0) + Number(fd.p1_reserves || 0) + Number(fd.p1_retained_earnings || 0)
-    const p2_equity  = Number(fd.p2_equity_capital || 0) + Number(fd.p2_reserves || 0) + Number(fd.p2_retained_earnings || 0)
+    const p1_equity  = Number(fd.p1_total_equity || 0)
+    const p2_equity  = Number(fd.p2_total_equity || 0)
 
-    const p1_revenue = Number(fd.p1_revenue || 0)
-    const p2_revenue = Number(fd.p2_revenue || 0)
+    const p1_revenue = Number(fd.p1_net_rev || 0)    // чистый доход от продаж (010)
+    const p2_revenue = Number(fd.p2_net_rev || 0)
     const p1_net     = Number(fd.p1_net || 0)
     const p2_net     = Number(fd.p2_net || 0)
-    const p1_op_cf   = Number(fd.p1_op_inflow || 0) - Number(fd.p1_op_outflow || 0)
-    const p2_op_cf   = Number(fd.p2_op_inflow || 0) - Number(fd.p2_op_outflow || 0)
+    const p1_op_cf   = Number(fd.p1_cf_net_op || 0)  // чистый поток от операционной деятельности
+    const p2_op_cf   = Number(fd.p2_cf_net_op || 0)
 
     const monthly_payment   = Number(fd.monthly_payment || 0)
     const annual_payment    = monthly_payment * 12
@@ -51,13 +48,13 @@ export async function POST(request: Request) {
     const is_increase          = conclusion_type === 'Увеличение кредитной линии'
 
     // ── Pre-calculated ratios ──────────────────────────────────────────────────
-    // 1. Текущая ликвидность = Ликвидные активы / Обязательства (≥1.5 — норма для МСБ)
-    const p1_liq_cur = div(p1_liquid, p1_liab)
-    const p2_liq_cur = div(p2_liquid, p2_liab)
+    // 1. Текущая ликвидность = Краткосрочные активы / Краткосрочные обязательства (≥1.5 — норма для МСБ)
+    const p1_liq_cur = div(p1_liquid, p1_cl)
+    const p2_liq_cur = div(p2_liquid, p2_cl)
 
-    // 2. Абсолютная ликвидность = Денежные средства / Обязательства (≥0.2 — норма)
-    const p1_liq_abs = div(p1_cash, p1_liab)
-    const p2_liq_abs = div(p2_cash, p2_liab)
+    // 2. Абсолютная ликвидность = Денежные средства / Краткосрочные обязательства (≥0.2 — норма)
+    const p1_liq_abs = div(p1_cash, p1_cl)
+    const p2_liq_abs = div(p2_cash, p2_cl)
 
     // 3. Рентабельность продаж (ROS) = Чистая прибыль / Выручка × 100%
     const p1_ros = div(p1_net, p1_revenue) * 100
@@ -116,24 +113,25 @@ ${is_collateral_change
 Цель линии: ${fd.loan_purpose}`}
 
 ═══ БАЛАНС (${fd.p1_label || 'П1'} → ${fd.p2_label || 'П2'}) ═══
-Ликвидные активы (Деньги + Дебиторка + ТМЗ): ${f(p1_liquid)} → ${f(p2_liquid)}${trend(p1_liquid, p2_liquid)}
-  Денежные средства:       ${f(p1_cash)} → ${f(p2_cash)}
-  Дебиторская задолженность: ${f(p1_recv)} → ${f(p2_recv)}
-  ТМЗ (запасы):            ${f(p1_inv)} → ${f(p2_inv)}
-Итого активы:              ${f(p1_assets)} → ${f(p2_assets)}${trend(p1_assets, p2_assets)}
-Итого обязательства:       ${f(p1_liab)} → ${f(p2_liab)}${trend(p1_liab, p2_liab)}
-Собственный капитал:       ${f(p1_equity)} → ${f(p2_equity)}${trend(p1_equity, p2_equity)}
+Краткосрочные активы итого:  ${f(p1_liquid)} → ${f(p2_liquid)}${trend(p1_liquid, p2_liquid)}
+  в т.ч. Денежные средства:  ${f(p1_cash)} → ${f(p2_cash)}
+  в т.ч. ТМЗ:                ${f(Number(fd.p1_inventory||0))} → ${f(Number(fd.p2_inventory||0))}
+Долгосрочные активы итого:   ${f(p1_nca)} → ${f(p2_nca)}${trend(p1_nca, p2_nca)}
+Итого активы:                ${f(p1_assets)} → ${f(p2_assets)}${trend(p1_assets, p2_assets)}
+Краткосрочные обязательства: ${f(p1_cl)} → ${f(p2_cl)}
+Итого обязательства:         ${f(p1_liab)} → ${f(p2_liab)}${trend(p1_liab, p2_liab)}
+Собственный капитал:         ${f(p1_equity)} → ${f(p2_equity)}${trend(p1_equity, p2_equity)}
 
-═══ ОПУ ═══
-Выручка:         ${f(p1_revenue)} → ${f(p2_revenue)}${trend(p1_revenue, p2_revenue)}
-Себестоимость:   ${f(fd.p1_cogs)} → ${f(fd.p2_cogs)}
-Валовая прибыль: ${f(fd.p1_gross)} → ${f(fd.p2_gross)}
-Операц. прибыль: ${f(fd.p1_op_profit)} → ${f(fd.p2_op_profit)}
-Чистая прибыль:  ${f(p1_net)} → ${f(p2_net)}${trend(p1_net, p2_net)}
+═══ ОПУ (Форма №2) ═══
+Чистый доход от продаж (010): ${f(p1_revenue)} → ${f(p2_revenue)}${trend(p1_revenue, p2_revenue)}
+Себестоимость (020):          ${f(Number(fd.p1_cogs)||0)} → ${f(Number(fd.p2_cogs)||0)}
+Валовая прибыль (030):        ${f(Number(fd.p1_gross)||0)} → ${f(Number(fd.p2_gross)||0)}
+Операц. прибыль (080):        ${f(Number(fd.p1_op_profit)||0)} → ${f(Number(fd.p2_op_profit)||0)}
+Чистая прибыль (230):         ${f(p1_net)} → ${f(p2_net)}${trend(p1_net, p2_net)}
 
-═══ ОДДС ═══
-Операц. поток: ${f(p1_op_cf)} → ${f(p2_op_cf)}
-Остаток конец: ${f(fd.p1_cash_end)} → ${f(fd.p2_cash_end)}
+═══ ОДДС (Форма №5) ═══
+Чистый опер. поток (200): ${f(p1_op_cf)} → ${f(p2_op_cf)}
+Остаток на конец:         ${f(Number(fd.p1_cf_cash_end)||0)} → ${f(Number(fd.p2_cf_cash_end)||0)}
 
 ═══ ЗАЛОГ ═══
 ${(fd.collaterals||[]).map((c: {type:string;description:string;value:number}, i: number) => `${i+1}. ${c.type}: ${c.description} — ${f(c.value)} TJS`).join('\n') || 'Не указан'}
@@ -141,13 +139,13 @@ ${(fd.collaterals||[]).map((c: {type:string;description:string;value:number}, i:
 
 ═══ ФИНАНСОВЫЕ КОЭФФИЦИЕНТЫ (рассчитаны системой, использовать точно) ═══
 
-1. Коэффициент текущей ликвидности = (Деньги + Дебиторка + ТМЗ) / Обязательства [норма МСБ ≥1.5]
-   П1: (${f(p1_cash)} + ${f(p1_recv)} + ${f(p1_inv)}) / ${f(p1_liab)} = ${rat(p1_liq_cur)} ${p1_liab > 0 ? (p1_liq_cur >= 1.5 ? '✓ норма' : p1_liq_cur >= 1.0 ? '⚠ допустимо' : '✗ низкая') : '(нет обязательств)'}
-   П2: (${f(p2_cash)} + ${f(p2_recv)} + ${f(p2_inv)}) / ${f(p2_liab)} = ${rat(p2_liq_cur)} ${p2_liab > 0 ? (p2_liq_cur >= 1.5 ? '✓ норма' : p2_liq_cur >= 1.0 ? '⚠ допустимо' : '✗ низкая') : '(нет обязательств)'}
+1. Коэффициент текущей ликвидности = Краткоср. активы / Краткоср. обязательства [норма МСБ ≥1.5]
+   П1: ${f(p1_liquid)} / ${f(p1_cl)} = ${rat(p1_liq_cur)} ${p1_cl > 0 ? (p1_liq_cur >= 1.5 ? '✓ норма' : p1_liq_cur >= 1.0 ? '⚠ допустимо' : '✗ низкая') : '(нет КО)'}
+   П2: ${f(p2_liquid)} / ${f(p2_cl)} = ${rat(p2_liq_cur)} ${p2_cl > 0 ? (p2_liq_cur >= 1.5 ? '✓ норма' : p2_liq_cur >= 1.0 ? '⚠ допустимо' : '✗ низкая') : '(нет КО)'}
 
-2. Коэффициент абсолютной ликвидности = Деньги / Обязательства [норма ≥0.2]
-   П1: ${f(p1_cash)} / ${f(p1_liab)} = ${rat(p1_liq_abs)} ${p1_liab > 0 ? (p1_liq_abs >= 0.2 ? '✓ норма' : '✗ ниже нормы') : '(нет обязательств)'}
-   П2: ${f(p2_cash)} / ${f(p2_liab)} = ${rat(p2_liq_abs)} ${p2_liab > 0 ? (p2_liq_abs >= 0.2 ? '✓ норма' : '✗ ниже нормы') : '(нет обязательств)'}
+2. Коэффициент абсолютной ликвидности = Денежные средства / Краткоср. обязательства [норма ≥0.2]
+   П1: ${f(p1_cash)} / ${f(p1_cl)} = ${rat(p1_liq_abs)} ${p1_cl > 0 ? (p1_liq_abs >= 0.2 ? '✓ норма' : '✗ ниже нормы') : '(нет КО)'}
+   П2: ${f(p2_cash)} / ${f(p2_cl)} = ${rat(p2_liq_abs)} ${p2_cl > 0 ? (p2_liq_abs >= 0.2 ? '✓ норма' : '✗ ниже нормы') : '(нет КО)'}
 
 3. Рентабельность продаж (ROS) = Чистая прибыль / Выручка × 100%
    П1: ${f(p1_net)} / ${f(p1_revenue)} × 100% = ${pct(p1_ros)}
@@ -190,7 +188,7 @@ ${is_collateral_change ? `
 ═══ ПРОВЕРКА КОРРЕКТНОСТИ ДАННЫХ (выполни перед написанием заключения) ═══
 Баланс П1: Актив ${f(p1_assets)} vs Пассив (обяз. ${f(p1_liab)} + капитал ${f(p1_equity)} = ${f(p1_liab + p1_equity)}) → ${Math.abs(p1_assets - (p1_liab + p1_equity)) < 1 ? '✅ сходится' : `⚠️ РАСХОЖДЕНИЕ ${f(Math.abs(p1_assets - (p1_liab + p1_equity)))}`}
 Баланс П2: Актив ${f(p2_assets)} vs Пассив (обяз. ${f(p2_liab)} + капитал ${f(p2_equity)} = ${f(p2_liab + p2_equity)}) → ${Math.abs(p2_assets - (p2_liab + p2_equity)) < 1 ? '✅ сходится' : `⚠️ РАСХОЖДЕНИЕ ${f(Math.abs(p2_assets - (p2_liab + p2_equity)))}`}
-Выручка vs Операц.приток П2: ${p2_revenue > 0 && Number(fd.p2_op_inflow) > 0 ? (Math.abs(p2_revenue - Number(fd.p2_op_inflow)) / p2_revenue > 0.3 ? `⚠️ выручка ${f(p2_revenue)} ≠ операц.приток ${f(Number(fd.p2_op_inflow))} — значительное расхождение, уточни у аналитика` : '✅ приемлемо') : 'нет данных'}
+Выручка vs Опер.поток П2: ${p2_revenue > 0 && p2_op_cf !== 0 ? (Math.abs(p2_revenue - p2_op_cf) / p2_revenue > 0.5 ? `⚠️ выручка ${f(p2_revenue)} существенно ≠ опер.поток ${f(p2_op_cf)}` : '✅ приемлемо') : 'нет данных'}
 ${(is_increase && loan_amount <= existing_balance) ? `⚠️ ЛОГИКА: желаемый лимит (${f(loan_amount)}) ≤ действующему (${f(existing_balance)}) — не имеет смысла для увеличения` : ''}
 
 Если есть расхождения — укажи их в разделе "ФИНАНСОВЫЙ АНАЛИЗ" с пометкой "⚠️ требует уточнения".

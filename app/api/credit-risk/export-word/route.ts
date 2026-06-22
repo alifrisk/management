@@ -93,21 +93,43 @@ export async function POST(request: Request) {
     const p1 = c.p1_label || 'Период 1'
     const p2 = c.p2_label || 'Период 2'
 
-    // Computed values
-    const p1a = (c.p1_cash||0)+(c.p1_receivables||0)+(c.p1_inventory||0)+(c.p1_fixed_assets||0)+(c.p1_other_assets||0)
-    const p2a = (c.p2_cash||0)+(c.p2_receivables||0)+(c.p2_inventory||0)+(c.p2_fixed_assets||0)+(c.p2_other_assets||0)
-    const p1l = (c.p1_supplier_debt||0)+(c.p1_bank_debt||0)+(c.p1_other_liabilities||0)
-    const p2l = (c.p2_supplier_debt||0)+(c.p2_bank_debt||0)+(c.p2_other_liabilities||0)
-    const p1e = (c.p1_equity_capital||0)+(c.p1_reserves||0)+(c.p1_retained_earnings||0)
-    const p2e = (c.p2_equity_capital||0)+(c.p2_reserves||0)+(c.p2_retained_earnings||0)
-    const p1gross = (c.p1_revenue||0)-(c.p1_cogs||0)
-    const p2gross = (c.p2_revenue||0)-(c.p2_cogs||0)
-    const p1op = (c.p1_revenue||0)-(c.p1_cogs||0)-(c.p1_sales_expense||0)-(c.p1_admin_expense||0)+(c.p1_other_op_income||0)
-    const p2op = (c.p2_revenue||0)-(c.p2_cogs||0)-(c.p2_sales_expense||0)-(c.p2_admin_expense||0)+(c.p2_other_op_income||0)
-    const p1ebt = p1op+(c.p1_non_op||0)
-    const p2ebt = p2op+(c.p2_non_op||0)
-    const p1opCF = (c.p1_op_inflow||0)-(c.p1_op_outflow||0)
-    const p2opCF = (c.p2_op_inflow||0)-(c.p2_op_outflow||0)
+    // Computed values — новые поля МФ РТ с фолбэком на старые для обратной совместимости
+    const p1ca = (c.p1_cash_desk||0)+(c.p1_cash_bank||0)+(c.p1_st_invest||0)+(c.p1_trade_rec||0)+(c.p1_other_rec||0)+(c.p1_founder_rec||0)+(c.p1_inventory||0)+(c.p1_prepaid||0)+(c.p1_nca_sale||0)
+    const p2ca = (c.p2_cash_desk||0)+(c.p2_cash_bank||0)+(c.p2_st_invest||0)+(c.p2_trade_rec||0)+(c.p2_other_rec||0)+(c.p2_founder_rec||0)+(c.p2_inventory||0)+(c.p2_prepaid||0)+(c.p2_nca_sale||0)
+    const p1nca = (c.p1_ppe||0)+(c.p1_nat_res||0)+(c.p1_intangibles||0)+(c.p1_bio_assets||0)+(c.p1_invest_prop||0)+(c.p1_lt_invest||0)+(c.p1_def_tax_asset||0)+(c.p1_lt_rec||0)
+    const p2nca = (c.p2_ppe||0)+(c.p2_nat_res||0)+(c.p2_intangibles||0)+(c.p2_bio_assets||0)+(c.p2_invest_prop||0)+(c.p2_lt_invest||0)+(c.p2_def_tax_asset||0)+(c.p2_lt_rec||0)
+    // Фолбэк для старых записей без новых полей
+    const p1a = p1ca + p1nca || (c.p1_cash||0)+(c.p1_receivables||0)+(c.p1_inventory||0)+(c.p1_fixed_assets||0)+(c.p1_other_assets||0)
+    const p2a = p2ca + p2nca || (c.p2_cash||0)+(c.p2_receivables||0)+(c.p2_inventory||0)+(c.p2_fixed_assets||0)+(c.p2_other_assets||0)
+    const p1cl = (c.p1_trade_pay||0)+(c.p1_st_debt||0)+(c.p1_accrued||0)+(c.p1_taxes_pay||0)+(c.p1_exp_reserves||0)+(c.p1_other_st_liab||0)
+    const p2cl = (c.p2_trade_pay||0)+(c.p2_st_debt||0)+(c.p2_accrued||0)+(c.p2_taxes_pay||0)+(c.p2_exp_reserves||0)+(c.p2_other_st_liab||0)
+    const p1ll = (c.p1_lt_debt||0)+(c.p1_def_income||0)+(c.p1_def_tax_liab||0)
+    const p2ll = (c.p2_lt_debt||0)+(c.p2_def_income||0)+(c.p2_def_tax_liab||0)
+    const p1l = p1cl + p1ll || (c.p1_supplier_debt||0)+(c.p1_bank_debt||0)+(c.p1_other_liabilities||0)
+    const p2l = p2cl + p2ll || (c.p2_supplier_debt||0)+(c.p2_bank_debt||0)+(c.p2_other_liabilities||0)
+    const p1e = (c.p1_charter_cap||0)+(c.p1_add_cap||0)+(c.p1_retained||0)+(c.p1_reserve_cap||0)+(c.p1_minority||0) || (c.p1_equity_capital||0)+(c.p1_reserves||0)+(c.p1_retained_earnings||0)
+    const p2e = (c.p2_charter_cap||0)+(c.p2_add_cap||0)+(c.p2_retained||0)+(c.p2_reserve_cap||0)+(c.p2_minority||0) || (c.p2_equity_capital||0)+(c.p2_reserves||0)+(c.p2_retained_earnings||0)
+    const p1rev = (c.p1_net_rev||0) || (c.p1_revenue||0)
+    const p2rev = (c.p2_net_rev||0) || (c.p2_revenue||0)
+    const p1gross = p1rev-(c.p1_cogs||0)
+    const p2gross = p2rev-(c.p2_cogs||0)
+    const p1op = p1gross-(c.p1_sell_exp||c.p1_sales_expense||0)-(c.p1_admin_exp||c.p1_admin_expense||0)+(c.p1_other_op||c.p1_other_op_income||0)
+    const p2op = p2gross-(c.p2_sell_exp||c.p2_sales_expense||0)-(c.p2_admin_exp||c.p2_admin_expense||0)+(c.p2_other_op||c.p2_other_op_income||0)
+    const p1nonop = (c.p1_interest_exp||0)+(c.p1_invest_inc||0)+(c.p1_fx_diff||0)+(c.p1_currency_ex||0)+(c.p1_asset_disp||0)-(c.p1_impairment||0)+(c.p1_other_nonop||c.p1_non_op||0)
+    const p2nonop = (c.p2_interest_exp||0)+(c.p2_invest_inc||0)+(c.p2_fx_diff||0)+(c.p2_currency_ex||0)+(c.p2_asset_disp||0)-(c.p2_impairment||0)+(c.p2_other_nonop||c.p2_non_op||0)
+    const p1ebt = p1op + p1nonop + (c.p1_assoc_profit||0)
+    const p2ebt = p2op + p2nonop + (c.p2_assoc_profit||0)
+    const p1netProfit = (c.p1_net_profit||0) || p1ebt-(c.p1_tax||0)
+    const p2netProfit = (c.p2_net_profit||0) || p2ebt-(c.p2_tax||0)
+    const p1opCF = (c.p1_cf_sales||0)+(c.p1_cf_other_op_in||0)-((c.p1_cf_cogs_paid||0)+(c.p1_cf_salary||0)+(c.p1_cf_services||0)+(c.p1_cf_interest||0)+(c.p1_cf_income_tax||0)+(c.p1_cf_other_taxes||0)+(c.p1_cf_other_op_out||0)) || (c.p1_op_inflow||0)-(c.p1_op_outflow||0)
+    const p2opCF = (c.p2_cf_sales||0)+(c.p2_cf_other_op_in||0)-((c.p2_cf_cogs_paid||0)+(c.p2_cf_salary||0)+(c.p2_cf_services||0)+(c.p2_cf_interest||0)+(c.p2_cf_income_tax||0)+(c.p2_cf_other_taxes||0)+(c.p2_cf_other_op_out||0)) || (c.p2_op_inflow||0)-(c.p2_op_outflow||0)
+    const p1invCF = (c.p1_cf_asset_sold||0)+(c.p1_cf_intang_sold||0)+(c.p1_cf_sec_sold||0)+(c.p1_cf_loan_ret||0)+(c.p1_cf_other_inv_in||0)-((c.p1_cf_asset_buy||0)+(c.p1_cf_intang_buy||0)+(c.p1_cf_sec_buy||0)+(c.p1_cf_loans_given||0)+(c.p1_cf_other_inv_out||0)) || (c.p1_inv_inflow||0)-(c.p1_inv_outflow||0)
+    const p2invCF = (c.p2_cf_asset_sold||0)+(c.p2_cf_intang_sold||0)+(c.p2_cf_sec_sold||0)+(c.p2_cf_loan_ret||0)+(c.p2_cf_other_inv_in||0)-((c.p2_cf_asset_buy||0)+(c.p2_cf_intang_buy||0)+(c.p2_cf_sec_buy||0)+(c.p2_cf_loans_given||0)+(c.p2_cf_other_inv_out||0)) || (c.p2_inv_inflow||0)-(c.p2_inv_outflow||0)
+    const p1finCF = (c.p1_cf_shares||0)+(c.p1_cf_bonds||0)+(c.p1_cf_founders||0)+(c.p1_cf_loans_in||0)+(c.p1_cf_other_fin_in||0)-((c.p1_cf_dividends||0)+(c.p1_cf_loans_out||0)+(c.p1_cf_buyback||0)+(c.p1_cf_other_fin_out||0)) || (c.p1_fin_inflow||0)-(c.p1_fin_outflow||0)
+    const p2finCF = (c.p2_cf_shares||0)+(c.p2_cf_bonds||0)+(c.p2_cf_founders||0)+(c.p2_cf_loans_in||0)+(c.p2_cf_other_fin_in||0)-((c.p2_cf_dividends||0)+(c.p2_cf_loans_out||0)+(c.p2_cf_buyback||0)+(c.p2_cf_other_fin_out||0)) || (c.p2_fin_inflow||0)-(c.p2_fin_outflow||0)
+    const p1cashBegin = (c.p1_cf_cash_begin||0) || (c.p1_cash_begin||0)
+    const p2cashBegin = (c.p2_cf_cash_begin||0) || (c.p2_cash_begin||0)
+    const p1cashEnd = (c.p1_cash_end||0) || p1cashBegin + p1opCF + p1invCF + p1finCF
 
     let collaterals: {type: string; description: string; value: number}[] = []
     if (Array.isArray(c.collaterals)) collaterals = c.collaterals
@@ -206,48 +228,110 @@ export async function POST(request: Request) {
           }),
           para('', { after: 60 }),
 
-          // ── 2. БАЛАНС ──
-          sectionHead('2', 'ФИНАНСОВОЕ ПОЛОЖЕНИЕ (БАЛАНС)'),
+          // ── 2. БАЛАНС (Форма №1) ──
+          sectionHead('2', 'ФИНАНСОВОЕ ПОЛОЖЕНИЕ (БАЛАНС — Форма №1)'),
           finTable([
-            ['Денежные средства', c.p1_cash||0, c.p2_cash||0],
-            ['Дебиторская задолженность', c.p1_receivables||0, c.p2_receivables||0],
-            ['ТМЗ (запасы)', c.p1_inventory||0, c.p2_inventory||0],
-            ['Основные средства', c.p1_fixed_assets||0, c.p2_fixed_assets||0],
-            ['Прочие активы', c.p1_other_assets||0, c.p2_other_assets||0],
-            ['ИТОГО АКТИВ', p1a, p2a, true],
-            ['Долги поставщикам', c.p1_supplier_debt||0, c.p2_supplier_debt||0],
-            ['Долги банкам', c.p1_bank_debt||0, c.p2_bank_debt||0],
-            ['Прочие обязательства', c.p1_other_liabilities||0, c.p2_other_liabilities||0],
+            ['КРАТКОСРОЧНЫЕ АКТИВЫ', '', '', true],
+            ['Денежные средства в кассе (10100)', c.p1_cash_desk||0, c.p2_cash_desk||0],
+            ['Денежные средства в банках (10200)', c.p1_cash_bank||0, c.p2_cash_bank||0],
+            ['Краткосрочные инвестиции (10300)', c.p1_st_invest||0, c.p2_st_invest||0],
+            ['Торговая дебиторская задолженность (10400)', c.p1_trade_rec||0, c.p2_trade_rec||0],
+            ['Прочая дебиторская задолженность (10500)', c.p1_other_rec||0, c.p2_other_rec||0],
+            ['Задолженность учредителей (10600)', c.p1_founder_rec||0, c.p2_founder_rec||0],
+            ['ТМЗ (10700)', c.p1_inventory||0, c.p2_inventory||0],
+            ['Расходы будущих периодов (10800)', c.p1_prepaid||0, c.p2_prepaid||0],
+            ['Долгосроч. активы для продажи (10900)', c.p1_nca_sale||0, c.p2_nca_sale||0],
+            ['Итого краткосрочных активов', p1ca, p2ca, true],
+            ['ДОЛГОСРОЧНЫЕ АКТИВЫ', '', '', true],
+            ['Основные средства (11000)', c.p1_ppe||0, c.p2_ppe||0],
+            ['Природные ресурсы (11200)', c.p1_nat_res||0, c.p2_nat_res||0],
+            ['Нематериальные активы (11300)', c.p1_intangibles||0, c.p2_intangibles||0],
+            ['Биологические активы (11400)', c.p1_bio_assets||0, c.p2_bio_assets||0],
+            ['Инвестиционное имущество (11500)', c.p1_invest_prop||0, c.p2_invest_prop||0],
+            ['Долгосрочные инвестиции (11600)', c.p1_lt_invest||0, c.p2_lt_invest||0],
+            ['Отложенные налоговые активы (11700)', c.p1_def_tax_asset||0, c.p2_def_tax_asset||0],
+            ['Долгосрочная дебиторка (11800)', c.p1_lt_rec||0, c.p2_lt_rec||0],
+            ['Итого долгосрочных активов', p1nca, p2nca, true],
+            ['ИТОГО АКТИВЫ', p1a, p2a, true],
+            ['КРАТКОСРОЧНЫЕ ОБЯЗАТЕЛЬСТВА', '', '', true],
+            ['Торговая кредиторка (22000)', c.p1_trade_pay||0, c.p2_trade_pay||0],
+            ['Краткосрочные долговые обяз. (22100)', c.p1_st_debt||0, c.p2_st_debt||0],
+            ['Начисленные обязательства (22200)', c.p1_accrued||0, c.p2_accrued||0],
+            ['Налоговые обязательства (22300)', c.p1_taxes_pay||0, c.p2_taxes_pay||0],
+            ['Резервы на расходы (22400)', c.p1_exp_reserves||0, c.p2_exp_reserves||0],
+            ['Прочие краткосрочные обяз. (22500)', c.p1_other_st_liab||0, c.p2_other_st_liab||0],
+            ['Итого краткосрочных обязательств', p1cl, p2cl, true],
+            ['ДОЛГОСРОЧНЫЕ ОБЯЗАТЕЛЬСТВА', '', '', true],
+            ['Долгосрочные долговые обяз. (22600)', c.p1_lt_debt||0, c.p2_lt_debt||0],
+            ['Доходы будущих периодов (22700)', c.p1_def_income||0, c.p2_def_income||0],
+            ['Отложенные нал. обязательства (22800)', c.p1_def_tax_liab||0, c.p2_def_tax_liab||0],
+            ['Итого долгосрочных обязательств', p1ll, p2ll, true],
             ['ИТОГО ОБЯЗАТЕЛЬСТВА', p1l, p2l, true],
-            ['КАПИТАЛ', p1e, p2e, true],
+            ['СОБСТВЕННЫЙ КАПИТАЛ', '', '', true],
+            ['Уставный капитал (33000)', c.p1_charter_cap||0, c.p2_charter_cap||0],
+            ['Дополнительный капитал (33100)', c.p1_add_cap||0, c.p2_add_cap||0],
+            ['Нераспределённая прибыль (33200)', c.p1_retained||0, c.p2_retained||0],
+            ['Резервный капитал (33300)', c.p1_reserve_cap||0, c.p2_reserve_cap||0],
+            ['Доля меньшинства (33400)', c.p1_minority||0, c.p2_minority||0],
+            ['ИТОГО КАПИТАЛ', p1e, p2e, true],
+            ['ИТОГО ПАССИВЫ', p1l+p1e, p2l+p2e, true],
           ], p1, p2, fmt),
           para('', { after: 60 }),
 
-          // ── 3. ОПУ ──
-          sectionHead('3', 'ФИНАНСОВЫЕ РЕЗУЛЬТАТЫ (ОПУ)'),
+          // ── 3. ОПУ (Форма №2) ──
+          sectionHead('3', 'ФИНАНСОВЫЕ РЕЗУЛЬТАТЫ (ОПУ — Форма №2)'),
           finTable([
-            ['Выручка от реализации', c.p1_revenue||0, c.p2_revenue||0],
-            ['Себестоимость', c.p1_cogs||0, c.p2_cogs||0],
-            ['Валовая прибыль', p1gross, p2gross, true],
-            ['Торговые расходы', c.p1_sales_expense||0, c.p2_sales_expense||0],
-            ['Административные расходы', c.p1_admin_expense||0, c.p2_admin_expense||0],
-            ['Прочие операционные доходы', c.p1_other_op_income||0, c.p2_other_op_income||0],
-            ['Операционная прибыль', p1op, p2op, true],
-            ['Прочие внеоперац. доходы/(расходы)', c.p1_non_op||0, c.p2_non_op||0],
-            ['Прибыль до налогообложения', p1ebt, p2ebt, true],
-            ['Налог на прибыль', c.p1_tax||0, c.p2_tax||0],
-            ['Чистая прибыль', c.p1_net_profit||0, c.p2_net_profit||0, true],
+            ['Чистый доход от продаж (010)', p1rev, p2rev],
+            ['Себестоимость продаж (020)', c.p1_cogs||0, c.p2_cogs||0],
+            ['Валовая прибыль (030)', p1gross, p2gross, true],
+            ['Расходы на продажу (040)', c.p1_sell_exp||c.p1_sales_expense||0, c.p2_sell_exp||c.p2_sales_expense||0],
+            ['Административные расходы (050)', c.p1_admin_exp||c.p1_admin_expense||0, c.p2_admin_exp||c.p2_admin_expense||0],
+            ['Прочие операционные доходы/(расходы) (070)', c.p1_other_op||c.p1_other_op_income||0, c.p2_other_op||c.p2_other_op_income||0],
+            ['Операционная прибыль/(убыток) (080)', p1op, p2op, true],
+            ['Доходы/(расходы) по процентам (100)', c.p1_interest_exp||0, c.p2_interest_exp||0],
+            ['Доходы/(убыток) от инвестиций (110)', c.p1_invest_inc||0, c.p2_invest_inc||0],
+            ['Доходы/(убыток) от курсовых разниц (120)', c.p1_fx_diff||0, c.p2_fx_diff||0],
+            ['Доходы/(убыток) от обмена валюты (130)', c.p1_currency_ex||0, c.p2_currency_ex||0],
+            ['Доходы/(убыток) от выбытия активов (140)', c.p1_asset_disp||0, c.p2_asset_disp||0],
+            ['Убыток от обесценения (150)', c.p1_impairment||0, c.p2_impairment||0],
+            ['Прочие неоперационные (160)', c.p1_other_nonop||c.p1_non_op||0, c.p2_other_nonop||c.p2_non_op||0],
+            ['Итого неоперационных (170)', p1nonop, p2nonop, true],
+            ['Доля прибыли ассоц. компаний (180)', c.p1_assoc_profit||0, c.p2_assoc_profit||0],
+            ['Прибыль до налогообложения (190)', p1ebt, p2ebt, true],
+            ['Налог на прибыль (200)', c.p1_tax||0, c.p2_tax||0],
+            ['ЧИСТАЯ ПРИБЫЛЬ/(УБЫТОК) (230)', p1netProfit, p2netProfit, true],
           ], p1, p2, fmt),
           para('', { after: 60 }),
 
-          // ── 4. ОДДС ──
-          sectionHead('4', 'ДВИЖЕНИЕ ДЕНЕЖНЫХ СРЕДСТВ (ОДДС)'),
+          // ── 4. ОДДС (Форма №5) ──
+          sectionHead('4', 'ДВИЖЕНИЕ ДЕНЕЖНЫХ СРЕДСТВ (ОДДС — Форма №5)'),
           finTable([
-            ['Остаток на начало периода', c.p1_cash_begin||0, c.p2_cash_begin||0],
-            ['Операционная деятельность (нетто)', p1opCF, p2opCF],
-            ['Финансовая деятельность (нетто)', (c.p1_fin_inflow||0)-(c.p1_fin_outflow||0), (c.p2_fin_inflow||0)-(c.p2_fin_outflow||0)],
-            ['Инвест. деятельность (нетто)', (c.p1_inv_inflow||0)-(c.p1_inv_outflow||0), (c.p2_inv_inflow||0)-(c.p2_inv_outflow||0)],
-            ['Остаток на конец периода', c.p1_cash_end||0, c.p2_cash_end||0, true],
+            ['ОПЕРАЦИОННАЯ ДЕЯТЕЛЬНОСТЬ', '', '', true],
+            ['Поступления от продаж (010)', c.p1_cf_sales||0, c.p2_cf_sales||0],
+            ['Прочие опер. поступления (020)', c.p1_cf_other_op_in||0, c.p2_cf_other_op_in||0],
+            ['Оплата себестоимости (050)', c.p1_cf_cogs_paid||0, c.p2_cf_cogs_paid||0],
+            ['Оплата труда и отчислений (060)', c.p1_cf_salary||0, c.p2_cf_salary||0],
+            ['Оплата прочих услуг (070)', c.p1_cf_services||0, c.p2_cf_services||0],
+            ['Выплата процентов (080)', c.p1_cf_interest||0, c.p2_cf_interest||0],
+            ['Уплата налога на прибыль (090)', c.p1_cf_income_tax||0, c.p2_cf_income_tax||0],
+            ['Уплата прочих налогов (100)', c.p1_cf_other_taxes||0, c.p2_cf_other_taxes||0],
+            ['Прочие опер. выплаты (110)', c.p1_cf_other_op_out||0, c.p2_cf_other_op_out||0],
+            ['Чистый поток — операционная (200)', p1opCF, p2opCF, true],
+            ['ИНВЕСТИЦИОННАЯ ДЕЯТЕЛЬНОСТЬ', '', '', true],
+            ['Продажа ОС (210)', c.p1_cf_asset_sold||0, c.p2_cf_asset_sold||0],
+            ['Приобретение ОС (270)', c.p1_cf_asset_buy||0, c.p2_cf_asset_buy||0],
+            ['Выданные займы (300)', c.p1_cf_loans_given||0, c.p2_cf_loans_given||0],
+            ['Прочие инвестиционные нетто', c.p1_cf_intang_sold||0+c.p1_cf_sec_sold||0+c.p1_cf_loan_ret||0+c.p1_cf_other_inv_in||0-c.p1_cf_intang_buy||0-c.p1_cf_sec_buy||0-c.p1_cf_other_inv_out||0, c.p2_cf_intang_sold||0+c.p2_cf_sec_sold||0+c.p2_cf_loan_ret||0+c.p2_cf_other_inv_in||0-c.p2_cf_intang_buy||0-c.p2_cf_sec_buy||0-c.p2_cf_other_inv_out||0],
+            ['Чистый поток — инвестиционная (330)', p1invCF, p2invCF, true],
+            ['ФИНАНСОВАЯ ДЕЯТЕЛЬНОСТЬ', '', '', true],
+            ['Полученные займы и кредиты (440)', c.p1_cf_loans_in||0, c.p2_cf_loans_in||0],
+            ['Погашение займов и кредитов (480)', c.p1_cf_loans_out||0, c.p2_cf_loans_out||0],
+            ['Выплата дивидендов (470)', c.p1_cf_dividends||0, c.p2_cf_dividends||0],
+            ['Прочие финансовые нетто', c.p1_cf_shares||0+c.p1_cf_bonds||0+c.p1_cf_founders||0+c.p1_cf_other_fin_in||0-c.p1_cf_buyback||0-c.p1_cf_other_fin_out||0, c.p2_cf_shares||0+c.p2_cf_bonds||0+c.p2_cf_founders||0+c.p2_cf_other_fin_in||0-c.p2_cf_buyback||0-c.p2_cf_other_fin_out||0],
+            ['Чистый поток — финансовая (520)', p1finCF, p2finCF, true],
+            ['Влияние курсовых разниц (600)', c.p1_cf_fx||0, c.p2_cf_fx||0],
+            ['Остаток на начало периода', p1cashBegin, p2cashBegin],
+            ['Остаток на конец периода', p1cashEnd, (c.p2_cash_end||0)||p2cashBegin+p2opCF+p2invCF+p2finCF, true],
           ], p1, p2, fmt),
           para('', { after: 60 }),
 
@@ -264,7 +348,8 @@ export async function POST(request: Request) {
                 cell('Норматив', { green: true, bold: true, center: true }),
               ]}),
               ...([
-                ['Рентабельность продаж', pct(c.p1_net_profit||0, c.p1_revenue||0), pct(c.p2_net_profit||0, c.p2_revenue||0), 'Норма: >5%'],
+                ['Рентабельность продаж (ROS)', pct(p1netProfit, p1rev), pct(p2netProfit, p2rev), 'Норма: >5%'],
+                ['Текущая ликвидность (КА/КО)', p1cl > 0 ? (p1ca/p1cl).toFixed(2) : '—', p2cl > 0 ? (p2ca/p2cl).toFixed(2) : '—', 'Норма: ≥1.5'],
                 ['Долговая нагрузка (Обяз/Актив)', pct(p1l, p1a), pct(p2l, p2a), 'Норма: <70%'],
                 ['Коэффициент автономии (Кап/Актив)', pct(p1e, p1a), pct(p2e, p2a), 'Норма: >30%'],
                 ['Покрытие долга опер. потоком', p1l > 0 ? (p1opCF/p1l).toFixed(2) : '—', p2l > 0 ? (p2opCF/p2l).toFixed(2) : '—', 'Норма: >1'],
