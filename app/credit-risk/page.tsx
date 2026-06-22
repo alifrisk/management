@@ -519,7 +519,7 @@ export default function CreditRiskPage() {
                   ['Прибыль П2', `${fmt(viewing.p2_net_profit)} TJS`],
                   ['Уровень риска', viewing.risk_level || '—'],
                   ['Аналитик', viewing.analyst_name || '—'],
-                ].filter(Boolean).map(([l, v]) => <div key={String(l)}><p className="text-xs text-gray-500">{l}</p><p className="text-sm font-medium text-gray-900 mt-0.5">{v}</p></div>)}
+                ].filter((x): x is string[] => x !== null).map(([l, v]) => <div key={String(l)}><p className="text-xs text-gray-500">{l}</p><p className="text-sm font-medium text-gray-900 mt-0.5">{v}</p></div>)}
               </div>
               <div><p className="text-xs font-semibold text-gray-700 uppercase tracking-wide mb-2">AI Заключение</p>
                 <div className="bg-blue-50 border border-blue-100 rounded-lg p-4">
