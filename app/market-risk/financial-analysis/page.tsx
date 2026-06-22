@@ -194,7 +194,7 @@ export default function FinancialAnalysisPage() {
   const [filterYear, setFilterYear] = useState('')
   const [filterMonth, setFilterMonth] = useState('')
   const [inputMode, setInputMode] = useState<'manual' | 'image'>('manual')
-  const [imageFile, setImageFile] = useState<File | null>(null)
+  const [imageFiles, setImageFiles] = useState<File[]>([])
   const [extracting, setExtracting] = useState(false)
   const [extractMsg, setExtractMsg] = useState<string | null>(null)
   const [extractWarn, setExtractWarn] = useState<string[]>([])
@@ -305,32 +305,39 @@ export default function FinancialAnalysisPage() {
 
   // ── EXTRACT ─────────────────────────────────────────────────────────────────
   async function handleExtract() {
-    if (!imageFile) return
+    if (imageFiles.length === 0) return
     setExtracting(true); setExtractMsg(null); setExtractWarn([])
     try {
-      const base64 = await new Promise<string>((resolve, reject) => {
-        const reader = new FileReader()
-        reader.onload = e => resolve((e.target?.result as string).split(',')[1])
-        reader.onerror = reject
-        reader.readAsDataURL(imageFile)
-      })
-      const res = await apiFetch('/api/extract-from-image', {
-        method: 'POST',
-        body: JSON.stringify({ imageBase64: base64, mimeType: imageFile.type, module: 'financial' }),
-      })
-      const data = await res.json()
-      if (data.error) throw new Error(data.error)
-
       const STR_KEYS = ['p1_label', 'p2_label']
-      const extracted: Record<string, string> = {}
-      for (const [k, v] of Object.entries(data.data)) {
-        if (v !== null && v !== undefined && v !== 0) {
-          extracted[k] = STR_KEYS.includes(k) ? String(v) : fmtN(String(Math.round(Number(v))))
+      const merged: Record<string, string> = {}
+      const mergedRaw: Record<string, number> = {}
+
+      for (let i = 0; i < imageFiles.length; i++) {
+        const file = imageFiles[i]
+        const base64 = await new Promise<string>((resolve, reject) => {
+          const reader = new FileReader()
+          reader.onload = e => resolve((e.target?.result as string).split(',')[1])
+          reader.onerror = reject
+          reader.readAsDataURL(file)
+        })
+        const res = await apiFetch('/api/extract-from-image', {
+          method: 'POST',
+          body: JSON.stringify({ imageBase64: base64, mimeType: file.type, module: 'financial' }),
+        })
+        const data = await res.json()
+        if (data.error) throw new Error(`Файл ${i + 1}: ${data.error}`)
+
+        for (const [k, v] of Object.entries(data.data)) {
+          if (v !== null && v !== undefined && v !== 0) {
+            merged[k] = STR_KEYS.includes(k) ? String(v) : fmtN(String(Math.round(Number(v))))
+            mergedRaw[k] = Number(v)
+          }
         }
       }
-      setForm(prev => ({ ...prev, ...extracted }))
 
-      const d = data.data as Record<string, number>
+      setForm(prev => ({ ...prev, ...merged }))
+
+      const d = mergedRaw
       const warnings: string[] = []
       if (!((d.p1_cash_cb || 0) + (d.p1_due_banks || 0) > 0)) warnings.push('активы: деньги и МБК')
       if (!((d.p1_cust_dep || 0) + (d.p1_ibl || 0) > 0)) warnings.push('обязательства: депозиты и МБК')
@@ -339,10 +346,10 @@ export default function FinancialAnalysisPage() {
       if (!((d.p2_cash_cb || 0) + (d.p2_cust_dep || 0) > 0)) warnings.push('данные второго периода (П2)')
       setExtractWarn(warnings)
       setInputMode('manual')
-      setImageFile(null)
+      setImageFiles([])
       setExtractMsg(warnings.length === 0
-        ? 'Данные МСФО извлечены. Проверьте и при необходимости исправьте.'
-        : 'Данные частично извлечены. Не найдено: проверьте вручную.')
+        ? `Данные МСФО извлечены из ${imageFiles.length > 1 ? `${imageFiles.length} файлов` : 'файла'}. Проверьте и при необходимости исправьте.`
+        : `Данные частично извлечены из ${imageFiles.length > 1 ? `${imageFiles.length} файлов` : 'файла'}. Не найдено: проверьте вручную.`)
     } catch (err: unknown) {
       setExtractMsg('Ошибка: ' + (err instanceof Error ? err.message : String(err)))
     } finally { setExtracting(false) }
@@ -471,7 +478,7 @@ export default function FinancialAnalysisPage() {
           <h1 className="text-xl font-semibold text-gray-900">Финансовый анализ контрагента — МСФО</h1>
           <p className="text-sm text-gray-500 mt-0.5">Анализ аудированной МСФО-отчётности банков и финансовых организаций</p>
         </div>
-        <button onClick={() => { setForm(EMPTY); setTab(1); setError(null); setInputMode('manual'); setImageFile(null); setExtractMsg(null); setShowModal(true) }}
+        <button onClick={() => { setForm(EMPTY); setTab(1); setError(null); setInputMode('manual'); setImageFiles([]); setExtractMsg(null); setShowModal(true) }}
           className="flex items-center gap-2 px-4 py-2 bg-[#1B8A4C] text-white rounded-lg text-sm font-medium hover:bg-[#177040]">
           <Plus className="w-4 h-4" /> Новый анализ
         </button>
@@ -639,27 +646,38 @@ export default function FinancialAnalysisPage() {
               {inputMode === 'image' && (
                 <div className="space-y-4">
                   <div className="bg-blue-50 border border-blue-100 rounded-lg p-3">
-                    <p className="text-xs text-blue-800 font-medium">📄 Загрузите скриншот или PDF аудированной МСФО отчётности банка</p>
-                    <p className="text-xs text-blue-700 mt-1">AI автоматически извлечёт: Баланс (IFRS 9, IFRS 16), ОПУ · Поддерживаются: PNG, JPG, PDF</p>
+                    <p className="text-xs text-blue-800 font-medium">📄 Загрузите скриншоты или PDF аудированной МСФО отчётности банка</p>
+                    <p className="text-xs text-blue-700 mt-1">AI извлечёт данные из всех файлов и объединит · PNG, JPG, PDF · до 10 МБ каждый</p>
                   </div>
                   <label className="block cursor-pointer">
-                    <div className={`border-2 border-dashed rounded-xl p-10 text-center transition-colors ${imageFile ? 'border-[#1B8A4C] bg-green-50' : 'border-gray-200 hover:border-[#1B8A4C] hover:bg-gray-50'}`}>
-                      {imageFile ? (
-                        <div className="space-y-2">
+                    <div className={`border-2 border-dashed rounded-xl p-8 text-center transition-colors ${imageFiles.length > 0 ? 'border-[#1B8A4C] bg-green-50' : 'border-gray-200 hover:border-[#1B8A4C] hover:bg-gray-50'}`}>
+                      {imageFiles.length > 0 ? (
+                        <div className="space-y-3">
                           <CheckCircle2 className="w-10 h-10 text-green-500 mx-auto" />
-                          <p className="text-sm font-medium text-gray-800">{imageFile.name}</p>
-                          <p className="text-xs text-gray-400">{(imageFile.size / 1024 / 1024).toFixed(1)} МБ · {imageFile.type === 'application/pdf' ? 'PDF документ' : 'Изображение'} · Готово</p>
+                          <p className="text-sm font-medium text-gray-800">
+                            {imageFiles.length === 1 ? imageFiles[0].name : `${imageFiles.length} файла выбрано`}
+                          </p>
+                          <div className="flex flex-wrap gap-2 justify-center">
+                            {imageFiles.map((f, i) => (
+                              <span key={i} className="inline-flex items-center gap-1 px-2 py-1 bg-white border border-green-200 rounded-lg text-xs text-gray-600">
+                                <FileText className="w-3 h-3 text-green-500" />
+                                {f.name.length > 20 ? f.name.slice(0, 17) + '…' : f.name}
+                                <span className="text-gray-400">({(f.size / 1024 / 1024).toFixed(1)}MB)</span>
+                              </span>
+                            ))}
+                          </div>
+                          <p className="text-xs text-gray-400">Нажмите чтобы изменить выбор</p>
                         </div>
                       ) : (
                         <div className="space-y-2">
                           <Upload className="w-10 h-10 text-gray-300 mx-auto" />
-                          <p className="text-sm font-medium text-gray-500">Нажмите или перетащите МСФО отчёт</p>
-                          <p className="text-xs text-gray-400">PNG, JPG, WEBP или PDF · до 20 МБ</p>
+                          <p className="text-sm font-medium text-gray-500">Нажмите или перетащите файлы</p>
+                          <p className="text-xs text-gray-400">PNG, JPG, WEBP или PDF · до 10 МБ каждый · можно несколько</p>
                         </div>
                       )}
                     </div>
-                    <input type="file" accept="image/png,image/jpeg,image/webp,application/pdf" className="hidden"
-                      onChange={e => { setImageFile(e.target.files?.[0] || null); setExtractMsg(null) }} />
+                    <input type="file" accept="image/png,image/jpeg,image/webp,application/pdf" multiple className="hidden"
+                      onChange={e => { setImageFiles(Array.from(e.target.files || [])); setExtractMsg(null) }} />
                   </label>
                   {extractMsg && (
                     <div className="flex items-center gap-2 p-3 bg-red-50 border border-red-100 rounded-lg">
@@ -870,10 +888,12 @@ export default function FinancialAnalysisPage() {
                 <>
                   <div />
                   <div className="flex gap-2">
-                    <button onClick={() => { setShowModal(false); setInputMode('manual'); setImageFile(null); setExtractMsg(null) }} className="px-4 py-2 border border-gray-200 rounded-lg text-sm text-gray-600 hover:bg-gray-50">Отмена</button>
-                    <button onClick={handleExtract} disabled={!imageFile || extracting}
+                    <button onClick={() => { setShowModal(false); setInputMode('manual'); setImageFiles([]); setExtractMsg(null) }} className="px-4 py-2 border border-gray-200 rounded-lg text-sm text-gray-600 hover:bg-gray-50">Отмена</button>
+                    <button onClick={handleExtract} disabled={imageFiles.length === 0 || extracting}
                       className="flex items-center gap-2 px-4 py-2 bg-[#1B8A4C] text-white rounded-lg text-sm font-medium hover:bg-[#177040] disabled:opacity-50">
-                      {extracting ? <><Loader2 className="w-4 h-4 animate-spin" /> Извлечение МСФО...</> : <><Upload className="w-4 h-4" /> Извлечь данные</>}
+                      {extracting
+                        ? <><Loader2 className="w-4 h-4 animate-spin" /> Извлечение МСФО...</>
+                        : <><Upload className="w-4 h-4" /> Извлечь данные{imageFiles.length > 1 ? ` (${imageFiles.length})` : ''}</>}
                     </button>
                   </div>
                 </>
@@ -881,7 +901,7 @@ export default function FinancialAnalysisPage() {
                 <>
                   <div>{tab > 1 && <button onClick={() => setTab(tab-1)} className="px-4 py-2 border border-gray-200 rounded-lg text-sm text-gray-600 hover:bg-gray-50">← Назад</button>}</div>
                   <div className="flex gap-2">
-                    <button onClick={() => { setShowModal(false); setInputMode('manual'); setImageFile(null); setExtractMsg(null) }} className="px-4 py-2 border border-gray-200 rounded-lg text-sm text-gray-600 hover:bg-gray-50">Отмена</button>
+                    <button onClick={() => { setShowModal(false); setInputMode('manual'); setImageFiles([]); setExtractMsg(null) }} className="px-4 py-2 border border-gray-200 rounded-lg text-sm text-gray-600 hover:bg-gray-50">Отмена</button>
                     {tab < 4
                       ? <button onClick={() => setTab(tab+1)} className="px-4 py-2 bg-[#1B8A4C] text-white rounded-lg text-sm font-medium hover:bg-[#177040]">Далее →</button>
                       : <button onClick={handleGenerate} disabled={generating}
