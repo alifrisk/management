@@ -9,10 +9,13 @@ interface Collateral { type: string; description: string; value: number }
 
 interface CreditConclusion {
   id: string
+  conclusion_number: number
+  conclusion_type: string
   borrower_name: string; borrower_inn: string; business_type: string
   years_in_business: number; loan_amount: number; loan_currency: string
   loan_term: string; loan_term_months: number; interest_rate: number
   loan_purpose: string; credit_history: string; analyst_name: string
+  existing_loan_balance: number
   p1_label: string; p2_label: string
   p1_revenue: number; p1_cogs: number; p1_gross_profit: number
   p1_sales_expense: number; p1_admin_expense: number; p1_other_op_income: number
@@ -34,7 +37,15 @@ interface CreditConclusion {
   ai_conclusion: string; recommendation: string; risk_level: string; created_at: string
 }
 
+const CONCLUSION_TYPES = [
+  'Одобрение кредитной линии',
+  'Увеличение кредитной линии',
+  'Смена залога',
+]
+
 const EMPTY: Record<string, string> = {
+  conclusion_type: 'Одобрение кредитной линии',
+  existing_loan_balance: '',
   borrower_name: '', borrower_inn: '', business_type: '', years_in_business: '',
   loan_amount: '', loan_currency: 'TJS', loan_term_months: '', interest_rate: '',
   loan_purpose: '', credit_history: 'Положительная', analyst_name: '', sector: '',
@@ -59,23 +70,23 @@ const CREDIT_HISTORY = ['Положительная', 'Нейтральная', 
 const CURRENCIES = ['TJS', 'USD', 'EUR', 'RUB']
 
 const BUSINESS_SECTORS = [
-  'Торговля (розничная)',
-  'Торговля (оптовая)',
-  'Производство продуктов питания',
-  'Производство промышленное',
-  'Строительство',
-  'Сельское хозяйство',
-  'Транспорт и логистика',
-  'Услуги (бытовые)',
-  'Услуги (профессиональные)',
-  'IT и технологии',
-  'Здравоохранение',
-  'Образование',
-  'Гостиницы и рестораны',
-  'Недвижимость',
-  'Другое',
+  'Торговля (розничная)', 'Торговля (оптовая)', 'Производство продуктов питания',
+  'Производство промышленное', 'Строительство', 'Сельское хозяйство',
+  'Транспорт и логистика', 'Услуги (бытовые)', 'Услуги (профессиональные)',
+  'IT и технологии', 'Здравоохранение', 'Образование', 'Гостиницы и рестораны',
+  'Недвижимость', 'Другое',
 ]
 
+const TYPE_COLORS: Record<string, string> = {
+  'Одобрение кредитной линии': 'bg-blue-100 text-blue-800',
+  'Увеличение кредитной линии': 'bg-purple-100 text-purple-800',
+  'Смена залога': 'bg-orange-100 text-orange-800',
+}
+const TYPE_SHORT: Record<string, string> = {
+  'Одобрение кредитной линии': 'Одобрение',
+  'Увеличение кредитной линии': 'Увеличение',
+  'Смена залога': 'Смена залога',
+}
 
 // ─── Sub-components OUTSIDE main component (prevent focus loss on re-render) ───
 
@@ -89,7 +100,6 @@ function FR({ label, f1, f2, bold, auto, v1, v2, formData, setF }: FRProps) {
   const fmt = (n: number) => new Intl.NumberFormat('ru-RU').format(Math.round(n || 0))
   const cls = "w-full px-2 py-2 border border-gray-200 rounded text-sm focus:outline-none focus:ring-2 focus:ring-[#1B8A4C] text-right bg-white"
 
-  // Format display: show spaces while editing
   const fmtInput = (raw: string) => {
     if (!raw) return ''
     const isNeg = raw.startsWith('-')
@@ -158,7 +168,7 @@ export default function CreditRiskPage() {
   const [filterYear, setFilterYear] = useState('')
   const [filterMonth, setFilterMonth] = useState('')
   const [inputMode, setInputMode] = useState<'manual' | 'image'>('manual')
-  const [imageFile, setImageFile] = useState<File | null>(null)
+  const [imageFiles, setImageFiles] = useState<File[]>([])
   const [extracting, setExtracting] = useState(false)
   const [extractMsg, setExtractMsg] = useState<string | null>(null)
 
@@ -222,19 +232,38 @@ export default function CreditRiskPage() {
     ? Math.round(loanAmt * rate / (1 - Math.pow(1 + rate, -months)))
     : Math.round(loanAmt / months)
 
+  // Покрытие залога (для Смены залога)
+  const collateral_total = collaterals.reduce((s, c) => s + (c.value || 0), 0)
+  const existing_balance = n('existing_loan_balance')
+  const collateral_coverage_pct = existing_balance > 0 ? (collateral_total / existing_balance) * 100 : 0
+
   async function handleGenerate() {
-    if (!form.borrower_name || !form.loan_amount || !form.loan_purpose) {
-      setError('Заполните обязательные поля: Заёмщик, Сумма, Цель кредита'); return
+    if (!form.borrower_name || !form.loan_purpose) {
+      setError('Заполните обязательные поля: Заёмщик, Цель'); return
+    }
+    if (form.conclusion_type !== 'Смена залога' && !form.loan_amount) {
+      setError('Заполните сумму кредита'); return
     }
     setGenerating(true); setError(null)
     try {
+      // Получаем следующий номер заключения
+      const { data: maxData } = await supabase
+        .from('credit_conclusions')
+        .select('conclusion_number')
+        .order('conclusion_number', { ascending: false })
+        .limit(1)
+        .maybeSingle()
+      const conclusion_number = (maxData?.conclusion_number || 0) + 1
+
       const payload = {
-        ...form, collaterals,
+        ...form, collaterals, conclusion_type: form.conclusion_type,
+        existing_loan_balance: n('existing_loan_balance'),
         p1_gross, p2_gross, p1_op_profit, p2_op_profit,
         p1_ebt, p2_ebt, p1_net, p2_net,
         p1_total_assets, p2_total_assets,
         p1_total_liabilities: p1_total_liab, p2_total_liabilities: p2_total_liab,
         p1_cash_end, p2_cash_end, monthly_payment: monthlyPayment,
+        collateral_total, collateral_coverage_pct,
       }
       const res = await apiFetch('/api/credit-risk/generate', {
         method: 'POST',
@@ -244,12 +273,15 @@ export default function CreditRiskPage() {
       if (data.error) throw new Error(data.error)
 
       const { error: dbErr } = await supabase.from('credit_conclusions').insert({
+        conclusion_number,
+        conclusion_type: form.conclusion_type || 'Одобрение кредитной линии',
         borrower_name: form.borrower_name, borrower_inn: form.borrower_inn,
         business_type: form.business_type, sector: form.sector || null, years_in_business: n('years_in_business'),
         loan_amount: n('loan_amount'), loan_currency: form.loan_currency,
         loan_term: `${form.loan_term_months} мес.`, loan_term_months: n('loan_term_months'),
         interest_rate: n('interest_rate'), loan_purpose: form.loan_purpose,
         credit_history: form.credit_history, analyst_name: form.analyst_name,
+        existing_loan_balance: n('existing_loan_balance'),
         p1_label: form.p1_label || 'Период 1', p2_label: form.p2_label || 'Период 2',
         // Баланс
         p1_cash: n('p1_cash'), p1_receivables: n('p1_receivables'), p1_inventory: n('p1_inventory'),
@@ -278,7 +310,8 @@ export default function CreditRiskPage() {
         recommendation: data.recommendation, risk_level: data.risk_level,
       })
       if (dbErr) throw new Error(dbErr.message)
-      // ✅ Автоматически создать запись в реестре заёмщиков
+
+      // Автоматически создать запись в реестре заёмщиков
       const { data: existingBorrower } = await supabase.from('borrowers').select('id').eq('code', form.borrower_name).single()
       if (!existingBorrower) {
         await supabase.from('borrowers').insert({ code: form.borrower_name })
@@ -292,32 +325,35 @@ export default function CreditRiskPage() {
   }
 
   async function handleExtract() {
-    if (!imageFile) return
+    if (imageFiles.length === 0) return
     setExtracting(true); setExtractMsg(null)
     try {
-      const base64 = await new Promise<string>((resolve, reject) => {
-        const reader = new FileReader()
-        reader.onload = e => resolve((e.target?.result as string).split(',')[1])
-        reader.onerror = reject
-        reader.readAsDataURL(imageFile)
-      })
-      const res = await apiFetch('/api/extract-from-image', {
-        method: 'POST',
-        body: JSON.stringify({ imageBase64: base64, mimeType: imageFile.type, module: 'credit' }),
-      })
-      const data = await res.json()
-      if (data.error) throw new Error(data.error)
-      const STRING_KEYS = ['p1_label', 'p2_label']
-      const extracted: Record<string, string> = {}
-      for (const [k, v] of Object.entries(data.data)) {
-        if (v !== null && v !== undefined && v !== 0) {
-          extracted[k] = STRING_KEYS.includes(k) ? String(v) : String(Math.round(Number(v)))
+      let merged: Record<string, string> = {}
+      for (let i = 0; i < imageFiles.length; i++) {
+        const file = imageFiles[i]
+        const base64 = await new Promise<string>((resolve, reject) => {
+          const reader = new FileReader()
+          reader.onload = e => resolve((e.target?.result as string).split(',')[1])
+          reader.onerror = reject
+          reader.readAsDataURL(file)
+        })
+        const res = await apiFetch('/api/extract-from-image', {
+          method: 'POST',
+          body: JSON.stringify({ imageBase64: base64, mimeType: file.type, module: 'credit' }),
+        })
+        const data = await res.json()
+        if (data.error) throw new Error(`Файл ${i + 1}: ${data.error}`)
+        const STRING_KEYS = ['p1_label', 'p2_label']
+        for (const [k, v] of Object.entries(data.data)) {
+          if (v !== null && v !== undefined && v !== 0) {
+            merged[k] = STRING_KEYS.includes(k) ? String(v) : String(Math.round(Number(v)))
+          }
         }
       }
-      setForm(prev => ({ ...prev, ...extracted }))
+      setForm(prev => ({ ...prev, ...merged }))
       setInputMode('manual')
-      setImageFile(null)
-      setExtractMsg('Данные извлечены из скриншота. Проверьте и при необходимости исправьте.')
+      setImageFiles([])
+      setExtractMsg(`Данные извлечены из ${imageFiles.length > 1 ? `${imageFiles.length} скриншотов` : 'скриншота'}. Проверьте и при необходимости исправьте.`)
     } catch (err: unknown) {
       setExtractMsg('Ошибка: ' + (err instanceof Error ? err.message : String(err)))
     } finally { setExtracting(false) }
@@ -349,6 +385,8 @@ export default function CreditRiskPage() {
   const inp = "w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#1B8A4C] bg-white"
   const lbl = "block text-xs font-medium text-gray-600 mb-1"
 
+  const isCollateralChange = form.conclusion_type === 'Смена залога'
+
   return (
     <div className="max-w-6xl mx-auto">
       <div className="sticky top-0 z-20 -mx-6 lg:-mx-8 px-6 lg:px-8 pt-5 pb-4 bg-[#F5F8F6]" style={{boxShadow: '0 2px 12px rgba(0,0,0,0.06)'}}>
@@ -357,7 +395,7 @@ export default function CreditRiskPage() {
             <h1 className="text-xl font-semibold text-gray-900">Кредитный риск — AI-заключения</h1>
             <p className="text-sm text-gray-500 mt-0.5">Анализ заёмщиков МСБ с помощью искусственного интеллекта</p>
           </div>
-          <button onClick={() => { setForm(EMPTY); setCollaterals([{type:'Недвижимость',description:'',value:0}]); setTab(1); setInputMode('manual'); setImageFile(null); setExtractMsg(null); setShowModal(true) }}
+          <button onClick={() => { setForm(EMPTY); setCollaterals([{type:'Недвижимость',description:'',value:0}]); setTab(1); setInputMode('manual'); setImageFiles([]); setExtractMsg(null); setShowModal(true) }}
             className="flex items-center gap-2 px-4 py-2 bg-[#1B8A4C] text-white rounded-lg text-sm font-medium hover:bg-[#177040]">
             <Plus className="w-4 h-4" /> Новое заключение
           </button>
@@ -405,19 +443,26 @@ export default function CreditRiskPage() {
         <table className="w-full text-sm">
           <thead>
             <tr className="bg-gray-50 border-b border-gray-100">
-              {['Заёмщик','Сумма','Цель','Риск','Рекомендация','Дата',''].map(h => (
+              {['№','Заёмщик','Тип','Сумма','Риск','Рекомендация','Дата',''].map(h => (
                 <th key={h} className="text-left px-4 py-3 text-xs font-medium text-gray-500 uppercase">{h}</th>
               ))}
             </tr>
           </thead>
           <tbody className="divide-y divide-gray-50">
-            {loading ? <tr><td colSpan={7} className="text-center py-12 text-gray-400">Загрузка...</td></tr>
-              : conclusions.length === 0 ? <tr><td colSpan={7} className="text-center py-12 text-gray-400"><FileText className="w-8 h-8 mx-auto mb-2 opacity-30" /><p>Нет заключений</p></td></tr>
+            {loading ? <tr><td colSpan={8} className="text-center py-12 text-gray-400">Загрузка...</td></tr>
+              : conclusions.length === 0 ? <tr><td colSpan={8} className="text-center py-12 text-gray-400"><FileText className="w-8 h-8 mx-auto mb-2 opacity-30" /><p>Нет заключений</p></td></tr>
               : conclusions.map(c => (
                 <tr key={c.id} className="hover:bg-gray-50">
+                  <td className="px-4 py-3 text-xs font-mono text-gray-500 whitespace-nowrap">
+                    №{c.conclusion_number || '—'}
+                  </td>
                   <td className="px-4 py-3"><p className="font-medium text-gray-900">{c.borrower_name}</p>{c.borrower_inn && <p className="text-xs text-gray-400">ИНН: {c.borrower_inn}</p>}</td>
+                  <td className="px-4 py-3">
+                    <span className={`inline-flex px-2 py-0.5 rounded-full text-xs font-medium whitespace-nowrap ${TYPE_COLORS[c.conclusion_type] || 'bg-gray-100 text-gray-700'}`}>
+                      {TYPE_SHORT[c.conclusion_type] || c.conclusion_type || 'Одобрение'}
+                    </span>
+                  </td>
                   <td className="px-4 py-3 font-medium whitespace-nowrap">{fmt(c.loan_amount)} {c.loan_currency}</td>
-                  <td className="px-4 py-3 text-gray-600 max-w-[140px] truncate">{c.loan_purpose}</td>
                   <td className="px-4 py-3"><span className={`inline-flex px-2 py-0.5 rounded-full text-xs font-medium ${riskColor(c.risk_level)}`}>{c.risk_level}</span></td>
                   <td className="px-4 py-3"><span className={`text-sm font-medium ${recColor(c.recommendation)}`}>{c.recommendation}</span></td>
                   <td className="px-4 py-3 text-gray-500 text-xs whitespace-nowrap">{new Date(c.created_at).toLocaleDateString('ru-RU')}</td>
@@ -440,7 +485,15 @@ export default function CreditRiskPage() {
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50">
           <div className="bg-white rounded-2xl shadow-2xl w-full max-w-3xl max-h-[90vh] flex flex-col">
             <div className="flex items-center justify-between p-6 border-b border-gray-100">
-              <h2 className="text-lg font-semibold">Заключение: {viewing.borrower_name}</h2>
+              <div>
+                <div className="flex items-center gap-2 mb-1">
+                  <span className="text-xs font-mono text-gray-400">№{viewing.conclusion_number || '—'}</span>
+                  <span className={`inline-flex px-2 py-0.5 rounded-full text-xs font-medium ${TYPE_COLORS[viewing.conclusion_type] || 'bg-gray-100 text-gray-700'}`}>
+                    {viewing.conclusion_type || 'Одобрение кредитной линии'}
+                  </span>
+                </div>
+                <h2 className="text-lg font-semibold">Заключение: {viewing.borrower_name}</h2>
+              </div>
               <button onClick={() => setViewing(null)}><X className="w-5 h-5 text-gray-400" /></button>
             </div>
             <div className="flex-1 overflow-y-auto p-6 space-y-4">
@@ -452,6 +505,7 @@ export default function CreditRiskPage() {
                   ['Выручка П1', `${fmt(viewing.p1_revenue)} TJS`], ['Выручка П2', `${fmt(viewing.p2_revenue)} TJS`],
                   ['Прибыль П1', `${fmt(viewing.p1_net_profit)} TJS`], ['Прибыль П2', `${fmt(viewing.p2_net_profit)} TJS`],
                   ['Уровень риска', viewing.risk_level || '—'], ['Аналитик', viewing.analyst_name || '—'],
+                  ...(viewing.existing_loan_balance ? [['Остаток кредита', `${fmt(viewing.existing_loan_balance)} TJS`]] : []),
                 ].map(([l, v]) => <div key={l}><p className="text-xs text-gray-500">{l}</p><p className="text-sm font-medium text-gray-900 mt-0.5">{v}</p></div>)}
               </div>
               <div><p className="text-xs font-semibold text-gray-700 uppercase tracking-wide mb-2">AI Заключение</p>
@@ -477,7 +531,14 @@ export default function CreditRiskPage() {
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50">
           <div className="bg-white rounded-2xl shadow-2xl w-full max-w-4xl max-h-[95vh] flex flex-col">
             <div className="flex items-center justify-between p-5 border-b border-gray-100">
-              <h2 className="text-base font-semibold text-gray-900">Заключение о кредитоспособности МСБ</h2>
+              <div>
+                <h2 className="text-base font-semibold text-gray-900">Заключение о кредитоспособности МСБ</h2>
+                {form.conclusion_type && (
+                  <span className={`inline-flex mt-1 px-2 py-0.5 rounded-full text-xs font-medium ${TYPE_COLORS[form.conclusion_type] || 'bg-gray-100 text-gray-700'}`}>
+                    {form.conclusion_type}
+                  </span>
+                )}
+              </div>
               <button onClick={() => { setShowModal(false); setForm(EMPTY) }} className="text-gray-400 hover:text-gray-600"><X className="w-5 h-5" /></button>
             </div>
 
@@ -509,25 +570,36 @@ export default function CreditRiskPage() {
               {/* Image upload zone */}
               {inputMode === 'image' && (
                 <div className="space-y-4">
-                  <p className="text-sm text-gray-600">Загрузите скриншот финансовой отчётности — баланс, ОПУ или кеш-флоу. AI извлечёт данные и заполнит форму автоматически.</p>
+                  <p className="text-sm text-gray-600">Загрузите один или несколько скриншотов финансовой отчётности — баланс, ОПУ, кеш-флоу. AI извлечёт данные из всех изображений и заполнит форму.</p>
                   <label className="block cursor-pointer">
-                    <div className={`border-2 border-dashed rounded-xl p-10 text-center transition-colors ${imageFile ? 'border-[#1B8A4C] bg-green-50' : 'border-gray-200 hover:border-[#1B8A4C] hover:bg-gray-50'}`}>
-                      {imageFile ? (
-                        <div className="space-y-2">
+                    <div className={`border-2 border-dashed rounded-xl p-8 text-center transition-colors ${imageFiles.length > 0 ? 'border-[#1B8A4C] bg-green-50' : 'border-gray-200 hover:border-[#1B8A4C] hover:bg-gray-50'}`}>
+                      {imageFiles.length > 0 ? (
+                        <div className="space-y-3">
                           <CheckCircle2 className="w-10 h-10 text-green-500 mx-auto" />
-                          <p className="text-sm font-medium text-gray-800">{imageFile.name}</p>
-                          <p className="text-xs text-gray-400">{(imageFile.size / 1024).toFixed(0)} KB · Готово к извлечению</p>
+                          <p className="text-sm font-medium text-gray-800">
+                            {imageFiles.length === 1 ? imageFiles[0].name : `${imageFiles.length} файла выбрано`}
+                          </p>
+                          <div className="flex flex-wrap gap-2 justify-center">
+                            {imageFiles.map((f, i) => (
+                              <span key={i} className="inline-flex items-center gap-1 px-2 py-1 bg-white border border-green-200 rounded-lg text-xs text-gray-600">
+                                <FileText className="w-3 h-3 text-green-500" />
+                                {f.name.length > 20 ? f.name.slice(0, 17) + '…' : f.name}
+                                <span className="text-gray-400">({(f.size / 1024).toFixed(0)}KB)</span>
+                              </span>
+                            ))}
+                          </div>
+                          <p className="text-xs text-gray-400">Нажмите чтобы изменить выбор</p>
                         </div>
                       ) : (
                         <div className="space-y-2">
                           <Upload className="w-10 h-10 text-gray-300 mx-auto" />
-                          <p className="text-sm font-medium text-gray-500">Нажмите или перетащите файл</p>
-                          <p className="text-xs text-gray-400">PNG, JPG, WEBP · до 5 МБ</p>
+                          <p className="text-sm font-medium text-gray-500">Нажмите или перетащите файлы</p>
+                          <p className="text-xs text-gray-400">PNG, JPG, WEBP · до 5 МБ каждый · можно выбрать несколько</p>
                         </div>
                       )}
                     </div>
-                    <input type="file" accept="image/png,image/jpeg,image/webp" className="hidden"
-                      onChange={e => { setImageFile(e.target.files?.[0] || null); setExtractMsg(null) }} />
+                    <input type="file" accept="image/png,image/jpeg,image/webp" multiple className="hidden"
+                      onChange={e => { setImageFiles(Array.from(e.target.files || [])); setExtractMsg(null) }} />
                   </label>
                   {extractMsg && (
                     <div className="flex items-center gap-2 p-3 bg-red-50 border border-red-100 rounded-lg">
@@ -552,6 +624,24 @@ export default function CreditRiskPage() {
               {/* Tab 1: Заёмщик */}
               {tab === 1 && (
                 <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+                  {/* Тип заключения — первым делом */}
+                  <div className="lg:col-span-2">
+                    <label className={lbl}>Тип заключения *</label>
+                    <div className="flex gap-2 flex-wrap">
+                      {CONCLUSION_TYPES.map(t => (
+                        <button key={t} type="button"
+                          onClick={() => setF('conclusion_type', t)}
+                          className={`px-3 py-2 rounded-lg text-sm font-medium border transition-colors ${
+                            form.conclusion_type === t
+                              ? 'border-[#1B8A4C] bg-[#1B8A4C] text-white'
+                              : 'border-gray-200 text-gray-600 hover:border-[#1B8A4C] hover:text-[#1B8A4C]'
+                          }`}>
+                          {t}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+
                   <div><label className={lbl}>Код заёмщика *</label>
                     <input type="text" value={form.borrower_name} onChange={e => setF('borrower_name', e.target.value)} placeholder="Заёмщик-001" className={inp} />
                     <p className="text-xs text-gray-400 mt-1">Используйте код вместо реального имени (напр. Заёмщик-001)</p>
@@ -565,25 +655,43 @@ export default function CreditRiskPage() {
                   </div>
                   <div><label className={lbl}>Вид деятельности (детально)</label><input type="text" value={form.business_type} onChange={e => setF('business_type', e.target.value)} placeholder="Торговля стройматериалами..." className={inp} /></div>
                   <div><label className={lbl}>Лет в бизнесе</label><input type="text" inputMode="numeric" value={form.years_in_business} onChange={e => setF('years_in_business', e.target.value.replace(/\D/g,''))} className={inp} /></div>
-                  <div><label className={lbl}>Сумма кредита *</label>
-                    <input type="text" inputMode="numeric"
-                      value={form.loan_amount ? new Intl.NumberFormat('ru-RU').format(Number(form.loan_amount)) : ''}
-                      onChange={e => setF('loan_amount', e.target.value.replace(/[^0-9]/g,''))}
-                      placeholder="0" className={inp} />
-                  </div>
-                  <div><label className={lbl}>Валюта</label><select value={form.loan_currency} onChange={e => setF('loan_currency', e.target.value)} className={inp}>{CURRENCIES.map(c => <option key={c}>{c}</option>)}</select></div>
-                  <div><label className={lbl}>Срок кредита (месяцев)</label><input type="text" inputMode="numeric" value={form.loan_term_months} onChange={e => setF('loan_term_months', e.target.value.replace(/\D/g,''))} placeholder="12" className={inp} /></div>
-                  <div><label className={lbl}>Процентная ставка (% годовых)</label><input type="text" inputMode="decimal" value={form.interest_rate} onChange={e => setF('interest_rate', e.target.value.replace(/[^0-9.]/g,''))} placeholder="24" className={inp} /></div>
-                  {form.loan_amount && form.loan_term_months && (
-                    <div className="lg:col-span-2 bg-blue-50 border border-blue-100 rounded-lg p-3 flex items-center justify-between">
-                      <p className="text-xs text-gray-600">Ежемесячное погашение (аннуитет):</p>
-                      <p className="text-base font-bold text-[#1B8A4C]">{new Intl.NumberFormat('ru-RU').format(monthlyPayment)} {form.loan_currency}/мес</p>
+
+                  {/* Для Смены залога — остаток по действующему кредиту */}
+                  {isCollateralChange ? (
+                    <div>
+                      <label className={lbl}>Остаток по действующему кредиту (TJS) *</label>
+                      <input type="text" inputMode="numeric"
+                        value={form.existing_loan_balance ? new Intl.NumberFormat('ru-RU').format(Number(form.existing_loan_balance)) : ''}
+                        onChange={e => setF('existing_loan_balance', e.target.value.replace(/[^0-9]/g,''))}
+                        placeholder="0" className={inp} />
+                      <p className="text-xs text-gray-400 mt-1">Текущий долг заёмщика перед банком</p>
+                    </div>
+                  ) : (
+                    <div><label className={lbl}>Сумма кредита *</label>
+                      <input type="text" inputMode="numeric"
+                        value={form.loan_amount ? new Intl.NumberFormat('ru-RU').format(Number(form.loan_amount)) : ''}
+                        onChange={e => setF('loan_amount', e.target.value.replace(/[^0-9]/g,''))}
+                        placeholder="0" className={inp} />
                     </div>
                   )}
+
+                  <div><label className={lbl}>Валюта</label><select value={form.loan_currency} onChange={e => setF('loan_currency', e.target.value)} className={inp}>{CURRENCIES.map(c => <option key={c}>{c}</option>)}</select></div>
+
+                  {!isCollateralChange && <>
+                    <div><label className={lbl}>Срок кредита (месяцев)</label><input type="text" inputMode="numeric" value={form.loan_term_months} onChange={e => setF('loan_term_months', e.target.value.replace(/\D/g,''))} placeholder="12" className={inp} /></div>
+                    <div><label className={lbl}>Процентная ставка (% годовых)</label><input type="text" inputMode="decimal" value={form.interest_rate} onChange={e => setF('interest_rate', e.target.value.replace(/[^0-9.]/g,''))} placeholder="24" className={inp} /></div>
+                    {form.loan_amount && form.loan_term_months && (
+                      <div className="lg:col-span-2 bg-blue-50 border border-blue-100 rounded-lg p-3 flex items-center justify-between">
+                        <p className="text-xs text-gray-600">Ежемесячное погашение (аннуитет):</p>
+                        <p className="text-base font-bold text-[#1B8A4C]">{new Intl.NumberFormat('ru-RU').format(monthlyPayment)} {form.loan_currency}/мес</p>
+                      </div>
+                    )}
+                  </>}
+
                   <div><label className={lbl}>Аналитик</label><input type="text" value={form.analyst_name} onChange={e => setF('analyst_name', e.target.value)} placeholder="ФИО" className={inp} /></div>
                   <div><label className={lbl}>Название периода 1 (напр. 31.12.2024)</label><input type="text" value={form.p1_label} onChange={e => setF('p1_label', e.target.value)} placeholder="31.12.2024" className={inp} /></div>
                   <div><label className={lbl}>Название периода 2 (напр. 31.03.2025)</label><input type="text" value={form.p2_label} onChange={e => setF('p2_label', e.target.value)} placeholder="31.03.2025" className={inp} /></div>
-                  <div className="lg:col-span-2"><label className={lbl}>Цель кредита *</label><textarea value={form.loan_purpose} onChange={e => setF('loan_purpose', e.target.value)} rows={2} placeholder="Пополнение оборотных средств..." className={inp + ' resize-none'} /></div>
+                  <div className="lg:col-span-2"><label className={lbl}>{isCollateralChange ? 'Причина смены залога *' : 'Цель кредита *'}</label><textarea value={form.loan_purpose} onChange={e => setF('loan_purpose', e.target.value)} rows={2} placeholder={isCollateralChange ? 'Причина замены предмета залога...' : 'Пополнение оборотных средств...'} className={inp + ' resize-none'} /></div>
                 </div>
               )}
 
@@ -611,7 +719,6 @@ export default function CreditRiskPage() {
                     <FR label="Итого капитал" bold auto v1={p1_total_equity} v2={p2_total_equity} formData={form} setF={setF} />
                     <FR label="ИТОГО ПАССИВ" bold auto v1={p1_total_passiv} v2={p2_total_passiv} formData={form} setF={setF} />
                   </FT>
-                  {/* Balance check */}
                   {(p1_total_assets > 0 || p2_total_assets > 0) && (
                     <div className="grid grid-cols-2 gap-3">
                       {[{period: p1, diff: p1_balance_diff, assets: p1_total_assets},{period: p2, diff: p2_balance_diff, assets: p2_total_assets}].map(({period, diff, assets}) => assets > 0 && (
@@ -661,6 +768,38 @@ export default function CreditRiskPage() {
               {/* Tab 5: Залог */}
               {tab === 5 && (
                 <div className="space-y-3">
+                  {/* Покрытие залога — только для Смены залога */}
+                  {isCollateralChange && existing_balance > 0 && (
+                    <div className={`p-4 rounded-xl border-2 flex items-center justify-between ${
+                      collateral_coverage_pct >= 150 ? 'bg-green-50 border-green-300' :
+                      collateral_coverage_pct >= 100 ? 'bg-yellow-50 border-yellow-300' :
+                      'bg-red-50 border-red-300'
+                    }`}>
+                      <div>
+                        <p className="text-xs font-semibold text-gray-600 uppercase tracking-wide">Уровень покрытия залога</p>
+                        <p className="text-xs text-gray-500 mt-0.5">
+                          Залог {fmt(collateral_total)} TJS / Остаток кредита {fmt(existing_balance)} TJS
+                        </p>
+                      </div>
+                      <div className="text-right">
+                        <p className={`text-2xl font-bold ${
+                          collateral_coverage_pct >= 150 ? 'text-green-700' :
+                          collateral_coverage_pct >= 100 ? 'text-yellow-700' : 'text-red-700'
+                        }`}>
+                          {collateral_coverage_pct.toFixed(1)}%
+                        </p>
+                        <p className={`text-xs font-medium mt-0.5 ${
+                          collateral_coverage_pct >= 150 ? 'text-green-600' :
+                          collateral_coverage_pct >= 100 ? 'text-yellow-600' : 'text-red-600'
+                        }`}>
+                          {collateral_coverage_pct >= 150 ? '✅ Достаточно (норма ≥150%)' :
+                           collateral_coverage_pct >= 100 ? '⚠️ Допустимо (рекомендуется ≥150%)' :
+                           '❌ Недостаточно (менее 100%)'}
+                        </p>
+                      </div>
+                    </div>
+                  )}
+
                   {collaterals.map((col, idx) => (
                     <div key={idx} className="p-4 border border-gray-200 rounded-xl space-y-3">
                       <div className="flex items-center justify-between">
@@ -688,7 +827,7 @@ export default function CreditRiskPage() {
                   </button>
                   <div className="bg-gray-50 rounded-lg p-3 flex items-center justify-between">
                     <p className="text-xs text-gray-500">Общая стоимость залога</p>
-                    <p className="text-base font-bold text-gray-900">{fmt(collaterals.reduce((s,c) => s+(c.value||0), 0))} TJS</p>
+                    <p className="text-base font-bold text-gray-900">{fmt(collateral_total)} TJS</p>
                   </div>
 
                   {/* Поручители */}
@@ -733,11 +872,13 @@ export default function CreditRiskPage() {
                 <>
                   <div />
                   <div className="flex gap-2">
-                    <button onClick={() => { setShowModal(false); setForm(EMPTY); setInputMode('manual'); setImageFile(null); setExtractMsg(null) }}
+                    <button onClick={() => { setShowModal(false); setForm(EMPTY); setInputMode('manual'); setImageFiles([]); setExtractMsg(null) }}
                       className="px-4 py-2 border border-gray-200 rounded-lg text-sm text-gray-600 hover:bg-gray-50">Отмена</button>
-                    <button onClick={handleExtract} disabled={!imageFile || extracting}
+                    <button onClick={handleExtract} disabled={imageFiles.length === 0 || extracting}
                       className="flex items-center gap-2 px-4 py-2 bg-[#1B8A4C] text-white rounded-lg text-sm font-medium hover:bg-[#177040] disabled:opacity-50">
-                      {extracting ? <><Loader2 className="w-4 h-4 animate-spin" /> Извлечение...</> : <><Upload className="w-4 h-4" /> Извлечь данные</>}
+                      {extracting
+                        ? <><Loader2 className="w-4 h-4 animate-spin" /> Извлечение...</>
+                        : <><Upload className="w-4 h-4" /> Извлечь данные{imageFiles.length > 1 ? ` (${imageFiles.length})` : ''}</>}
                     </button>
                   </div>
                 </>
@@ -745,7 +886,7 @@ export default function CreditRiskPage() {
                 <>
                   <div>{tab > 1 && <button onClick={() => setTab(tab-1)} className="px-4 py-2 border border-gray-200 rounded-lg text-sm text-gray-600 hover:bg-gray-50">← Назад</button>}</div>
                   <div className="flex gap-2">
-                    <button onClick={() => { setShowModal(false); setForm(EMPTY); setInputMode('manual'); setImageFile(null); setExtractMsg(null) }}
+                    <button onClick={() => { setShowModal(false); setForm(EMPTY); setInputMode('manual'); setImageFiles([]); setExtractMsg(null) }}
                       className="px-4 py-2 border border-gray-200 rounded-lg text-sm text-gray-600 hover:bg-gray-50">Отмена</button>
                     {tab < 5
                       ? <button onClick={() => setTab(tab+1)} className="px-4 py-2 bg-[#1B8A4C] text-white rounded-lg text-sm font-medium hover:bg-[#177040]">Далее →</button>

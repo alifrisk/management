@@ -41,10 +41,13 @@ export async function POST(request: Request) {
     const p1_op_cf   = Number(fd.p1_op_inflow || 0) - Number(fd.p1_op_outflow || 0)
     const p2_op_cf   = Number(fd.p2_op_inflow || 0) - Number(fd.p2_op_outflow || 0)
 
-    const monthly_payment  = Number(fd.monthly_payment || 0)
-    const annual_payment   = monthly_payment * 12
-    const loan_amount      = Number(fd.loan_amount || 0)
-    const collateral_total = (fd.collaterals || []).reduce((s: number, c: {value: number}) => s + (c.value || 0), 0)
+    const monthly_payment   = Number(fd.monthly_payment || 0)
+    const annual_payment    = monthly_payment * 12
+    const loan_amount       = Number(fd.loan_amount || 0)
+    const collateral_total  = (fd.collaterals || []).reduce((s: number, c: {value: number}) => s + (c.value || 0), 0)
+    const conclusion_type   = fd.conclusion_type || 'Одобрение кредитной линии'
+    const existing_balance  = Number(fd.existing_loan_balance || 0)
+    const is_collateral_change = conclusion_type === 'Смена залога'
 
     // ── Pre-calculated ratios ──────────────────────────────────────────────────
     // 1. Текущая ликвидность = Ликвидные активы / Обязательства (≥1.5 — норма для МСБ)
@@ -79,9 +82,14 @@ export async function POST(request: Request) {
     const collateral_coverage = div(collateral_total, loan_amount) * 100
 
     // ✅ Безопасность: AI не видит имя и ИНН заёмщика
+    const collateral_coverage_existing = is_collateral_change && existing_balance > 0
+      ? (collateral_total / existing_balance) * 100 : 0
+
     const prompt = `Ты старший кредитный риск-аналитик банка Алиф Банк (Таджикистон) с 15-летним опытом.
 
-Твоя задача: дать КОНКРЕТНОЕ заключение с рекомендацией — одобрить или отклонить кредит. Ты ОБЯЗАН дать рекомендацию даже если данных мало — на основе того что есть.
+ВИД ЗАКЛЮЧЕНИЯ: ${conclusion_type}
+${is_collateral_change ? '⚠️ Это заключение о СМЕНЕ ЗАЛОГА по действующему кредиту. Основной анализ — достаточность и качество нового залога.' : 'Твоя задача: дать КОНКРЕТНОЕ заключение с рекомендацией — одобрить или отклонить кредит.'}
+Ты ОБЯЗАН дать рекомендацию даже если данных мало — на основе того что есть.
 
 ВАЖНО: все финансовые коэффициенты уже рассчитаны системой — используй ТОЛЬКО эти значения, не пересчитывай самостоятельно.
 
@@ -90,11 +98,14 @@ export async function POST(request: Request) {
 Вид деятельности: ${fd.business_type || 'не указан'}
 Лет в бизнесе: ${fd.years_in_business || 'не указано'}
 Кредитная история: ${fd.credit_history}
-Сумма кредита: ${f(fd.loan_amount)} ${fd.loan_currency}
+${is_collateral_change
+  ? `Остаток по действующему кредиту: ${f(existing_balance)} ${fd.loan_currency}
+Причина смены залога: ${fd.loan_purpose}`
+  : `Сумма кредита: ${f(fd.loan_amount)} ${fd.loan_currency}
 Срок: ${fd.loan_term_months || '—'} мес.
 Процентная ставка: ${fd.interest_rate || '—'}% годовых
 Ежемесячное погашение: ${f(monthly_payment)} TJS
-Цель: ${fd.loan_purpose}
+Цель: ${fd.loan_purpose}`}
 
 ═══ БАЛАНС (${fd.p1_label || 'П1'} → ${fd.p2_label || 'П2'}) ═══
 Ликвидные активы (Деньги + Дебиторка + ТМЗ): ${f(p1_liquid)} → ${f(p2_liquid)}${trend(p1_liquid, p2_liquid)}
@@ -151,8 +162,16 @@ ${(fd.collaterals||[]).map((c: {type:string;description:string;value:number}, i:
    П1: ${f(p1_op_cf)} / ${f(annual_payment)} = ${annual_payment > 0 ? rat(p1_dsc) : 'н/д'} ${annual_payment > 0 ? (p1_dsc >= 1.2 ? '✓ норма' : p1_dsc >= 1.0 ? '⚠ допустимо' : '✗ недостаточно') : ''}
    П2: ${f(p2_op_cf)} / ${f(annual_payment)} = ${annual_payment > 0 ? rat(p2_dsc) : 'н/д'} ${annual_payment > 0 ? (p2_dsc >= 1.2 ? '✓ норма' : p2_dsc >= 1.0 ? '⚠ допустимо' : '✗ недостаточно') : ''}
 
-8. Обеспеченность залогом = Залог / Кредит × 100%
-   ${f(collateral_total)} / ${f(loan_amount)} × 100% = ${pct(collateral_coverage)} ${collateral_coverage >= 100 ? '✓ обеспечен' : '✗ недостаточно'}
+8. Обеспеченность залогом = Залог / ${is_collateral_change ? 'Остаток кредита' : 'Кредит'} × 100%
+   ${f(collateral_total)} / ${f(is_collateral_change ? existing_balance : loan_amount)} × 100% = ${pct(is_collateral_change ? collateral_coverage_existing : collateral_coverage)} ${(is_collateral_change ? collateral_coverage_existing : collateral_coverage) >= 150 ? '✓ достаточно (≥150%)' : (is_collateral_change ? collateral_coverage_existing : collateral_coverage) >= 100 ? '⚠ допустимо' : '✗ недостаточно'}
+
+${is_collateral_change ? `
+═══ ДОПОЛНИТЕЛЬНО ДЛЯ СМЕНЫ ЗАЛОГА ═══
+Остаток кредита: ${f(existing_balance)} ${fd.loan_currency}
+Новый залог: ${f(collateral_total)} TJS
+Покрытие: ${collateral_coverage_existing.toFixed(1)}% ${collateral_coverage_existing >= 150 ? '✓ норма' : collateral_coverage_existing >= 100 ? '⚠ допустимо' : '✗ недостаточно'}
+Норматив банка: ≥150%
+` : ''}
 
 Напиши краткое профессиональное заключение строго по этой структуре (не более 600 слов):
 
@@ -164,15 +183,23 @@ ${(fd.collaterals||[]).map((c: {type:string;description:string;value:number}, i:
 - Главные сильные стороны (1-2 пункта)
 - Главные слабые стороны (1-2 пункта)
 
-3. КОЭФФИЦИЕНТЫ И ОЦЕНКА (используй ТОЧНО рассчитанные значения выше)
-Раскрой каждый по шаблону: «[название] = [значение] — [оценка]»
-Обязательно: Текущая ликвидность, Абсолютная ликвидность, ROS, ROA, Автономия, DSC, Залог.
+3. ${is_collateral_change ? 'АНАЛИЗ ЗАЛОГОВОГО ПОКРЫТИЯ (это основной раздел для данного типа заключения)' : 'КОЭФФИЦИЕНТЫ И ОЦЕНКА (используй ТОЧНО рассчитанные значения выше)'}
+${is_collateral_change
+  ? `Раскрой:
+- Покрытие залогом: ${collateral_coverage_existing.toFixed(1)}% (норма ≥150%) — оценка достаточности
+- Качество залога: тип, ликвидность, риски обесценения
+- Сравнение с предыдущим залогом (если применимо)
+- Коэффициент текущей ликвидности, Рентабельность продаж, DSC`
+  : `Раскрой каждый по шаблону: «[название] = [значение] — [оценка]»
+Обязательно: Текущая ликвидность, Абсолютная ликвидность, ROS, ROA, Автономия, DSC, Залог.`}
 
 4. ОЦЕНКА РИСКОВ
 Ровно 3 риска. Каждый: название + 1 предложение обоснования + оценка (высокий/средний/низкий).
 
 5. РЕШЕНИЕ И ОБОСНОВАНИЕ
-Чёткий ответ: давать или не давать. 3-4 предложения с конкретными цифрами.
+${is_collateral_change
+  ? 'Чёткий ответ: одобрить смену залога или отклонить. 3-4 предложения с конкретными цифрами покрытия.'
+  : 'Чёткий ответ: давать или не давать. 3-4 предложения с конкретными цифрами.'}
 Если "Условно" — укажи конкретные условия.
 
 Завершить ТОЧНО так:

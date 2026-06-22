@@ -12,6 +12,8 @@ interface Borrower {
 }
 interface CreditConclusion {
   id: string
+  conclusion_number: number
+  conclusion_type: string
   borrower_name: string
   recommendation: string
   risk_level: string
@@ -31,7 +33,7 @@ export default function BorrowersPage() {
     setLoading(true)
     const [{ data: b }, { data: c }] = await Promise.all([
       supabase.from('borrowers').select('*').order('created_at', { ascending: false }),
-      supabase.from('credit_conclusions').select('id, borrower_name, recommendation, risk_level, loan_amount, loan_currency, created_at').order('created_at', { ascending: false }),
+      supabase.from('credit_conclusions').select('id, conclusion_number, conclusion_type, borrower_name, recommendation, risk_level, loan_amount, loan_currency, created_at').order('created_at', { ascending: false }),
     ])
     setBorrowers(b || [])
     setConclusions(c || [])
@@ -86,6 +88,16 @@ export default function BorrowersPage() {
   const getConclusions = (code: string) => conclusions.filter(c => c.borrower_name === code)
   const riskColor = (l: string) => l === 'Высокий' ? 'bg-red-100 text-red-800' : l === 'Средний' ? 'bg-yellow-100 text-yellow-800' : 'bg-green-100 text-green-800'
   const recColor = (r: string) => r?.includes('Отклонить') ? 'text-red-600' : r?.includes('Условно') ? 'text-yellow-600' : 'text-green-600'
+  const typeColor: Record<string, string> = {
+    'Одобрение кредитной линии': 'bg-blue-100 text-blue-700',
+    'Увеличение кредитной линии': 'bg-purple-100 text-purple-700',
+    'Смена залога': 'bg-orange-100 text-orange-700',
+  }
+  const typeShort: Record<string, string> = {
+    'Одобрение кредитной линии': 'Одобрение',
+    'Увеличение кредитной линии': 'Увеличение',
+    'Смена залога': 'Смена залога',
+  }
   const fmt = (v: number) => v ? new Intl.NumberFormat('ru-RU').format(Math.round(v)) : '—'
   const inp = "w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#1B8A4C] bg-white"
   return (
@@ -195,8 +207,14 @@ export default function BorrowersPage() {
                       <p className="text-xs font-medium text-gray-500 mb-2">Заключения ({bConclusions.length})</p>
                       <div className="space-y-2">
                         {bConclusions.map(c => (
-                          <div key={c.id} className="flex items-center justify-between p-2.5 bg-gray-50 rounded-lg">
-                            <div className="flex items-center gap-2">
+                          <div key={c.id} className="flex items-center justify-between p-2.5 bg-gray-50 rounded-lg gap-2 flex-wrap">
+                            <div className="flex items-center gap-2 flex-wrap">
+                              <span className="text-xs font-mono text-gray-400 min-w-[36px]">
+                                №{c.conclusion_number || '—'}
+                              </span>
+                              <span className={`text-xs px-1.5 py-0.5 rounded-full font-medium ${typeColor[c.conclusion_type] || 'bg-gray-100 text-gray-600'}`}>
+                                {typeShort[c.conclusion_type] || c.conclusion_type || 'Одобрение'}
+                              </span>
                               <span className={`text-xs font-medium ${recColor(c.recommendation)}`}>{c.recommendation}</span>
                               <span className={`text-xs px-1.5 py-0.5 rounded-full font-medium ${riskColor(c.risk_level)}`}>{c.risk_level}</span>
                             </div>
