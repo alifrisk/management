@@ -3,7 +3,7 @@
 import { useState, useEffect, useCallback } from 'react'
 import { supabase } from '@/supabase/client'
 import { apiFetch } from '@/lib/api-fetch'
-import { Plus, FileText, Download, Eye, Trash2, X, Loader2, CheckCircle2, AlertCircle, Filter, Upload } from 'lucide-react'
+import { Plus, FileText, Download, Eye, Trash2, X, Loader2, CheckCircle2, AlertCircle, Filter, Upload, Edit2 } from 'lucide-react'
 
 interface Collateral { type: string; description: string; value: number }
 
@@ -33,7 +33,9 @@ interface CreditConclusion {
   p1_fin_inflow: number; p1_fin_outflow: number; p1_inv_inflow: number; p1_inv_outflow: number; p1_cash_end: number
   p2_cash_begin: number; p2_op_inflow: number; p2_op_outflow: number
   p2_fin_inflow: number; p2_fin_outflow: number; p2_inv_inflow: number; p2_inv_outflow: number; p2_cash_end: number
+  sector?: string
   collaterals: Collateral[]
+  guarantors?: { name: string; inn: string; relation: string }[]
   ai_conclusion: string; recommendation: string; risk_level: string; created_at: string
 }
 
@@ -164,6 +166,8 @@ export default function CreditRiskPage() {
   const [generating, setGenerating] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [viewing, setViewing] = useState<CreditConclusion | null>(null)
+  const [editingId, setEditingId] = useState<string | null>(null)
+  const [editingNumber, setEditingNumber] = useState<number | null>(null)
   const [tab, setTab] = useState(1)
   const [filterYear, setFilterYear] = useState('')
   const [filterMonth, setFilterMonth] = useState('')
@@ -237,6 +241,76 @@ export default function CreditRiskPage() {
   const existing_balance = n('existing_loan_balance')
   const collateral_coverage_pct = existing_balance > 0 ? (collateral_total / existing_balance) * 100 : 0
 
+  function handleEdit(c: CreditConclusion) {
+    // 0 → '' so empty inputs look blank, not "0"
+    const s = (v: number | null | undefined) => (v != null && v !== 0) ? String(Math.round(v)) : ''
+    setForm({
+      conclusion_type: c.conclusion_type || 'Одобрение кредитной линии',
+      existing_loan_balance: s(c.existing_loan_balance),
+      borrower_name: c.borrower_name || '',
+      borrower_inn: c.borrower_inn || '',
+      business_type: c.business_type || '',
+      sector: c.sector || '',
+      years_in_business: s(c.years_in_business),
+      loan_amount: s(c.loan_amount),
+      loan_currency: c.loan_currency || 'TJS',
+      loan_term_months: s(c.loan_term_months),
+      interest_rate: c.interest_rate ? String(c.interest_rate) : '',
+      loan_purpose: c.loan_purpose || '',
+      credit_history: c.credit_history || 'Положительная',
+      analyst_name: c.analyst_name || '',
+      p1_label: c.p1_label || '',
+      p2_label: c.p2_label || '',
+      // Баланс
+      p1_cash: s(c.p1_cash), p1_receivables: s(c.p1_receivables), p1_inventory: s(c.p1_inventory),
+      p1_fixed_assets: s(c.p1_fixed_assets), p1_other_assets: s(c.p1_other_assets),
+      p1_supplier_debt: s(c.p1_supplier_debt), p1_bank_debt: s(c.p1_bank_debt), p1_other_liabilities: s(c.p1_other_liabilities),
+      p1_equity_capital: s(c.p1_equity_capital), p1_reserves: s(c.p1_reserves), p1_retained_earnings: s(c.p1_retained_earnings),
+      p2_cash: s(c.p2_cash), p2_receivables: s(c.p2_receivables), p2_inventory: s(c.p2_inventory),
+      p2_fixed_assets: s(c.p2_fixed_assets), p2_other_assets: s(c.p2_other_assets),
+      p2_supplier_debt: s(c.p2_supplier_debt), p2_bank_debt: s(c.p2_bank_debt), p2_other_liabilities: s(c.p2_other_liabilities),
+      p2_equity_capital: s(c.p2_equity_capital), p2_reserves: s(c.p2_reserves), p2_retained_earnings: s(c.p2_retained_earnings),
+      // ОПУ
+      p1_revenue: s(c.p1_revenue), p1_cogs: s(c.p1_cogs),
+      p1_sales_expense: s(c.p1_sales_expense), p1_admin_expense: s(c.p1_admin_expense),
+      p1_other_op_income: s(c.p1_other_op_income), p1_non_op: s(c.p1_non_op), p1_tax: s(c.p1_tax),
+      p2_revenue: s(c.p2_revenue), p2_cogs: s(c.p2_cogs),
+      p2_sales_expense: s(c.p2_sales_expense), p2_admin_expense: s(c.p2_admin_expense),
+      p2_other_op_income: s(c.p2_other_op_income), p2_non_op: s(c.p2_non_op), p2_tax: s(c.p2_tax),
+      // КешФлоу
+      p1_cash_begin: s(c.p1_cash_begin), p1_op_inflow: s(c.p1_op_inflow), p1_op_outflow: s(c.p1_op_outflow),
+      p1_fin_inflow: s(c.p1_fin_inflow), p1_fin_outflow: s(c.p1_fin_outflow),
+      p1_inv_inflow: s(c.p1_inv_inflow), p1_inv_outflow: s(c.p1_inv_outflow),
+      p2_cash_begin: s(c.p2_cash_begin), p2_op_inflow: s(c.p2_op_inflow), p2_op_outflow: s(c.p2_op_outflow),
+      p2_fin_inflow: s(c.p2_fin_inflow), p2_fin_outflow: s(c.p2_fin_outflow),
+      p2_inv_inflow: s(c.p2_inv_inflow), p2_inv_outflow: s(c.p2_inv_outflow),
+    })
+    setCollaterals(c.collaterals?.length ? c.collaterals : [{ type: 'Недвижимость', description: '', value: 0 }])
+    setGuarantors(c.guarantors || [])
+    setEditingId(c.id)
+    setEditingNumber(c.conclusion_number || null)
+    setTab(1)
+    setInputMode('manual')
+    setImageFiles([])
+    setExtractMsg(null)
+    setError(null)
+    setShowModal(true)
+  }
+
+  function closeModal() {
+    setShowModal(false)
+    setForm(EMPTY)
+    setCollaterals([{ type: 'Недвижимость', description: '', value: 0 }])
+    setGuarantors([])
+    setEditingId(null)
+    setEditingNumber(null)
+    setTab(1)
+    setInputMode('manual')
+    setImageFiles([])
+    setExtractMsg(null)
+    setError(null)
+  }
+
   async function handleGenerate() {
     if (!form.borrower_name || !form.loan_purpose) {
       setError('Заполните обязательные поля: Заёмщик, Цель'); return
@@ -246,15 +320,6 @@ export default function CreditRiskPage() {
     }
     setGenerating(true); setError(null)
     try {
-      // Получаем следующий номер заключения
-      const { data: maxData } = await supabase
-        .from('credit_conclusions')
-        .select('conclusion_number')
-        .order('conclusion_number', { ascending: false })
-        .limit(1)
-        .maybeSingle()
-      const conclusion_number = (maxData?.conclusion_number || 0) + 1
-
       const payload = {
         ...form, collaterals, conclusion_type: form.conclusion_type,
         existing_loan_balance: n('existing_loan_balance'),
@@ -272,8 +337,7 @@ export default function CreditRiskPage() {
       const data = await res.json()
       if (data.error) throw new Error(data.error)
 
-      const { error: dbErr } = await supabase.from('credit_conclusions').insert({
-        conclusion_number,
+      const dbRow = {
         conclusion_type: form.conclusion_type || 'Одобрение кредитной линии',
         borrower_name: form.borrower_name, borrower_inn: form.borrower_inn,
         business_type: form.business_type, sector: form.sector || null, years_in_business: n('years_in_business'),
@@ -308,16 +372,32 @@ export default function CreditRiskPage() {
         p2_inv_inflow: n('p2_inv_inflow'), p2_inv_outflow: n('p2_inv_outflow'), p2_cash_end,
         collaterals, guarantors, ai_conclusion: data.conclusion,
         recommendation: data.recommendation, risk_level: data.risk_level,
-      })
-      if (dbErr) throw new Error(dbErr.message)
-
-      // Автоматически создать запись в реестре заёмщиков
-      const { data: existingBorrower } = await supabase.from('borrowers').select('id').eq('code', form.borrower_name).single()
-      if (!existingBorrower) {
-        await supabase.from('borrowers').insert({ code: form.borrower_name })
       }
 
-      setShowModal(false); setForm(EMPTY); setCollaterals([{ type: 'Недвижимость', description: '', value: 0 }]); setGuarantors([]); setTab(1)
+      if (editingId) {
+        // UPDATE — сохраняем тот же conclusion_number
+        const { error: dbErr } = await supabase.from('credit_conclusions').update(dbRow).eq('id', editingId)
+        if (dbErr) throw new Error(dbErr.message)
+      } else {
+        // INSERT — назначаем новый номер
+        const { data: maxData } = await supabase
+          .from('credit_conclusions')
+          .select('conclusion_number')
+          .order('conclusion_number', { ascending: false })
+          .limit(1)
+          .maybeSingle()
+        const conclusion_number = (maxData?.conclusion_number || 0) + 1
+        const { error: dbErr } = await supabase.from('credit_conclusions').insert({ ...dbRow, conclusion_number })
+        if (dbErr) throw new Error(dbErr.message)
+
+        // Автоматически создать запись в реестре заёмщиков
+        const { data: existingBorrower } = await supabase.from('borrowers').select('id').eq('code', form.borrower_name).single()
+        if (!existingBorrower) {
+          await supabase.from('borrowers').insert({ code: form.borrower_name })
+        }
+      }
+
+      closeModal()
       fetch_()
     } catch (err: unknown) {
       setError('Ошибка: ' + (err instanceof Error ? err.message : String(err)))
@@ -396,7 +476,7 @@ export default function CreditRiskPage() {
             <h1 className="text-xl font-semibold text-gray-900">Кредитный риск — AI-заключения</h1>
             <p className="text-sm text-gray-500 mt-0.5">Анализ заёмщиков МСБ с помощью искусственного интеллекта</p>
           </div>
-          <button onClick={() => { setForm(EMPTY); setCollaterals([{type:'Недвижимость',description:'',value:0}]); setTab(1); setInputMode('manual'); setImageFiles([]); setExtractMsg(null); setShowModal(true) }}
+          <button onClick={() => { closeModal(); setShowModal(true) }}
             className="flex items-center gap-2 px-4 py-2 bg-[#1B8A4C] text-white rounded-lg text-sm font-medium hover:bg-[#177040]">
             <Plus className="w-4 h-4" /> Новое заключение
           </button>
@@ -469,6 +549,7 @@ export default function CreditRiskPage() {
                   <td className="px-4 py-3 text-gray-500 text-xs whitespace-nowrap">{new Date(c.created_at).toLocaleDateString('ru-RU')}</td>
                   <td className="px-4 py-3">
                     <div className="flex items-center gap-1">
+                      <button onClick={() => handleEdit(c)} title="Изменить и перегенерировать" className="p-1.5 text-gray-400 hover:text-amber-600 hover:bg-amber-50 rounded-lg"><Edit2 className="w-3.5 h-3.5" /></button>
                       <button onClick={() => setViewing(c)} className="p-1.5 text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg"><Eye className="w-3.5 h-3.5" /></button>
                       <button onClick={() => downloadWord(c)} className="p-1.5 text-gray-400 hover:text-[#1B8A4C] hover:bg-green-50 rounded-lg"><Download className="w-3.5 h-3.5" /></button>
                       <button onClick={() => handleDelete(c.id)} className="p-1.5 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg"><Trash2 className="w-3.5 h-3.5" /></button>
@@ -545,14 +626,16 @@ export default function CreditRiskPage() {
           <div className="bg-white rounded-2xl shadow-2xl w-full max-w-4xl max-h-[95vh] flex flex-col">
             <div className="flex items-center justify-between p-5 border-b border-gray-100">
               <div>
-                <h2 className="text-base font-semibold text-gray-900">Заключение о кредитоспособности МСБ</h2>
+                <h2 className="text-base font-semibold text-gray-900">
+                  {editingId ? `Изменить заключение №${editingNumber}` : 'Заключение о кредитоспособности МСБ'}
+                </h2>
                 {form.conclusion_type && (
                   <span className={`inline-flex mt-1 px-2 py-0.5 rounded-full text-xs font-medium ${TYPE_COLORS[form.conclusion_type] || 'bg-gray-100 text-gray-700'}`}>
                     {form.conclusion_type}
                   </span>
                 )}
               </div>
-              <button onClick={() => { setShowModal(false); setForm(EMPTY) }} className="text-gray-400 hover:text-gray-600"><X className="w-5 h-5" /></button>
+              <button onClick={closeModal} className="text-gray-400 hover:text-gray-600"><X className="w-5 h-5" /></button>
             </div>
 
             {/* Mode switcher */}
@@ -935,7 +1018,7 @@ export default function CreditRiskPage() {
                     {tab < 5
                       ? <button onClick={() => setTab(tab+1)} className="px-4 py-2 bg-[#1B8A4C] text-white rounded-lg text-sm font-medium hover:bg-[#177040]">Далее →</button>
                       : <button onClick={handleGenerate} disabled={generating} className="flex items-center gap-2 px-4 py-2 bg-[#1B8A4C] text-white rounded-lg text-sm font-medium hover:bg-[#177040] disabled:opacity-70">
-                          {generating ? <><Loader2 className="w-4 h-4 animate-spin" /> AI анализирует...</> : <><CheckCircle2 className="w-4 h-4" /> Сгенерировать</>}
+                          {generating ? <><Loader2 className="w-4 h-4 animate-spin" /> AI анализирует...</> : <><CheckCircle2 className="w-4 h-4" /> {editingId ? 'Перегенерировать' : 'Сгенерировать'}</>}
                         </button>}
                   </div>
                 </>
