@@ -31,6 +31,11 @@ interface FinAnalysis {
   p2_deposits: number; p2_borrowings: number; p2_other_liab: number
   p2_equity: number; p2_net_profit: number
   p2_label: string; counterparty_type?: string
+  // Pre-computed ratios stored at generate time
+  p2_car_ratio?: number | null
+  p2_roe_ratio?: number | null
+  p2_liquidity_ratio?: number | null
+  p2_liquid_assets_usd?: number | null
 }
 
 const MONTHS = ['Январь','Февраль','Март','Апрель','Май','Июнь','Июль','Август','Сентябрь','Октябрь','Ноябрь','Декабрь']
@@ -222,7 +227,7 @@ export default function MarketRiskPage() {
     if (filterYear && filterMonth) query = query.gte('assessment_date', `${filterYear}-${filterMonth}-01`).lte('assessment_date', `${filterYear}-${filterMonth}-31`)
     const [{ data: aData }, { data: fData }] = await Promise.all([
       query,
-      supabase.from('counterparty_financials').select('id, code, p2_label, currency, p2_usd_rate, counterparty_type, p2_cash, p2_receivables, p2_investments, p2_loans_issued, p2_fixed_assets, p2_other_assets, p2_deposits, p2_borrowings, p2_other_liab, p2_equity, p2_net_profit').order('created_at', { ascending: false }),
+      supabase.from('counterparty_financials').select('id, code, p2_label, currency, p2_usd_rate, counterparty_type, p2_cash, p2_receivables, p2_investments, p2_loans_issued, p2_fixed_assets, p2_other_assets, p2_deposits, p2_borrowings, p2_other_liab, p2_equity, p2_net_profit, p2_car_ratio, p2_roe_ratio, p2_liquidity_ratio, p2_liquid_assets_usd').order('created_at', { ascending: false }),
     ])
     setAssessments(aData || [])
     setFinAnalyses(fData || [])
@@ -249,12 +254,17 @@ export default function MarketRiskPage() {
     const toUSD = (v: number) => Math.round(v / rate)
     const totalAssets = toUSD(fin.p2_cash + fin.p2_receivables + fin.p2_investments + fin.p2_loans_issued + fin.p2_fixed_assets + fin.p2_other_assets)
     const totalLiab = toUSD(fin.p2_deposits + fin.p2_borrowings + fin.p2_other_liab)
+    // Use stored IFRS liquid assets (cash_cb + due_banks + fvtpl + fvoci) if available,
+    // otherwise fallback to legacy aggregated columns
+    const liquidAssetsUsd = (fin.p2_liquid_assets_usd != null && fin.p2_liquid_assets_usd > 0)
+      ? Math.round(fin.p2_liquid_assets_usd)
+      : toUSD(fin.p2_cash + fin.p2_receivables + fin.p2_investments)
     setForm(p => ({
       ...p,
       bank_name: fin.code,
       counterparty_type: fin.counterparty_type || 'Банк',
       total_assets: fmtN(totalAssets),
-      liquid_assets: fmtN(toUSD(fin.p2_cash + fin.p2_receivables + fin.p2_investments)),
+      liquid_assets: fmtN(liquidAssetsUsd),
       total_capital: fmtN(toUSD(fin.p2_equity)),
       short_term_liabilities: fmtN(toUSD(fin.p2_deposits)),
       total_liabilities: fmtN(totalLiab),

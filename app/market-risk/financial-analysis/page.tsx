@@ -43,6 +43,13 @@ interface FinAnalysis {
   p1_other_income?: number; p2_other_income?: number
   p1_operating_expense?: number; p2_operating_expense?: number
   p1_provisions?: number; p2_provisions?: number
+  // Pre-computed ratios (stored at generate time — authoritative values)
+  p2_car_ratio?: number | null
+  p2_roe_ratio?: number | null
+  p2_liquidity_ratio?: number | null
+  p2_npl_ratio?: number | null
+  p2_nim_ratio?: number | null
+  p2_liquid_assets_usd?: number | null
   counterparty_type: string; ai_conclusion: string; created_at: string
 }
 
@@ -444,6 +451,13 @@ export default function FinancialAnalysisPage() {
         p1_operating_expense: p1_total_opex, p2_operating_expense: p2_total_opex,
         p1_provisions: n('p1_ecl_charge'), p2_provisions: n('p2_ecl_charge'),
         p1_net_profit: p1_net_profit, p2_net_profit: p2_net_profit,
+        // Pre-computed ratios — single source of truth for table & assessment
+        p2_car_ratio: Math.round(p2_car * 10) / 10,
+        p2_roe_ratio: Math.round(p2_roe * 10) / 10,
+        p2_liquidity_ratio: Math.round(p2_liquidity * 10) / 10,
+        p2_npl_ratio: Math.round(p2_npl * 10) / 10,
+        p2_nim_ratio: Math.round(p2_nim_pct * 10) / 10,
+        p2_liquid_assets_usd: Math.round(p2_liq_assets),
         ai_conclusion: data.conclusion,
       }
 
@@ -621,12 +635,10 @@ export default function FinancialAnalysisPage() {
                 const toUsd2 = (v: number) => a.currency === 'USD' ? v : v / r2
                 const p2assets = (a.p2_cash||0)+(a.p2_receivables||0)+(a.p2_investments||0)+(a.p2_loans_issued||0)+(a.p2_fixed_assets||0)+(a.p2_other_assets||0)
                 const p2a_u = toUsd2(p2assets)
-                const p2e_u = toUsd2(a.p2_equity||0)
-                const p2l_u = toUsd2((a.p2_deposits||0)+(a.p2_borrowings||0)+(a.p2_other_liab||0))
-                const p2np_u = toUsd2(a.p2_net_profit||0)
-                const car2 = p2a_u > 0 ? (p2e_u / p2a_u * 100).toFixed(1) : null
-                const roe2 = p2e_u > 0 ? (p2np_u / p2e_u * 100).toFixed(1) : null
-                const liq2 = p2l_u > 0 ? (toUsd2((a.p2_cash||0)+(a.p2_receivables||0)) / p2l_u * 100).toFixed(1) : null
+                // Use stored ratios (authoritative) if available; fallback to legacy computation for old records
+                const car2 = a.p2_car_ratio != null ? String(a.p2_car_ratio) : (p2a_u > 0 ? (toUsd2(a.p2_equity||0) / p2a_u * 100).toFixed(1) : null)
+                const roe2 = a.p2_roe_ratio != null ? String(a.p2_roe_ratio) : (toUsd2(a.p2_equity||0) > 0 ? (toUsd2(a.p2_net_profit||0) / toUsd2(a.p2_equity||0) * 100).toFixed(1) : null)
+                const liq2 = a.p2_liquidity_ratio != null ? String(a.p2_liquidity_ratio) : null
                 return (
                   <tr key={a.id} className="hover:bg-gray-50">
                     <td className="px-4 py-3 font-semibold text-gray-900">{a.code}</td>
