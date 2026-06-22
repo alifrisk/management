@@ -386,6 +386,7 @@ export default function CreditRiskPage() {
   const lbl = "block text-xs font-medium text-gray-600 mb-1"
 
   const isCollateralChange = form.conclusion_type === 'Смена залога'
+  const isIncrease = form.conclusion_type === 'Увеличение кредитной линии'
 
   return (
     <div className="max-w-6xl mx-auto">
@@ -499,14 +500,26 @@ export default function CreditRiskPage() {
             <div className="flex-1 overflow-y-auto p-6 space-y-4">
               <div className="grid grid-cols-2 gap-3">
                 {[
-                  ['Заёмщик', viewing.borrower_name], ['Сумма', `${fmt(viewing.loan_amount)} ${viewing.loan_currency}`],
-                  ['Срок', viewing.loan_term || '—'], ['Ставка', viewing.interest_rate ? `${viewing.interest_rate}%` : '—'],
-                  ['Бизнес', viewing.business_type || '—'], ['Лет', String(viewing.years_in_business || '—')],
-                  ['Выручка П1', `${fmt(viewing.p1_revenue)} TJS`], ['Выручка П2', `${fmt(viewing.p2_revenue)} TJS`],
-                  ['Прибыль П1', `${fmt(viewing.p1_net_profit)} TJS`], ['Прибыль П2', `${fmt(viewing.p2_net_profit)} TJS`],
-                  ['Уровень риска', viewing.risk_level || '—'], ['Аналитик', viewing.analyst_name || '—'],
-                  ...(viewing.existing_loan_balance ? [['Остаток кредита', `${fmt(viewing.existing_loan_balance)} TJS`]] : []),
-                ].map(([l, v]) => <div key={l}><p className="text-xs text-gray-500">{l}</p><p className="text-sm font-medium text-gray-900 mt-0.5">{v}</p></div>)}
+                  ['Заёмщик', viewing.borrower_name],
+                  viewing.conclusion_type === 'Увеличение кредитной линии' && viewing.existing_loan_balance
+                    ? ['Действующий лимит', `${fmt(viewing.existing_loan_balance)} ${viewing.loan_currency}`]
+                    : null,
+                  viewing.conclusion_type === 'Увеличение кредитной линии' && viewing.loan_amount
+                    ? ['Желаемый лимит', `${fmt(viewing.loan_amount)} ${viewing.loan_currency}`]
+                    : viewing.conclusion_type === 'Смена залога'
+                    ? (viewing.existing_loan_balance ? ['Остаток кредита', `${fmt(viewing.existing_loan_balance)} ${viewing.loan_currency}`] : null)
+                    : (viewing.loan_amount ? ['Сумма линии', `${fmt(viewing.loan_amount)} ${viewing.loan_currency}`] : null),
+                  ['Срок линии', viewing.loan_term || '—'],
+                  ['Ставка', viewing.interest_rate ? `${viewing.interest_rate}%` : '—'],
+                  ['Бизнес', viewing.business_type || '—'],
+                  ['Лет', String(viewing.years_in_business || '—')],
+                  ['Выручка П1', `${fmt(viewing.p1_revenue)} TJS`],
+                  ['Выручка П2', `${fmt(viewing.p2_revenue)} TJS`],
+                  ['Прибыль П1', `${fmt(viewing.p1_net_profit)} TJS`],
+                  ['Прибыль П2', `${fmt(viewing.p2_net_profit)} TJS`],
+                  ['Уровень риска', viewing.risk_level || '—'],
+                  ['Аналитик', viewing.analyst_name || '—'],
+                ].filter(Boolean).map(([l, v]) => <div key={String(l)}><p className="text-xs text-gray-500">{l}</p><p className="text-sm font-medium text-gray-900 mt-0.5">{v}</p></div>)}
               </div>
               <div><p className="text-xs font-semibold text-gray-700 uppercase tracking-wide mb-2">AI Заключение</p>
                 <div className="bg-blue-50 border border-blue-100 rounded-lg p-4">
@@ -656,18 +669,42 @@ export default function CreditRiskPage() {
                   <div><label className={lbl}>Вид деятельности (детально)</label><input type="text" value={form.business_type} onChange={e => setF('business_type', e.target.value)} placeholder="Торговля стройматериалами..." className={inp} /></div>
                   <div><label className={lbl}>Лет в бизнесе</label><input type="text" inputMode="numeric" value={form.years_in_business} onChange={e => setF('years_in_business', e.target.value.replace(/\D/g,''))} className={inp} /></div>
 
-                  {/* Для Смены залога — остаток по действующему кредиту */}
+                  {/* Поля суммы — зависят от типа заключения */}
                   {isCollateralChange ? (
                     <div>
-                      <label className={lbl}>Остаток по действующему кредиту (TJS) *</label>
+                      <label className={lbl}>Остаток по действующему кредиту *</label>
                       <input type="text" inputMode="numeric"
                         value={form.existing_loan_balance ? new Intl.NumberFormat('ru-RU').format(Number(form.existing_loan_balance)) : ''}
                         onChange={e => setF('existing_loan_balance', e.target.value.replace(/[^0-9]/g,''))}
                         placeholder="0" className={inp} />
                       <p className="text-xs text-gray-400 mt-1">Текущий долг заёмщика перед банком</p>
                     </div>
+                  ) : isIncrease ? (
+                    <>
+                      <div>
+                        <label className={lbl}>Действующий лимит *</label>
+                        <input type="text" inputMode="numeric"
+                          value={form.existing_loan_balance ? new Intl.NumberFormat('ru-RU').format(Number(form.existing_loan_balance)) : ''}
+                          onChange={e => setF('existing_loan_balance', e.target.value.replace(/[^0-9]/g,''))}
+                          placeholder="0" className={inp} />
+                        <p className="text-xs text-gray-400 mt-1">Текущий утверждённый лимит кредитной линии</p>
+                      </div>
+                      <div>
+                        <label className={lbl}>Желаемый лимит *</label>
+                        <input type="text" inputMode="numeric"
+                          value={form.loan_amount ? new Intl.NumberFormat('ru-RU').format(Number(form.loan_amount)) : ''}
+                          onChange={e => setF('loan_amount', e.target.value.replace(/[^0-9]/g,''))}
+                          placeholder="0" className={inp} />
+                        {form.loan_amount && form.existing_loan_balance && Number(form.loan_amount) > Number(form.existing_loan_balance) && (
+                          <p className="text-xs text-[#1B8A4C] mt-1 font-medium">
+                            +{new Intl.NumberFormat('ru-RU').format(Number(form.loan_amount) - Number(form.existing_loan_balance))} ({(((Number(form.loan_amount) - Number(form.existing_loan_balance)) / Number(form.existing_loan_balance)) * 100).toFixed(1)}% к действующему)
+                          </p>
+                        )}
+                      </div>
+                    </>
                   ) : (
-                    <div><label className={lbl}>Сумма кредита *</label>
+                    <div>
+                      <label className={lbl}>Сумма открываемой кредитной линии *</label>
                       <input type="text" inputMode="numeric"
                         value={form.loan_amount ? new Intl.NumberFormat('ru-RU').format(Number(form.loan_amount)) : ''}
                         onChange={e => setF('loan_amount', e.target.value.replace(/[^0-9]/g,''))}
@@ -678,7 +715,7 @@ export default function CreditRiskPage() {
                   <div><label className={lbl}>Валюта</label><select value={form.loan_currency} onChange={e => setF('loan_currency', e.target.value)} className={inp}>{CURRENCIES.map(c => <option key={c}>{c}</option>)}</select></div>
 
                   {!isCollateralChange && <>
-                    <div><label className={lbl}>Срок кредита (месяцев)</label><input type="text" inputMode="numeric" value={form.loan_term_months} onChange={e => setF('loan_term_months', e.target.value.replace(/\D/g,''))} placeholder="12" className={inp} /></div>
+                    <div><label className={lbl}>Срок линии (месяцев)</label><input type="text" inputMode="numeric" value={form.loan_term_months} onChange={e => setF('loan_term_months', e.target.value.replace(/\D/g,''))} placeholder="12" className={inp} /></div>
                     <div><label className={lbl}>Процентная ставка (% годовых)</label><input type="text" inputMode="decimal" value={form.interest_rate} onChange={e => setF('interest_rate', e.target.value.replace(/[^0-9.]/g,''))} placeholder="24" className={inp} /></div>
                     {form.loan_amount && form.loan_term_months && (
                       <div className="lg:col-span-2 bg-blue-50 border border-blue-100 rounded-lg p-3 flex items-center justify-between">
@@ -691,7 +728,14 @@ export default function CreditRiskPage() {
                   <div><label className={lbl}>Аналитик</label><input type="text" value={form.analyst_name} onChange={e => setF('analyst_name', e.target.value)} placeholder="ФИО" className={inp} /></div>
                   <div><label className={lbl}>Название периода 1 (напр. 31.12.2024)</label><input type="text" value={form.p1_label} onChange={e => setF('p1_label', e.target.value)} placeholder="31.12.2024" className={inp} /></div>
                   <div><label className={lbl}>Название периода 2 (напр. 31.03.2025)</label><input type="text" value={form.p2_label} onChange={e => setF('p2_label', e.target.value)} placeholder="31.03.2025" className={inp} /></div>
-                  <div className="lg:col-span-2"><label className={lbl}>{isCollateralChange ? 'Причина смены залога *' : 'Цель кредита *'}</label><textarea value={form.loan_purpose} onChange={e => setF('loan_purpose', e.target.value)} rows={2} placeholder={isCollateralChange ? 'Причина замены предмета залога...' : 'Пополнение оборотных средств...'} className={inp + ' resize-none'} /></div>
+                  <div className="lg:col-span-2">
+                    <label className={lbl}>
+                      {isCollateralChange ? 'Причина смены залога *' : isIncrease ? 'Обоснование увеличения лимита *' : 'Цель кредитной линии *'}
+                    </label>
+                    <textarea value={form.loan_purpose} onChange={e => setF('loan_purpose', e.target.value)} rows={2}
+                      placeholder={isCollateralChange ? 'Причина замены предмета залога...' : isIncrease ? 'Рост бизнеса, расширение оборотных средств...' : 'Пополнение оборотных средств...'}
+                      className={inp + ' resize-none'} />
+                  </div>
                 </div>
               )}
 
