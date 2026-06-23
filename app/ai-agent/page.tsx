@@ -48,6 +48,7 @@ export default function RiskovikPage() {
   const [showHist,  setShowHist]  = useState(false)
   const [editId,    setEditId]    = useState<string | null>(null)
   const [editText,  setEditText]  = useState('')
+  const [userId,    setUserId]    = useState<string | null>(null)
 
   // Knowledge base
   const [showKB,    setShowKB]    = useState(false)
@@ -67,8 +68,11 @@ export default function RiskovikPage() {
 
   useEffect(() => { bottomRef.current?.scrollIntoView({ behavior: 'smooth' }) }, [messages, loading])
 
-  const loadChats = useCallback(async () => {
-    const { data } = await supabase.from('ai_chats').select('id, title, created_at').order('updated_at', { ascending: false }).limit(20)
+  const loadChats = useCallback(async (uid?: string) => {
+    const { data: { user } } = await supabase.auth.getUser()
+    const id = uid || user?.id
+    if (!id) return
+    const { data } = await supabase.from('ai_chats').select('id, title, created_at').eq('user_id', id).order('updated_at', { ascending: false }).limit(20)
     setChats(data || [])
   }, [])
 
@@ -83,17 +87,17 @@ export default function RiskovikPage() {
 
   useEffect(() => {
     async function init() {
-      // Check admin role
       const { data: { user } } = await supabase.auth.getUser()
       if (user) {
+        setUserId(user.id)
         const { data: profile } = await supabase.from('user_profiles').select('role').eq('id', user.id).single()
         setIsAdmin(profile?.role === 'admin')
-      }
-      await loadKBDocs()
-      await loadChats()
-      const { data: chatsData } = await supabase.from('ai_chats').select('id').order('updated_at', { ascending: false }).limit(1)
-      if (chatsData && chatsData.length > 0) {
-        await openChat(chatsData[0].id)
+        await loadKBDocs()
+        await loadChats(user.id)
+        const { data: chatsData } = await supabase.from('ai_chats').select('id').eq('user_id', user.id).order('updated_at', { ascending: false }).limit(1)
+        if (chatsData && chatsData.length > 0) {
+          await openChat(chatsData[0].id)
+        }
       }
     }
     init()
@@ -273,7 +277,8 @@ export default function RiskovikPage() {
   }
 
   async function newChat() {
-    const { data } = await supabase.from('ai_chats').insert({ title: 'Новый чат', context: '' }).select().single()
+    if (!userId) return
+    const { data } = await supabase.from('ai_chats').insert({ title: 'Новый чат', context: '', user_id: userId }).select().single()
     if (data) {
       setChatId(data.id)
       setMessages([])
@@ -385,7 +390,8 @@ export default function RiskovikPage() {
 
     let activeChatId = chatId
     if (!activeChatId) {
-      const { data } = await supabase.from('ai_chats').insert({ title: content.slice(0, 60), context }).select().single()
+      if (!userId) return
+      const { data } = await supabase.from('ai_chats').insert({ title: content.slice(0, 60), context, user_id: userId }).select().single()
       if (!data) return
       activeChatId = data.id
       setChatId(data.id)
