@@ -277,8 +277,7 @@ export default function RiskovikPage() {
   }
 
   async function newChat() {
-    if (!userId) return
-    const { data } = await supabase.from('ai_chats').insert({ title: 'Новый чат', context: '', user_id: userId }).select().single()
+    const { data } = await supabase.from('ai_chats').insert({ title: 'Новый чат', context: '' }).select().single()
     if (data) {
       setChatId(data.id)
       setMessages([])
@@ -390,8 +389,7 @@ export default function RiskovikPage() {
 
     let activeChatId = chatId
     if (!activeChatId) {
-      if (!userId) return
-      const { data } = await supabase.from('ai_chats').insert({ title: content.slice(0, 60), context, user_id: userId }).select().single()
+      const { data } = await supabase.from('ai_chats').insert({ title: content.slice(0, 60), context }).select().single()
       if (!data) return
       activeChatId = data.id
       setChatId(data.id)
