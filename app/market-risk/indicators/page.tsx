@@ -1,7 +1,6 @@
 'use client'
 import { useState, useEffect, useCallback } from 'react'
-import { RefreshCw, TrendingUp, TrendingDown, Minus, Clock, Edit2, Check, X } from 'lucide-react'
-import { supabase } from '@/supabase/client'
+import { RefreshCw, TrendingUp, TrendingDown, Minus, Clock } from 'lucide-react'
 
 interface Indicator {
   id: string
@@ -94,8 +93,6 @@ function Section({ title, icon, items }: { title: string; icon: string; items: I
   )
 }
 
-interface MacroItem { id: string; label: string; rate: number | null; change: number | null; unit: string; year: string; sort_order?: number }
-
 // ── Main ──────────────────────────────────────────────────────────────────────
 export default function MarketIndicatorsPage() {
   const [data,     setData]     = useState<IndicatorsData | null>(null)
@@ -103,9 +100,6 @@ export default function MarketIndicatorsPage() {
   const [error,    setError]    = useState<string | null>(null)
   const [lastFetch,setLastFetch]= useState<Date | null>(null)
   const [fetchCount, setFetchCount] = useState(0)
-  const [isAdmin,  setIsAdmin]  = useState(false)
-  const [editMacro, setEditMacro] = useState<MacroItem[] | null>(null)
-  const [saving,   setSaving]   = useState(false)
 
   const fetchData = useCallback(async () => {
     setLoading(true); setError(null)
@@ -128,41 +122,6 @@ export default function MarketIndicatorsPage() {
     return () => clearInterval(interval)
   }, [fetchData])
 
-  useEffect(() => {
-    supabase.auth.getUser().then(({ data: { user } }) => {
-      if (!user) return
-      supabase.from('user_profiles').select('role').eq('id', user.id).single()
-        .then(({ data }) => setIsAdmin(data?.role === 'admin'))
-    })
-  }, [])
-
-  async function startEdit() {
-    const { data: rows } = await supabase.from('nbt_indicators').select('*').order('sort_order', { ascending: true })
-    if (rows && rows.length > 0) {
-      setEditMacro(rows)
-    } else {
-      // если таблица пустая, берём из загруженных данных
-      setEditMacro((data?.macro || []).map((m, i) => ({ ...m, sort_order: i })) as MacroItem[])
-    }
-  }
-
-  async function saveMacro() {
-    if (!editMacro) return
-    setSaving(true)
-    for (const row of editMacro) {
-      await supabase.from('nbt_indicators').upsert({
-        id: row.id, label: row.label,
-        rate: row.rate !== null && row.rate !== undefined ? Number(row.rate) : null,
-        change: row.change !== null && row.change !== undefined ? Number(row.change) : null,
-        unit: row.unit || '%', year: row.year || '',
-        sort_order: row.sort_order ?? 0,
-        updated_at: new Date().toISOString(),
-      })
-    }
-    setSaving(false)
-    setEditMacro(null)
-    fetchData()
-  }
 
   return (
     <div className="max-w-7xl mx-auto space-y-6">
@@ -210,87 +169,6 @@ export default function MarketIndicatorsPage() {
           <Section title="Валюты (к USD)" icon="💱" items={data.currencies} />
           <Section title="Сырьё" icon="🛢️" items={data.commodities as Indicator[]} />
           <Section title="Криптовалюты" icon="₿" items={data.crypto} />
-          {false && data.macro?.length > 0 && (
-            <div>
-              <div className="flex items-center justify-between mb-3">
-                <h2 className="text-sm font-semibold text-gray-700 flex items-center gap-2">
-                  <span className="text-base">🇹🇯</span> Макроэкономика Таджикистана
-                  <span className="text-[10px] text-gray-400 font-normal">· Источник: nbt.tj</span>
-                </h2>
-                {isAdmin && !editMacro && (
-                  <button onClick={startEdit}
-                    className="flex items-center gap-1.5 px-3 py-1.5 text-xs text-gray-500 border border-gray-200 rounded-lg hover:bg-gray-50">
-                    <Edit2 className="w-3 h-3" /> Обновить данные НБТ
-                  </button>
-                )}
-                {isAdmin && editMacro && (
-                  <div className="flex items-center gap-2">
-                    <button onClick={() => setEditMacro(null)} className="flex items-center gap-1 px-3 py-1.5 text-xs border border-gray-200 rounded-lg text-gray-500 hover:bg-gray-50">
-                      <X className="w-3 h-3" /> Отмена
-                    </button>
-                    <button onClick={saveMacro} disabled={saving}
-                      className="flex items-center gap-1 px-3 py-1.5 text-xs bg-[#1B8A4C] text-white rounded-lg hover:bg-[#177040] disabled:opacity-50">
-                      <Check className="w-3 h-3" /> {saving ? 'Сохранение...' : 'Сохранить'}
-                    </button>
-                  </div>
-                )}
-              </div>
-
-              {/* Edit form */}
-              {editMacro && (
-                <div className="mb-4 p-4 border border-[#1B8A4C] rounded-xl bg-green-50 space-y-3">
-                  <p className="text-xs text-gray-600 font-medium">Обновите показатели с сайта <a href="https://nbt.tj" target="_blank" className="text-[#1B8A4C] underline">nbt.tj</a> и нажмите «Сохранить»</p>
-                  <div className="grid grid-cols-1 lg:grid-cols-2 gap-3">
-                    {editMacro.map((row, idx) => (
-                      <div key={row.id} className="bg-white rounded-lg p-3 border border-gray-200 space-y-2">
-                        <input value={row.label} onChange={e => setEditMacro(p => p!.map((r,i) => i===idx ? {...r, label: e.target.value} : r))}
-                          className="w-full px-2 py-1.5 text-xs border border-gray-200 rounded focus:outline-none focus:ring-1 focus:ring-[#1B8A4C]"
-                          placeholder="Название" />
-                        <div className="grid grid-cols-3 gap-2">
-                          <div>
-                            <p className="text-[10px] text-gray-400 mb-1">Значение</p>
-                            <input type="number" step="0.01" value={row.rate ?? ''} onChange={e => setEditMacro(p => p!.map((r,i) => i===idx ? {...r, rate: e.target.value === '' ? null : Number(e.target.value)} : r))}
-                              className="w-full px-2 py-1.5 text-xs border border-gray-200 rounded focus:outline-none focus:ring-1 focus:ring-[#1B8A4C]" placeholder="0.0" />
-                          </div>
-                          <div>
-                            <p className="text-[10px] text-gray-400 mb-1">Изм. п.п.</p>
-                            <input type="number" step="0.01" value={row.change ?? ''} onChange={e => setEditMacro(p => p!.map((r,i) => i===idx ? {...r, change: e.target.value === '' ? null : Number(e.target.value)} : r))}
-                              className="w-full px-2 py-1.5 text-xs border border-gray-200 rounded focus:outline-none focus:ring-1 focus:ring-[#1B8A4C]" placeholder="±0.0" />
-                          </div>
-                          <div>
-                            <p className="text-[10px] text-gray-400 mb-1">Период</p>
-                            <input value={row.year} onChange={e => setEditMacro(p => p!.map((r,i) => i===idx ? {...r, year: e.target.value} : r))}
-                              className="w-full px-2 py-1.5 text-xs border border-gray-200 rounded focus:outline-none focus:ring-1 focus:ring-[#1B8A4C]" placeholder="май 2026" />
-                          </div>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              )}
-
-              <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
-                {data.macro.map(item => (
-                  <div key={item.id} className="rounded-xl border border-gray-100 p-4 shadow-sm bg-gray-50">
-                    <p className="text-xs font-medium text-gray-500 mb-2 truncate">{item.label}</p>
-                    <p className="text-xl font-bold text-gray-900 mb-1">
-                      {item.rate !== null ? item.rate : '—'}
-                      <span className="text-xs font-normal text-gray-400 ml-1">{item.unit}</span>
-                    </p>
-                    {'year' in item && item.year && (
-                      <p className="text-[10px] text-gray-400">{item.year}</p>
-                    )}
-                    {item.change !== null && (
-                      <div className={`flex items-center gap-1 text-xs font-semibold mt-1 ${changeColor(item.change)}`}>
-                        {item.change > 0 ? <TrendingUp className="w-3 h-3" /> : <TrendingDown className="w-3 h-3" />}
-                        {item.change > 0 ? '+' : ''}{item.change} п.п.
-                      </div>
-                    )}
-                  </div>
-                ))}
-              </div>
-            </div>
-          )}
         </div>
       )}
 
