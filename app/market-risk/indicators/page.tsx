@@ -210,7 +210,7 @@ export default function MarketIndicatorsPage() {
           <Section title="Валюты (к USD)" icon="💱" items={data.currencies} />
           <Section title="Сырьё" icon="🛢️" items={data.commodities as Indicator[]} />
           <Section title="Криптовалюты" icon="₿" items={data.crypto} />
-          {data.macro?.length > 0 && (
+          {false && data.macro?.length > 0 && (
             <div>
               <div className="flex items-center justify-between mb-3">
                 <h2 className="text-sm font-semibold text-gray-700 flex items-center gap-2">
