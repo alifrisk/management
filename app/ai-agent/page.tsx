@@ -102,12 +102,59 @@ export default function RiskovikPage() {
   // Fetch live data when context changes
   useEffect(() => {
     async function fetchLive() {
-      if (!context) { setLiveData(''); return }
       setLiveLoading(true)
       try {
         let text = ''
 
-        if (context.includes('Операционный риск')) {
+        if (!context) {
+          // Общий контекст — подгружаем компактный срез из всех модулей
+          const [creditRes, assessRes, finRes, opRes] = await Promise.all([
+            supabase.from('credit_conclusions')
+              .select('borrower_name, loan_amount, currency, recommendation, risk_level, analyst_name, created_at, ai_conclusion')
+              .order('created_at', { ascending: false }).limit(5),
+            supabase.from('counterparty_assessments')
+              .select('bank_name, country, total_score, reliability_category, recommended_limit_usd, created_at')
+              .order('created_at', { ascending: false }).limit(5),
+            supabase.from('counterparty_financials')
+              .select('code, counterparty_type, p1_label, p2_label, currency, ai_conclusion, created_at')
+              .order('created_at', { ascending: false }).limit(3),
+            supabase.from('operational_incidents')
+              .select('incident_number, risk_level, business_process, incident_status, loss_amount_tjs')
+              .order('created_at', { ascending: false }).limit(20),
+          ])
+          if (creditRes.data?.length) {
+            const a = creditRes.data.filter(c => c.recommendation === 'Одобрить').length
+            const r = creditRes.data.filter(c => c.recommendation === 'Отклонить').length
+            text += `КРЕДИТНЫЙ РИСК — последние ${creditRes.data.length} заключений (Одобрено: ${a} | Отклонено: ${r}):\n`
+            creditRes.data.forEach(c => {
+              text += `• ${c.borrower_name} | ${Number(c.loan_amount).toLocaleString()} ${c.currency} | ${c.recommendation} [${c.risk_level}]\n`
+              if (c.ai_conclusion) text += `  Заключение: ${c.ai_conclusion.slice(0, 300)}...\n`
+            })
+            text += '\n'
+          }
+          if (assessRes.data?.length) {
+            text += `РЫНОЧНЫЙ РИСК — контрагенты (${assessRes.data.length}):\n`
+            assessRes.data.forEach(a => {
+              text += `• ${a.bank_name} (${a.country}) | Балл: ${a.total_score} | ${a.reliability_category} | Лимит: $${Number(a.recommended_limit_usd || 0).toLocaleString()}\n`
+            })
+            text += '\n'
+          }
+          if (finRes.data?.length) {
+            text += `ФИНАНСОВЫЙ АНАЛИЗ КОНТРАГЕНТОВ (${finRes.data.length}):\n`
+            finRes.data.forEach(f => {
+              text += `• ${f.code} (${f.counterparty_type}) | ${f.p1_label} → ${f.p2_label}\n`
+              if (f.ai_conclusion) text += `  Анализ: ${f.ai_conclusion.slice(0, 300)}...\n`
+            })
+            text += '\n'
+          }
+          if (opRes.data?.length) {
+            const extreme = opRes.data.filter(i => i.risk_level === 'Экстремальные').length
+            const high = opRes.data.filter(i => i.risk_level === 'Высокий').length
+            const totalLoss = opRes.data.reduce((s, i) => s + (Number(i.loss_amount_tjs) || 0), 0)
+            text += `ОПЕРАЦИОННЫЙ РИСК — ${opRes.data.length} инцидентов | Экстремальных: ${extreme} | Высоких: ${high} | Потери: ${totalLoss.toLocaleString('ru-RU')} TJS\n`
+          }
+
+        } else if (context.includes('Операционный риск')) {
           const { data } = await supabase
             .from('operational_incidents')
             .select('incident_number, incident_status, risk_level, factor, business_process, loss_amount_tjs, incident_date, case_description, department')
