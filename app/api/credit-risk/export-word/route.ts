@@ -153,7 +153,7 @@ export async function POST(request: Request) {
 
     // AI conclusion paragraphs - styled
     const conclusionParagraphs = (c.ai_conclusion || '').split('\n').filter((l: string) => l.trim()).map((line: string) => {
-      const text = line.trim()
+      const text = line.trim().replace(/\*\*/g, '').replace(/\*/g, '')
       if (/^\d+\./.test(text)) {
         return new Paragraph({
           spacing: { before: 180, after: 80 },
@@ -192,7 +192,7 @@ export async function POST(request: Request) {
         children: [
 
           // ── ШАПКА ──
-          para('ҶСК «Алиф Бонк»', { bold: true, size: 30, center: true, after: 40 }),
+          para('ОАО «Алиф Банк»', { bold: true, size: 30, center: true, after: 40 }),
           para('Служба управления рисками', { size: 20, center: true, after: 40, color: '555555' }),
           // Горизонтальная линия
           new Table({
