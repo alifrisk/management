@@ -134,31 +134,57 @@ export default function RiskovikPage() {
         } else if (context.includes('Кредитный риск')) {
           const { data } = await supabase
             .from('credit_conclusions')
-            .select('borrower_name, loan_amount, currency, recommendation, risk_level, created_at, analyst_name')
+            .select('borrower_name, business_type, loan_amount, loan_term_months, interest_rate, currency, recommendation, risk_level, analyst_name, created_at, ai_conclusion, p1_label, p2_label, p1_net_profit, p2_net_profit, p1_net_rev, p2_net_rev, p1_total_assets, p2_total_assets')
             .order('created_at', { ascending: false })
-            .limit(20)
+            .limit(10)
           if (data && data.length > 0) {
             const approved = data.filter(c => c.recommendation === 'Одобрить').length
             const rejected = data.filter(c => c.recommendation === 'Отклонить').length
             const cond = data.filter(c => c.recommendation === 'Условно одобрить').length
-            text = `Кредитный риск — последние ${data.length} заключений:\n`
+            text = `КРЕДИТНЫЙ РИСК — последние ${data.length} заключений МСБ:\n`
             text += `Одобрено: ${approved} | Отклонено: ${rejected} | Условно: ${cond}\n\n`
-            text += `Последние заключения:\n`
-            data.slice(0, 10).forEach(c => {
-              text += `• ${c.borrower_name} | ${Number(c.loan_amount).toLocaleString()} ${c.currency} | ${c.recommendation} [${c.risk_level}]\n`
+            data.forEach((c, i) => {
+              text += `━━━ Заключение ${i + 1}: ${c.borrower_name} ━━━\n`
+              text += `Вид деятельности: ${c.business_type || '—'} | Аналитик: ${c.analyst_name || '—'} | Дата: ${c.created_at?.slice(0, 10)}\n`
+              text += `Кредит: ${Number(c.loan_amount).toLocaleString()} ${c.currency} | Срок: ${c.loan_term_months} мес. | Ставка: ${c.interest_rate}%\n`
+              text += `Периоды: ${c.p1_label || 'П1'} → ${c.p2_label || 'П2'}\n`
+              if (c.p2_net_rev || c.p2_total_assets) {
+                text += `Выручка: ${Number(c.p1_net_rev || 0).toLocaleString()} → ${Number(c.p2_net_rev || 0).toLocaleString()} | Активы: ${Number(c.p1_total_assets || 0).toLocaleString()} → ${Number(c.p2_total_assets || 0).toLocaleString()}\n`
+                text += `Чистая прибыль: ${Number(c.p1_net_profit || 0).toLocaleString()} → ${Number(c.p2_net_profit || 0).toLocaleString()}\n`
+              }
+              text += `РЕШЕНИЕ: ${c.recommendation} | РИСК: ${c.risk_level}\n`
+              if (c.ai_conclusion) text += `\nЗАКЛЮЧЕНИЕ АНАЛИТИКА:\n${c.ai_conclusion}\n`
+              text += '\n'
             })
           }
 
         } else if (context.includes('Рыночный риск')) {
-          const { data } = await supabase
-            .from('counterparty_assessments')
-            .select('bank_name, country, total_score, reliability_category, recommended_limit_usd, created_at')
-            .order('created_at', { ascending: false })
-            .limit(20)
-          if (data && data.length > 0) {
-            text = `Рыночный риск — оценки контрагентов (${data.length}):\n`
-            data.forEach(a => {
-              text += `• ${a.bank_name} (${a.country}) | Оценка: ${a.total_score} | ${a.reliability_category} | Лимит: $${Number(a.recommended_limit_usd || 0).toLocaleString()}\n`
+          const [assessRes, finRes] = await Promise.all([
+            supabase
+              .from('counterparty_assessments')
+              .select('bank_name, country, total_score, reliability_category, recommended_limit_usd, created_at')
+              .order('created_at', { ascending: false })
+              .limit(10),
+            supabase
+              .from('counterparty_financials')
+              .select('code, counterparty_type, p1_label, p2_label, currency, ai_conclusion, created_at')
+              .order('created_at', { ascending: false })
+              .limit(5),
+          ])
+          if (assessRes.data && assessRes.data.length > 0) {
+            text = `РЫНОЧНЫЙ РИСК — оценки надёжности контрагентов (${assessRes.data.length}):\n`
+            assessRes.data.forEach(a => {
+              text += `• ${a.bank_name} (${a.country}) | Балл: ${a.total_score} | ${a.reliability_category} | Лимит: $${Number(a.recommended_limit_usd || 0).toLocaleString()}\n`
+            })
+            text += '\n'
+          }
+          if (finRes.data && finRes.data.length > 0) {
+            text += `ФИНАНСОВЫЙ АНАЛИЗ КОНТРАГЕНТОВ — последние ${finRes.data.length}:\n`
+            finRes.data.forEach((f, i) => {
+              text += `━━━ Анализ ${i + 1}: ${f.code} (${f.counterparty_type}) ━━━\n`
+              text += `Периоды: ${f.p1_label || 'П1'} → ${f.p2_label || 'П2'} | Валюта: ${f.currency} | Дата: ${f.created_at?.slice(0, 10)}\n`
+              if (f.ai_conclusion) text += `\nЗАКЛЮЧЕНИЕ:\n${f.ai_conclusion}\n`
+              text += '\n'
             })
           }
 
