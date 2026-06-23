@@ -62,6 +62,7 @@ interface CreditConclusion {
   p2_cf_shares?: number; p2_cf_bonds?: number; p2_cf_founders?: number; p2_cf_loans_in?: number; p2_cf_other_fin_in?: number; p2_cf_dividends?: number; p2_cf_loans_out?: number; p2_cf_buyback?: number; p2_cf_other_fin_out?: number
   p2_cf_fx?: number; p2_cf_cash_begin?: number
   sector?: string
+  additional_info?: string
   collaterals: Collateral[]
   guarantors?: { name: string; inn: string; relation: string }[]
   ai_conclusion: string; recommendation: string; risk_level: string; created_at: string
@@ -112,6 +113,7 @@ const EMPTY: Record<string, string> = {
   p2_cf_shares: '', p2_cf_bonds: '', p2_cf_founders: '', p2_cf_loans_in: '', p2_cf_other_fin_in: '', p2_cf_dividends: '', p2_cf_loans_out: '', p2_cf_buyback: '', p2_cf_other_fin_out: '',
   p1_cf_fx: '', p1_cf_cash_begin: '',
   p2_cf_fx: '', p2_cf_cash_begin: '',
+  additional_info: '',
 }
 
 const COLLATERAL_TYPES = ['Недвижимость', 'Автотранспорт', 'Оборудование', 'Товары в обороте', 'Депозит', 'Другое']
@@ -411,6 +413,7 @@ export default function CreditRiskPage() {
       p2_cf_dividends: s(c.p2_cf_dividends), p2_cf_loans_out: s(c.p2_cf_loans_out) || s(c.p2_fin_outflow),
       p2_cf_buyback: s(c.p2_cf_buyback), p2_cf_other_fin_out: s(c.p2_cf_other_fin_out),
       p2_cf_fx: s(c.p2_cf_fx), p2_cf_cash_begin: s(c.p2_cf_cash_begin) || s(c.p2_cash_begin),
+      additional_info: c.additional_info || '',
     })
     setCollaterals(c.collaterals?.length ? c.collaterals : [{ type: 'Недвижимость', description: '', value: 0 }])
     setGuarantors(c.guarantors || [])
@@ -449,6 +452,7 @@ export default function CreditRiskPage() {
     try {
       const payload = {
         ...form, collaterals, conclusion_type: form.conclusion_type,
+        additional_info: form.additional_info || '',
         existing_loan_balance: n('existing_loan_balance'),
         p1_gross, p2_gross, p1_op_profit, p2_op_profit,
         p1_ebt, p2_ebt, p1_net, p2_net,
@@ -545,7 +549,9 @@ export default function CreditRiskPage() {
         p2_cf_dividends: n('p2_cf_dividends'), p2_cf_loans_out: n('p2_cf_loans_out'), p2_cf_buyback: n('p2_cf_buyback'),
         p2_cf_other_fin_out: n('p2_cf_other_fin_out'), p2_cf_fx: n('p2_cf_fx'), p2_cf_cash_begin: n('p2_cf_cash_begin'),
         p2_cash_end,
-        collaterals, guarantors, ai_conclusion: data.conclusion,
+        collaterals, guarantors,
+        additional_info: form.additional_info || null,
+        ai_conclusion: data.conclusion,
         recommendation: data.recommendation, risk_level: data.risk_level,
       }
 
@@ -828,7 +834,7 @@ export default function CreditRiskPage() {
             {/* Tabs — only in manual mode */}
             {inputMode === 'manual' && (
             <div className="flex border-b border-gray-100 px-2">
-              {[{n:1,t:'Заёмщик'},{n:2,t:'Баланс'},{n:3,t:'ОПУ'},{n:4,t:'КешФлоу'},{n:5,t:'Залог'}].map(({n:tn,t}) => (
+              {[{n:1,t:'Заёмщик'},{n:2,t:'Баланс'},{n:3,t:'ОПУ'},{n:4,t:'КешФлоу'},{n:5,t:'Залог'},{n:6,t:'Дополнение'}].map(({n:tn,t}) => (
                 <button key={tn} onClick={() => setTab(tn)}
                   className={`px-3 py-3 text-xs font-semibold border-b-2 whitespace-nowrap transition-colors flex-shrink-0 ${tab === tn ? 'border-[#1B8A4C] text-[#1B8A4C]' : 'border-transparent text-gray-500 hover:text-gray-700'}`}>
                   {t}
@@ -1144,6 +1150,27 @@ export default function CreditRiskPage() {
                 </div>
               )}
 
+              {/* Tab 6: Дополнение */}
+              {tab === 6 && (
+                <div className="space-y-4">
+                  <div className="p-3 bg-blue-50 border border-blue-100 rounded-lg">
+                    <p className="text-xs text-blue-700 font-medium">Дополнительная информация о заёмщике</p>
+                    <p className="text-xs text-blue-500 mt-0.5">Укажите любую информацию, которую AI должен учесть при составлении заключения: репутация, рыночная ситуация, связанные стороны, история отношений с банком, особые обстоятельства и т.д.</p>
+                  </div>
+                  <div>
+                    <label className={lbl}>Комментарий аналитика</label>
+                    <textarea
+                      value={form.additional_info || ''}
+                      onChange={e => setF('additional_info', e.target.value)}
+                      rows={10}
+                      placeholder={'Например:\n— Заёмщик является крупным поставщиком стройматериалов в регионе, имеет долгосрочные контракты с госструктурами\n— Ранее кредитовался в 2022 году, погасил досрочно\n— Учредитель имеет дополнительный бизнес (ресторан), не отражённый в текущей отчётности\n— В 4 квартале ожидается крупная сделка...'}
+                      className={inp + ' resize-y text-sm leading-relaxed'}
+                    />
+                    <p className="text-xs text-gray-400 mt-1">{(form.additional_info || '').length} символов</p>
+                  </div>
+                </div>
+              )}
+
               {/* Tab 5: Залог */}
               {tab === 5 && (
                 <div className="space-y-3">
@@ -1267,7 +1294,7 @@ export default function CreditRiskPage() {
                   <div className="flex gap-2">
                     <button onClick={() => { setShowModal(false); setForm(EMPTY); setInputMode('manual'); setImageFiles([]); setExtractMsg(null) }}
                       className="px-4 py-2 border border-gray-200 rounded-lg text-sm text-gray-600 hover:bg-gray-50">Отмена</button>
-                    {tab < 5
+                    {tab < 6
                       ? <button onClick={() => setTab(tab+1)} className="px-4 py-2 bg-[#1B8A4C] text-white rounded-lg text-sm font-medium hover:bg-[#177040]">Далее →</button>
                       : <button onClick={handleGenerate} disabled={generating} className="flex items-center gap-2 px-4 py-2 bg-[#1B8A4C] text-white rounded-lg text-sm font-medium hover:bg-[#177040] disabled:opacity-70">
                           {generating ? <><Loader2 className="w-4 h-4 animate-spin" /> AI анализирует...</> : <><CheckCircle2 className="w-4 h-4" /> {editingId ? 'Перегенерировать' : 'Сгенерировать'}</>}

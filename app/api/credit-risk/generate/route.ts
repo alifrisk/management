@@ -185,7 +185,11 @@ ${is_collateral_change ? `
 Залог / Новый лимит: ${pct(collateral_coverage)} ${collateral_coverage >= 150 ? '✓ норма' : collateral_coverage >= 100 ? '⚠ допустимо' : '✗ недостаточно'}
 ` : ''}
 
-═══ ПРОВЕРКА КОРРЕКТНОСТИ ДАННЫХ (выполни перед написанием заключения) ═══
+${fd.additional_info ? `═══ ДОПОЛНИТЕЛЬНАЯ ИНФОРМАЦИЯ ОТ АНАЛИТИКА ═══
+${fd.additional_info}
+ВАЖНО: Учти эту информацию при составлении заключения — она может влиять на оценку рисков и рекомендацию.
+
+` : ''}═══ ПРОВЕРКА КОРРЕКТНОСТИ ДАННЫХ (выполни перед написанием заключения) ═══
 Баланс П1: Актив ${f(p1_assets)} vs Пассив (обяз. ${f(p1_liab)} + капитал ${f(p1_equity)} = ${f(p1_liab + p1_equity)}) → ${Math.abs(p1_assets - (p1_liab + p1_equity)) < 1 ? '✅ сходится' : `⚠️ РАСХОЖДЕНИЕ ${f(Math.abs(p1_assets - (p1_liab + p1_equity)))}`}
 Баланс П2: Актив ${f(p2_assets)} vs Пассив (обяз. ${f(p2_liab)} + капитал ${f(p2_equity)} = ${f(p2_liab + p2_equity)}) → ${Math.abs(p2_assets - (p2_liab + p2_equity)) < 1 ? '✅ сходится' : `⚠️ РАСХОЖДЕНИЕ ${f(Math.abs(p2_assets - (p2_liab + p2_equity)))}`}
 Выручка vs Опер.поток П2: ${p2_revenue > 0 && p2_op_cf !== 0 ? (Math.abs(p2_revenue - p2_op_cf) / p2_revenue > 0.5 ? `⚠️ выручка ${f(p2_revenue)} существенно ≠ опер.поток ${f(p2_op_cf)}` : '✅ приемлемо') : 'нет данных'}
