@@ -265,8 +265,8 @@ export default function DashboardPage() {
           <ComposedChart data={filterMonth ? monthData.filter((_,i) => i === parseInt(filterMonth) - 1) : monthData}>
             <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
             <XAxis dataKey="name" tick={{ fontSize: 11 }} />
-            <YAxis yAxisId="left" tick={{ fontSize: 11 }} tickFormatter={v => fmt(v)} />
-            <YAxis yAxisId="right" orientation="right" tick={{ fontSize: 11 }} />
+            <YAxis yAxisId="left" tick={{ fontSize: 11 }} tickFormatter={v => fmt(v)} domain={[0, (dataMax: number) => Math.ceil(dataMax * 1.3) || 1]} />
+            <YAxis yAxisId="right" orientation="right" tick={{ fontSize: 11 }} domain={[0, (dataMax: number) => Math.ceil(dataMax * 1.5) || 1]} />
             <Tooltip formatter={(v: number, name: string) => name === 'Кол-во' ? [v, name] : [fmt(v), name]} />
             <Legend />
             <Bar yAxisId="left" dataKey="loss" name="Ущерб (TJS)" fill="#EF4444" radius={[4,4,0,0]}><LabelList dataKey="loss" position="top" style={{ fontSize: 9 }} formatter={(v: number) => v > 0 ? fmt(v) : ''} /></Bar>
