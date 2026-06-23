@@ -705,7 +705,7 @@ export default function CreditRiskPage() {
         <table className="w-full text-sm">
           <thead>
             <tr className="bg-gray-50 border-b border-gray-100">
-              {['№','Заёмщик','Тип','Сумма','Риск','Рекомендация','Дата',''].map(h => (
+              {['№','Заёмщик','Тип','Сумма линии','Риск','Рекомендация','Дата',''].map(h => (
                 <th key={h} className="text-left px-4 py-3 text-xs font-medium text-gray-500 uppercase">{h}</th>
               ))}
             </tr>

@@ -101,8 +101,16 @@ const EMPTY: Record<string, string> = {
 }
 
 const fmtDisp = (v: number) => v ? new Intl.NumberFormat('ru-RU').format(Math.round(v)) : '—'
-const fmtN = (v: string) => { const n = v.replace(/\D/g, ''); return n ? new Intl.NumberFormat('ru-RU').format(Number(n)) : '' }
-const parseN = (v: string) => Number(v.replace(/\D/g, '')) || 0
+const fmtN = (v: string) => {
+  const clean = v.replace(/[^\d.,]/g, '')
+  const sep = clean.search(/[.,]/)
+  if (sep === -1) return clean ? new Intl.NumberFormat('ru-RU').format(Number(clean)) : ''
+  const intPart = clean.slice(0, sep)
+  const decPart = clean.slice(sep + 1).replace(/[.,]/g, '')
+  const intFmt = intPart ? new Intl.NumberFormat('ru-RU').format(Number(intPart)) : '0'
+  return `${intFmt},${decPart}`
+}
+const parseN = (v: string) => Number(v.replace(/[\s ]/g, '').replace(',', '.')) || 0
 
 // ── Input row component ──────────────────────────────────────────────────────
 interface FRProps {
@@ -132,7 +140,7 @@ function FR({ label, f1, f2, bold, auto, v1, v2, indent, deduction, highlight,
               {shouldConvert && (v1||0) > 0 && <div className="text-xs text-gray-400 text-right pr-2">≈ ${fmtDisp(toUSD1(v1||0))}</div>}
             </div>
           : <div className="space-y-0.5">
-              <input type="text" inputMode="numeric" value={form[f1] || ''} onChange={e => setF(f1, fmtN(e.target.value))} className={cls} placeholder="0" />
+              <input type="text" inputMode="decimal" value={form[f1] || ''} onChange={e => setF(f1, fmtN(e.target.value))} className={cls} placeholder="0" />
               {shouldConvert && parseN(form[f1]) > 0 && <div className="text-xs text-gray-400 text-right">≈ ${fmtDisp(toUSD1(parseN(form[f1])))}</div>}
             </div>}
       </td>
@@ -622,7 +630,7 @@ export default function FinancialAnalysisPage() {
         <table className="w-full text-sm">
           <thead>
             <tr className="bg-gray-50 border-b border-gray-100">
-              {['Контрагент','Тип','Аналитик','Периоды','Активы П2 ($)','CAR','ROE','Ликвидность','Дата',''].map(h => (
+              {['Контрагент','Тип','Аналитик','Периоды','Активы П2 (тыс. $)','CAR','ROE','Ликвидность','Дата',''].map(h => (
                 <th key={h} className="text-left px-4 py-3 text-xs font-medium text-gray-500 uppercase whitespace-nowrap">{h}</th>
               ))}
             </tr>
