@@ -261,7 +261,7 @@ export default function CfpPage() {
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-xl font-semibold text-gray-900">План финансирования на ЧС (CFP)</h1>
-          <p className="text-sm text-gray-500 mt-0.5">Contingency Funding Plan · Инструкция НБТ №247 · ОАО «Алиф Банк»</p>
+          <p className="text-sm text-gray-500 mt-0.5">Contingency Funding Plan · Инструкция НБТ №247</p>
         </div>
         <button onClick={() => { resetModal(); setShowModal(true) }}
           className="flex items-center gap-2 px-4 py-2 bg-[#1B8A4C] text-white rounded-lg text-sm font-medium hover:bg-[#177040]">
@@ -510,7 +510,7 @@ export default function CfpPage() {
                     <div>
                       <label className={lbl}>Название плана *</label>
                       <input type="text" value={form.report_name} onChange={e => setF('report_name', e.target.value)}
-                        placeholder="CFP Алиф Банк 2026" className={inp} />
+                        placeholder="CFP 2026" className={inp} />
                     </div>
                     <div>
                       <label className={lbl}>Аналитик</label>
