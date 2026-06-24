@@ -43,13 +43,23 @@ export async function POST(req: Request) {
       const anyWarning = [s11, s12, s13, sk21].includes('yellow')
       const overallComplianceLabel = anyBreach ? '🔴 ЕСТЬ НАРУШЕНИЯ НОРМАТИВОВ' : anyWarning ? '⚠️ НОРМАТИВЫ БЛИЗКО К НАРУШЕНИЮ' : '🟢 ВСЕ НОРМАТИВЫ СОБЛЮДЕНЫ'
 
+      // Округляем суммы до ближайших 50 млн — точные цифры не уходят в AI
+      const r50 = (n: number) => Math.round(n / 50) * 50
+
+      const tD50  = r50(termDeposits)
+      const cA50  = r50(currentAccs)
+      const ib50  = r50(interbank)
+      const oth50 = r50(other)
+      const tot50 = tD50 + cA50 + ib50 + oth50
+      const totF50 = r50(totalFunding)
+
       const sourcesBlock = fundingSources.length === 0
         ? 'Источники не указаны'
         : fundingSources.map((r, i) =>
-            `  ${i + 1}. ${r.name} — ${r.amount} млн TJS | Доступность: ${r.access_term} | Статус: ${r.status}`
+            `  ${i + 1}. ${r.name} — ~${r50(Number(r.amount))} млн TJS | Доступность: ${r.access_term} | Статус: ${r.status}`
           ).join('\n')
 
-      // Рассчитываем стресс-сценарии для запаса ликвидности
+      // Стресс-сценарии (только нормативы в % — точные значения нужны для расчёта)
       const k21Gap  = k21 > 0 ? k21 - 30 : 0   // запас до минимума НБТ
       const k21Mild = Math.max(k21 - 5, 0)       // умеренный стресс
       const k21Mod  = Math.max(k21 - 10, 0)      // средний стресс
@@ -64,15 +74,15 @@ export async function POST(req: Request) {
   CAR 1.3 = ${car13}% (норма >= 10%, ${normLabel(s13)}, запас ${car13 > 10 ? (car13 - 10).toFixed(1) : '—'} п.п.)
 Норматив ликвидности (Инструкция НБТ №247):
   К2-1 = ${k21}% (норма >= 30%, ${normLabel(sk21)}, запас ${k21Gap > 0 ? k21Gap.toFixed(1) + ' п.п.' : 'нет — нарушение'})
-Структура обязательств:
-  Срочные депозиты физлиц: ${termDeposits} млн TJS
-  Текущие счета: ${currentAccs} млн TJS
-  МБК: ${interbank} млн TJS
-  Прочие: ${other} млн TJS
-  Итого обязательства: ${totalLiab} млн TJS
+Структура обязательств (млн TJS, округлено до 50):
+  Срочные депозиты физлиц: ~${tD50} млн TJS
+  Текущие счета: ~${cA50} млн TJS
+  МБК: ~${ib50} млн TJS
+  Прочие: ~${oth50} млн TJS
+  Итого обязательства: ~${tot50} млн TJS
 Заявленные источники финансирования:
 ${sourcesBlock}
-  Итого доступно: ${totalFunding} млн TJS
+  Итого доступно: ~${totF50} млн TJS
 ${planPeriod ? `Период плана: ${planPeriod}` : ''}
 
 СТРУКТУРА ДОКУМЕНТА — составь каждый раздел как оперативный план, не как аналитику:

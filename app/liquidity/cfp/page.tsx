@@ -42,6 +42,7 @@ const fmt  = (n: number) => n ? new Intl.NumberFormat('ru-RU', { maximumFraction
 const fmtN = (v: string) => { const n = v.replace(/\D/g, ''); return n ? new Intl.NumberFormat('ru-RU').format(Number(n)) : '' }
 const parseN = (v: string) => Number(v.replace(/[\s ]/g, '').replace(/ /g, '')) || 0
 const pct  = (v: string) => v.replace(/[^\d.,]/g, '').replace(',', '.')
+const r50  = (n: number) => Math.round(n / 50) * 50
 
 const inp    = 'w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#1B8A4C] bg-white'
 const inpNum = inp + ' text-right'
@@ -112,12 +113,13 @@ export default function CfpPage() {
   const [loading,    setLoading]    = useState(true)
   const [showModal,  setShowModal]  = useState(false)
   const [viewing,    setViewing]    = useState<CfpReport | null>(null)
-  const [editingId,  setEditingId]  = useState<string | null>(null)
-  const [tab,        setTab]        = useState(1)
-  const [generating, setGenerating] = useState(false)
-  const [error,      setError]      = useState<string | null>(null)
+  const [editingId,   setEditingId]   = useState<string | null>(null)
+  const [tab,         setTab]         = useState(1)
+  const [generating,  setGenerating]  = useState(false)
+  const [error,       setError]       = useState<string | null>(null)
   const [generatedDoc, setGeneratedDoc] = useState<string | null>(null)
-  const [saving,     setSaving]     = useState(false)
+  const [saving,      setSaving]      = useState(false)
+  const [showWarning, setShowWarning] = useState(false)
 
   // Form state
   const [form, setForm] = useState({
@@ -173,9 +175,16 @@ export default function CfpPage() {
     setShowModal(true)
   }
 
-  // Generate
-  async function handleGenerate() {
+  // Generate — step 1: validate and show warning
+  function handleGenerate() {
     if (!form.report_name.trim()) { setError('Введите название плана'); return }
+    setError(null)
+    setShowWarning(true)
+  }
+
+  // Generate — step 2: confirmed, call AI
+  async function confirmGenerate() {
+    setShowWarning(false)
     setGenerating(true); setError(null)
     try {
       const res = await apiFetch('/api/liquidity/cfp', {
@@ -465,6 +474,95 @@ export default function CfpPage() {
             </div>
             <div className="flex justify-end p-6 border-t border-gray-100">
               <button onClick={() => setViewing(null)} className="px-4 py-2 border border-gray-200 rounded-lg text-sm text-gray-600 hover:bg-gray-50">Закрыть</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ── Warning Modal ─────────────────────────────────────────────────────── */}
+      {showWarning && (
+        <div className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-black/60">
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-lg">
+            <div className="p-6 border-b border-gray-100">
+              <h3 className="text-base font-semibold text-gray-900">Данные, передаваемые ИИ</h3>
+              <p className="text-xs text-gray-500 mt-1">Проверьте, что именно уйдёт в запрос. Суммы округлены до ближайших 50 млн для защиты данных.</p>
+            </div>
+
+            <div className="p-6 space-y-4 max-h-[60vh] overflow-y-auto">
+              {/* Norms — exact % */}
+              <div>
+                <p className="text-[11px] font-semibold text-gray-500 uppercase tracking-wide mb-2">Нормативы (точные значения, %)</p>
+                <div className="grid grid-cols-2 gap-2">
+                  {[
+                    { code: 'CAR 1.1', val: form.car11, norm: '≥12%' },
+                    { code: 'CAR 1.2', val: form.car12, norm: '≥10%' },
+                    { code: 'CAR 1.3', val: form.car13, norm: '≥10%' },
+                    { code: 'К2-1',    val: form.k21,   norm: '≥30%' },
+                  ].map(({ code, val, norm }) => (
+                    <div key={code} className="flex items-center justify-between px-3 py-2 bg-gray-50 rounded-lg">
+                      <span className="text-xs text-gray-500">{code} <span className="text-gray-400">({norm})</span></span>
+                      <span className="text-xs font-semibold text-gray-900">{val || '—'}%</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              {/* Liabilities — rounded */}
+              {(parseN(form.liab_term) + parseN(form.liab_current) + parseN(form.liab_interbank) + parseN(form.liab_other)) > 0 && (
+                <div>
+                  <p className="text-[11px] font-semibold text-gray-500 uppercase tracking-wide mb-2">Обязательства (округлено до ~50 млн)</p>
+                  <div className="grid grid-cols-2 gap-2">
+                    {[
+                      { label: 'Срочные депозиты', val: parseN(form.liab_term) },
+                      { label: 'Текущие счета',    val: parseN(form.liab_current) },
+                      { label: 'МБК',              val: parseN(form.liab_interbank) },
+                      { label: 'Прочие',           val: parseN(form.liab_other) },
+                    ].map(({ label, val }) => (
+                      <div key={label} className="flex items-center justify-between px-3 py-2 bg-gray-50 rounded-lg">
+                        <span className="text-xs text-gray-500">{label}</span>
+                        <span className="text-xs font-semibold text-gray-900">~{fmt(r50(val))} млн</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* Funding sources — rounded */}
+              {sources.filter(s => s.name.trim()).length > 0 && (
+                <div>
+                  <p className="text-[11px] font-semibold text-gray-500 uppercase tracking-wide mb-2">Источники финансирования (округлено)</p>
+                  <div className="space-y-1.5">
+                    {sources.filter(s => s.name.trim()).map((s, i) => (
+                      <div key={i} className="flex items-center justify-between px-3 py-2 bg-gray-50 rounded-lg">
+                        <span className="text-xs text-gray-700">{s.name}</span>
+                        <span className="text-xs font-semibold text-gray-900">~{fmt(r50(parseN(s.amount)))} млн</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* Security note */}
+              <div className="flex items-start gap-2.5 p-3 bg-green-50 border border-green-100 rounded-xl">
+                <CheckCircle className="w-4 h-4 text-green-600 flex-shrink-0 mt-0.5" />
+                <div className="text-xs text-green-800 space-y-0.5">
+                  <p className="font-semibold">Защита данных</p>
+                  <p>Название и реквизиты банка не передаются.</p>
+                  <p>Суммы обязательств и источников округлены до ±50 млн.</p>
+                  <p>Нормативы (%) — точные, т.к. необходимы для расчёта планов.</p>
+                </div>
+              </div>
+            </div>
+
+            <div className="flex items-center justify-end gap-3 p-6 border-t border-gray-100">
+              <button onClick={() => setShowWarning(false)}
+                className="px-4 py-2 border border-gray-200 rounded-lg text-sm text-gray-600 hover:bg-gray-50">
+                Отмена
+              </button>
+              <button onClick={confirmGenerate}
+                className="flex items-center gap-2 px-4 py-2 bg-[#1B8A4C] text-white rounded-lg text-sm font-medium hover:bg-[#177040]">
+                <ShieldAlert className="w-4 h-4" /> Подтвердить и сгенерировать
+              </button>
             </div>
           </div>
         </div>
