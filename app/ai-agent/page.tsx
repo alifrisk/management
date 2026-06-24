@@ -134,7 +134,7 @@ export default function RiskovikPage() {
             text += `КРЕДИТНЫЙ РИСК — последние ${creditRes.data.length} заключений (Одобрено: ${a} | Отклонено: ${r}):\n`
             creditRes.data.forEach(c => {
               text += `• ${c.borrower_name} | ${Number(c.loan_amount).toLocaleString()} ${c.loan_currency} | ${c.recommendation} [${c.risk_level}]\n`
-              if (c.ai_conclusion) text += `  Заключение: ${c.ai_conclusion.slice(0, 300)}...\n`
+              if (c.ai_conclusion) text += `  Заключение: ${c.ai_conclusion.slice(0, 1500)}...\n`
             })
             text += '\n'
           }
@@ -149,7 +149,7 @@ export default function RiskovikPage() {
             text += `ФИНАНСОВЫЙ АНАЛИЗ КОНТРАГЕНТОВ (${finRes.data.length}):\n`
             finRes.data.forEach(f => {
               text += `• ${f.code} (${f.counterparty_type}) | ${f.p1_label} → ${f.p2_label}\n`
-              if (f.ai_conclusion) text += `  Анализ: ${f.ai_conclusion.slice(0, 300)}...\n`
+              if (f.ai_conclusion) text += `  Анализ: ${f.ai_conclusion.slice(0, 1500)}...\n`
             })
             text += '\n'
           }
@@ -371,9 +371,10 @@ export default function RiskovikPage() {
     setEditId(null); setEditText('')
     setLoading(true)
     try {
+      const kbCtxEdit = kbDocs.length > 0 ? kbDocs.map(d => `=== ${d.title} ===\n${d.content}`).join('\n\n') : undefined
       const res = await apiFetch('/api/ai-agent', {
         method: 'POST',
-        body: JSON.stringify({ messages: updatedMsgs.map(m => ({ role: m.role, content: m.content })), context, live_data: liveData || undefined }),
+        body: JSON.stringify({ messages: updatedMsgs.map(m => ({ role: m.role, content: m.content })), context, live_data: liveData || undefined, kb_content: kbCtxEdit }),
       })
       const data = await res.json()
       if (data.error) throw new Error(data.error)
@@ -408,6 +409,7 @@ export default function RiskovikPage() {
 
     try {
       const docCtx = docs.length > 0 ? docs.map(d => `=== ${d.name} ===\n${d.content}`).join('\n\n') : undefined
+      const kbCtx = kbDocs.length > 0 ? kbDocs.map(d => `=== ${d.title} ===\n${d.content}`).join('\n\n') : undefined
       const res = await apiFetch('/api/ai-agent', {
         method: 'POST',
         body: JSON.stringify({
@@ -415,6 +417,7 @@ export default function RiskovikPage() {
           context,
           document_context: docCtx,
           live_data: liveData || undefined,
+          kb_content: kbCtx,
         }),
       })
       const data = await res.json()

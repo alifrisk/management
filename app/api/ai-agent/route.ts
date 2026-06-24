@@ -291,14 +291,16 @@ async function fetchKnowledgeDocs(): Promise<string> {
 
 export async function POST(request: Request) {
   try {
-    const { messages, context, document_context, live_data } = await request.json()
+    const { messages, context, document_context, live_data, kb_content } = await request.json()
 
     const conversation = messages.map((m: { role: string; content: string }) => ({
       role: m.role,
       content: m.content,
     }))
 
-    const knowledgeDocs = await fetchKnowledgeDocs()
+    const knowledgeDocs = kb_content
+      ? `\n\n════════════════════════════════════════\nБАЗА ЗНАНИЙ АЛИФ БАНКА\n════════════════════════════════════════\n\n${kb_content}`
+      : await fetchKnowledgeDocs()
 
     let systemFinal = SYSTEM_PROMPT
     if (knowledgeDocs) systemFinal += knowledgeDocs
