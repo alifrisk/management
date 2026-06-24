@@ -275,6 +275,7 @@ async function fetchKnowledgeDocs(): Promise<string> {
       .select('title, content')
       .eq('is_active', true)
       .order('created_at', { ascending: true })
+      .limit(50)
 
     if (!docs || docs.length === 0) return ''
 

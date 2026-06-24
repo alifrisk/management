@@ -116,17 +116,17 @@ export default function RiskovikPage() {
           const [creditRes, finRes, opRes] = await Promise.all([
             supabase.from('credit_conclusions')
               .select('borrower_name, loan_amount, loan_currency, recommendation, risk_level, analyst_name, created_at, ai_conclusion')
-              .order('created_at', { ascending: false }).limit(5),
+              .order('created_at', { ascending: false }).limit(10),
             supabase.from('counterparty_financials')
               .select('code, counterparty_type, p1_label, p2_label, currency, ai_conclusion, created_at')
-              .order('created_at', { ascending: false }).limit(3),
+              .order('created_at', { ascending: false }).limit(6),
             supabase.from('operational_incidents')
               .select('incident_number, risk_level, business_process, incident_status, loss_amount_tjs')
-              .order('created_at', { ascending: false }).limit(20),
+              .order('created_at', { ascending: false }).limit(40),
           ])
           const assessRes = await supabase.from('counterparty_assessments')
             .select('bank_name, country, total_score, reliability_category, recommended_limit_usd, created_at')
-            .order('created_at', { ascending: false }).limit(5)
+            .order('created_at', { ascending: false }).limit(10)
             .then(r => r.error ? { data: null } : r)
           if (creditRes.data?.length) {
             const a = creditRes.data.filter(c => c.recommendation === 'Одобрить').length
@@ -165,7 +165,7 @@ export default function RiskovikPage() {
             .from('operational_incidents')
             .select('incident_number, incident_status, risk_level, factor, business_process, loss_amount_tjs, incident_date, case_description, department')
             .order('created_at', { ascending: false })
-            .limit(50)
+            .limit(100)
           if (data && data.length > 0) {
             const open = data.filter(i => i.incident_status === 'Открыт').length
             const inProg = data.filter(i => i.incident_status === 'В процессе').length
@@ -189,7 +189,7 @@ export default function RiskovikPage() {
             .from('credit_conclusions')
             .select('borrower_name, business_type, loan_amount, loan_term_months, interest_rate, currency, recommendation, risk_level, analyst_name, created_at, ai_conclusion, p1_label, p2_label, p1_net_profit, p2_net_profit, p1_net_rev, p2_net_rev, p1_total_assets, p2_total_assets')
             .order('created_at', { ascending: false })
-            .limit(10)
+            .limit(20)
           if (data && data.length > 0) {
             const approved = data.filter(c => c.recommendation === 'Одобрить').length
             const rejected = data.filter(c => c.recommendation === 'Отклонить').length
@@ -217,13 +217,13 @@ export default function RiskovikPage() {
               .from('counterparty_assessments')
               .select('bank_name, country, total_score, reliability_category, recommended_limit_usd, created_at')
               .order('created_at', { ascending: false })
-              .limit(10)
+              .limit(20)
               .then(r => r.error ? { data: null } : r),
             supabase
               .from('counterparty_financials')
               .select('code, counterparty_type, p1_label, p2_label, currency, ai_conclusion, created_at')
               .order('created_at', { ascending: false })
-              .limit(5),
+              .limit(10),
           ])
           if (assessRes.data && assessRes.data.length > 0) {
             text = `РЫНОЧНЫЙ РИСК — оценки надёжности контрагентов (${assessRes.data.length}):\n`
