@@ -293,7 +293,12 @@ export default function RiskovikPage() {
 
   async function deleteChat(id: string) {
     await supabase.from('ai_messages').delete().eq('chat_id', id)
-    await supabase.from('ai_chats').delete().eq('id', id)
+    const { error } = await supabase.from('ai_chats').delete().eq('id', id)
+    if (error) {
+      console.error('deleteChat error:', error)
+      // Force remove from UI even if DB delete failed
+      setChats(prev => prev.filter(c => c.id !== id))
+    }
     if (chatId === id) { setChatId(null); setMessages([]) }
     loadChats()
   }
