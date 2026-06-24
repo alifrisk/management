@@ -83,7 +83,7 @@ export async function POST(request: Request) {
     const collateral_coverage_existing = is_collateral_change && existing_balance > 0
       ? (collateral_total / existing_balance) * 100 : 0
 
-    const prompt = `Ты старший кредитный риск-аналитик банка Алиф Банк (Таджикистон) с 15-летним опытом.
+    const prompt = `Ты старший кредитный риск-аналитик банка с 15-летним опытом.
 
 ВИД ЗАКЛЮЧЕНИЯ: ${conclusion_type}
 ${is_collateral_change ? '⚠️ Это заключение о СМЕНЕ ЗАЛОГА по действующему кредиту. Основной анализ — достаточность и качество нового залога.' : 'Твоя задача: дать КОНКРЕТНОЕ заключение с рекомендацией — одобрить или отклонить кредит.'}

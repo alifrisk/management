@@ -71,7 +71,7 @@ export async function POST(request: Request) {
     const tl = TYPE_LOGIC[counterpartyType as keyof typeof TYPE_LOGIC] || TYPE_LOGIC['Банк']
     const isBank = counterpartyType === 'Банк'
 
-    const prompt = `Ты старший риск-аналитик банка Алиф Банк (Таджикистан) с 15-летним опытом анализа контрагентов по МСФО (IFRS).
+    const prompt = `Ты старший риск-аналитик банка с 15-летним опытом анализа контрагентов по МСФО (IFRS).
 Тип анализируемого контрагента: ${counterpartyType}. Применяй логику и нормативы СТРОГО для этого типа.
 Стиль: чёткий, аналитический, с конкретными цифрами. Не более 800 слов.
 
