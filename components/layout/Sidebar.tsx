@@ -6,7 +6,7 @@ import { supabase } from '@/supabase/client'
 import { UserProfile } from '@/types'
 import { cn } from '@/lib/utils'
 import { useI18n, type TranslationKey, type Lang } from '@/lib/i18n'
-import { Shield, FileText, TrendingUp, Droplets, LayoutDashboard, ChevronDown, ChevronRight, LogOut, Settings, Users, Menu, X, ClipboardList, BarChart3, Map, FolderOpen, ClipboardCheck, BookUser, Activity, Building2, ListTodo, Newspaper, Bot, LineChart, Sun, Moon, ShieldAlert } from 'lucide-react'
+import { Shield, FileText, TrendingUp, Droplets, LayoutDashboard, ChevronDown, ChevronRight, LogOut, Settings, Users, Menu, X, ClipboardList, BarChart3, Map, FolderOpen, ClipboardCheck, BookUser, Activity, Building2, ListTodo, Newspaper, Bot, LineChart, Sun, Moon, ShieldAlert, GitMerge } from 'lucide-react'
 
 interface SidebarProps { user: UserProfile }
 
@@ -43,8 +43,9 @@ const NAV_ITEMS = [
   {
     titleKey: 'nav.liquidity' as TranslationKey, href: '/liquidity', icon: <Droplets className="w-4 h-4" />, adminOnly: true,
     children: [
-      { titleKey: 'nav.stressTest' as TranslationKey, href: '/liquidity',     icon: <BarChart3 className="w-3.5 h-3.5" /> },
-      { titleKey: 'nav.cfpPlan'    as TranslationKey, href: '/liquidity/cfp', icon: <ShieldAlert className="w-3.5 h-3.5" /> },
+      { titleKey: 'nav.stressTest'  as TranslationKey, href: '/liquidity',         icon: <BarChart3  className="w-3.5 h-3.5" /> },
+      { titleKey: 'nav.cfpPlan'    as TranslationKey, href: '/liquidity/cfp',     icon: <ShieldAlert className="w-3.5 h-3.5" /> },
+      { titleKey: 'nav.gapAnalysis' as TranslationKey, href: '/liquidity/gap',    icon: <GitMerge   className="w-3.5 h-3.5" /> },
     ],
   },
   { titleKey: 'nav.vnd' as TranslationKey, href: '/vnd', icon: <FolderOpen className="w-4 h-4" />, adminOnly: false, children: [{ titleKey: 'nav.documents' as TranslationKey, href: '/vnd', icon: <FolderOpen className="w-3.5 h-3.5" /> }] },
