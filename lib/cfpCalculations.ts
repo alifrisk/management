@@ -52,6 +52,41 @@ export function calcReserveCoverage(reserveTotal: number, pessimisticOutflow: nu
   return Math.round((reserveTotal / pessimisticOutflow) * 1000) / 10
 }
 
+// ── НБТ Инструкция №176 — нормативы достаточности капитала ──────────────────
+// CAR 1.1 = Кр / Ар × 100%, норма ≥ 12%
+export function statusCar11(v: number): EwiStatus {
+  if (v <= 0) return 'green'
+  if (v < 12) return 'red'
+  if (v < 13) return 'yellow'
+  return 'green'
+}
+// CAR 1.2 = Кр / А × 100%, норма ≥ 10%
+export function statusCar12(v: number): EwiStatus {
+  if (v <= 0) return 'green'
+  if (v < 10) return 'red'
+  if (v < 11) return 'yellow'
+  return 'green'
+}
+// CAR 1.3 = Чок / Ар × 100%, норма ≥ 10%
+export function statusCar13(v: number): EwiStatus {
+  if (v <= 0) return 'green'
+  if (v < 10) return 'red'
+  if (v < 11) return 'yellow'
+  return 'green'
+}
+// К2-1 = ЛАТ / ОВТ × 100% (текущая ликвидность), норма ≥ 30%
+export function statusK21(v: number): EwiStatus {
+  if (v <= 0) return 'green'
+  if (v < 30) return 'red'
+  if (v < 35) return 'yellow'
+  return 'green'
+}
+export function normLabel(s: EwiStatus): string {
+  if (s === 'green') return 'Норма'
+  if (s === 'yellow') return 'Близко к нарушению'
+  return 'НАРУШЕНИЕ'
+}
+
 export const READINESS_LEVELS: Record<number, { label: string; color: string; bg: string; border: string; desc: string }> = {
   1: { label: 'Уровень 1 — Норма',          color: 'text-green-700',  bg: 'bg-green-50',  border: 'border-green-300',  desc: 'Штатный режим работы, мониторинг показателей' },
   2: { label: 'Уровень 2 — Наблюдение',      color: 'text-yellow-700', bg: 'bg-yellow-50', border: 'border-yellow-300', desc: 'Ранние сигналы, усиленный мониторинг, уведомление КУАП' },
