@@ -1,5 +1,6 @@
-import { Shield, FileText, TrendingUp, Droplets, ArrowRight, FolderOpen, ClipboardCheck, BookUser, Building2, BarChart3, ListTodo, LineChart, Bot, ShieldAlert } from 'lucide-react'
+import { Shield, FileText, TrendingUp, Droplets, ArrowRight, FolderOpen, ClipboardCheck, ListTodo, LineChart, Bot } from 'lucide-react'
 import Link from 'next/link'
+import CfpDashboardCard from '@/components/dashboard/CfpDashboardCard'
 
 export default function DashboardPage() {
   return (
@@ -79,22 +80,8 @@ export default function DashboardPage() {
           </div>
         </Link>
 
-        {/* Ликвидность — CFP */}
-        <Link href="/liquidity/cfp" className="group block bg-white rounded-xl border border-gray-100 p-4 shadow-sm hover:shadow-md transition-all">
-          <div className="flex items-start justify-between mb-2">
-            <div className="w-8 h-8 bg-cyan-50 rounded-lg flex items-center justify-center">
-              <ShieldAlert className="w-4 h-4 text-cyan-600" />
-            </div>
-            <ArrowRight className="w-3.5 h-3.5 text-gray-300 group-hover:text-[#1B8A4C] transition-colors" />
-          </div>
-          <h3 className="font-semibold text-gray-900 text-sm mb-0.5">CFP — План финансирования</h3>
-          <p className="text-[11px] text-gray-400 mb-2">EWI · Survival Horizon · Резервные источники</p>
-          <div className="flex flex-wrap gap-1">
-            {['EWI-статус','Survival Horizon','КУАП нарратив'].map(t => (
-              <span key={t} className="text-[10px] bg-cyan-50 text-cyan-700 px-1.5 py-0.5 rounded-full">{t}</span>
-            ))}
-          </div>
-        </Link>
+        {/* Ликвидность — CFP (live widget) */}
+        <CfpDashboardCard />
 
         {/* Индикаторы рынка */}
         <Link href="/market-risk/indicators" className="group block bg-white rounded-xl border border-gray-100 p-4 shadow-sm hover:shadow-md transition-all">

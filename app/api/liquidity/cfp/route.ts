@@ -37,7 +37,14 @@ export async function POST(req: Request) {
       const totalFunding = fundingSources.reduce((s, r) => s + (Number(r.amount) || 0), 0)
 
       const planPeriod = d.plan_period || ''
-      const planDate   = d.plan_date   || ''
+
+      const cfpBuckets: { label: string; outflow: number; inflow: number; net: number; cumulative_net: number; status: string }[] = d.cfp_buckets || []
+      const bucketsBlock = cfpBuckets.length > 0
+        ? cfpBuckets.map(b => {
+            const statusLabel = b.status === 'red' ? 'ДЕФИЦИТ' : b.status === 'yellow' ? 'Внимание' : 'Профицит'
+            return `  ${b.label}: Оттоки ~${r50(b.outflow)} | Поступления ~${r50(b.inflow)} | Чистая ~${b.net >= 0 ? '+' : ''}${r50(b.net)} | ${statusLabel}`
+          }).join('\n')
+        : 'Данные по срочным корзинам не предоставлены'
 
       const anyBreach  = [s11, s12, s13, sk21].includes('red')
       const anyWarning = [s11, s12, s13, sk21].includes('yellow')
@@ -74,15 +81,8 @@ export async function POST(req: Request) {
   CAR 1.3 = ${car13}% (норма >= 10%, ${normLabel(s13)}, запас ${car13 > 10 ? (car13 - 10).toFixed(1) : '—'} п.п.)
 Норматив ликвидности (Инструкция НБТ №247):
   К2-1 = ${k21}% (норма >= 30%, ${normLabel(sk21)}, запас ${k21Gap > 0 ? k21Gap.toFixed(1) + ' п.п.' : 'нет — нарушение'})
-Структура обязательств (млн TJS, округлено до 50):
-  Срочные депозиты физлиц: ~${tD50} млн TJS
-  Текущие счета: ~${cA50} млн TJS
-  МБК: ~${ib50} млн TJS
-  Прочие: ~${oth50} млн TJS
-  Итого обязательства: ~${tot50} млн TJS
-Заявленные источники финансирования:
-${sourcesBlock}
-  Итого доступно: ~${totF50} млн TJS
+CFP-ПОЗИЦИЯ ПО ВРЕМЕННЫМ КОРЗИНАМ (млн TJS, округлено до 50):
+${bucketsBlock}
 ${planPeriod ? `Период плана: ${planPeriod}` : ''}
 
 СТРУКТУРА ДОКУМЕНТА — составь каждый раздел как оперативный план, не как аналитику:
