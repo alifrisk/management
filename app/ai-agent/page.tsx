@@ -113,12 +113,9 @@ export default function RiskovikPage() {
 
         if (!context) {
           // Общий контекст — подгружаем компактный срез из всех модулей
-          const [creditRes, assessRes, finRes, opRes] = await Promise.all([
+          const [creditRes, finRes, opRes] = await Promise.all([
             supabase.from('credit_conclusions')
-              .select('borrower_name, loan_amount, currency, recommendation, risk_level, analyst_name, created_at, ai_conclusion')
-              .order('created_at', { ascending: false }).limit(5),
-            supabase.from('counterparty_assessments')
-              .select('bank_name, country, total_score, reliability_category, recommended_limit_usd, created_at')
+              .select('borrower_name, loan_amount, loan_currency, recommendation, risk_level, analyst_name, created_at, ai_conclusion')
               .order('created_at', { ascending: false }).limit(5),
             supabase.from('counterparty_financials')
               .select('code, counterparty_type, p1_label, p2_label, currency, ai_conclusion, created_at')
@@ -127,12 +124,16 @@ export default function RiskovikPage() {
               .select('incident_number, risk_level, business_process, incident_status, loss_amount_tjs')
               .order('created_at', { ascending: false }).limit(20),
           ])
+          const assessRes = await supabase.from('counterparty_assessments')
+            .select('bank_name, country, total_score, reliability_category, recommended_limit_usd, created_at')
+            .order('created_at', { ascending: false }).limit(5)
+            .then(r => r.error ? { data: null } : r)
           if (creditRes.data?.length) {
             const a = creditRes.data.filter(c => c.recommendation === 'Одобрить').length
             const r = creditRes.data.filter(c => c.recommendation === 'Отклонить').length
             text += `КРЕДИТНЫЙ РИСК — последние ${creditRes.data.length} заключений (Одобрено: ${a} | Отклонено: ${r}):\n`
             creditRes.data.forEach(c => {
-              text += `• ${c.borrower_name} | ${Number(c.loan_amount).toLocaleString()} ${c.currency} | ${c.recommendation} [${c.risk_level}]\n`
+              text += `• ${c.borrower_name} | ${Number(c.loan_amount).toLocaleString()} ${c.loan_currency} | ${c.recommendation} [${c.risk_level}]\n`
               if (c.ai_conclusion) text += `  Заключение: ${c.ai_conclusion.slice(0, 300)}...\n`
             })
             text += '\n'
@@ -216,7 +217,8 @@ export default function RiskovikPage() {
               .from('counterparty_assessments')
               .select('bank_name, country, total_score, reliability_category, recommended_limit_usd, created_at')
               .order('created_at', { ascending: false })
-              .limit(10),
+              .limit(10)
+              .then(r => r.error ? { data: null } : r),
             supabase
               .from('counterparty_financials')
               .select('code, counterparty_type, p1_label, p2_label, currency, ai_conclusion, created_at')
