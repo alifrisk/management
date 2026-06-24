@@ -305,6 +305,11 @@ export async function POST(request: Request) {
     if (live_data) systemFinal += `\n\n════════════════════════════════════════\nЖИВЫЕ ДАННЫЕ ИЗ СИСТЕМЫ АЛИФ БАНКА\n════════════════════════════════════════\n${live_data}`
     if (document_context) systemFinal += `\n\nЗАГРУЖЕННЫЕ ДОКУМЕНТЫ:\n${document_context}`
 
+    console.log('System prompt length:', systemFinal.length)
+    console.log('KB included:', knowledgeDocs.length > 0)
+    console.log('Live data:', !!live_data)
+    console.log('Doc context:', !!document_context)
+
     const response = await fetch('https://api.anthropic.com/v1/messages', {
       method: 'POST',
       headers: {

@@ -83,6 +83,7 @@ export default function RiskovikPage() {
       .eq('is_active', true)
       .order('created_at', { ascending: true })
     setKbDocs(data || [])
+    console.log('KB docs:', (data || []).length, (data || []).map(d => d.title))
   }, [])
 
   useEffect(() => {
