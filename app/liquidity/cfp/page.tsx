@@ -2,7 +2,7 @@
 import { useState, useEffect, useCallback } from 'react'
 import { supabase } from '@/supabase/client'
 import { apiFetch } from '@/lib/api-fetch'
-import { Plus, Eye, Trash2, X, Loader2, ShieldAlert, CheckCircle } from 'lucide-react'
+import { Plus, Eye, Trash2, X, Loader2, ShieldAlert, CheckCircle, Edit2 } from 'lucide-react'
 import {
   statusCar11, statusCar12, statusCar13, statusK21, normLabel,
   ewiN1, ewiLcr, ewiOutflow, ewiTop5, overallEwi,
@@ -112,6 +112,7 @@ export default function CfpPage() {
   const [loading,    setLoading]    = useState(true)
   const [showModal,  setShowModal]  = useState(false)
   const [viewing,    setViewing]    = useState<CfpReport | null>(null)
+  const [editingId,  setEditingId]  = useState<string | null>(null)
   const [tab,        setTab]        = useState(1)
   const [generating, setGenerating] = useState(false)
   const [error,      setError]      = useState<string | null>(null)
@@ -142,7 +143,34 @@ export default function CfpPage() {
   function resetModal() {
     setForm({ report_name: '', analyst_name: '', plan_period: '', plan_date: '', car11: '', car12: '', car13: '', k21: '', liab_term: '', liab_current: '', liab_interbank: '', liab_other: '' })
     setSources([{ ...EMPTY_SRC }])
-    setTab(1); setGeneratedDoc(null); setError(null)
+    setEditingId(null); setTab(1); setGeneratedDoc(null); setError(null)
+  }
+
+  function handleEdit(r: CfpReport) {
+    setEditingId(r.id)
+    setForm({
+      report_name:   r.report_name  || '',
+      analyst_name:  r.analyst_name || '',
+      plan_period:   r.plan_period  || '',
+      plan_date:     r.plan_date    || '',
+      car11: r.car11 != null ? String(r.car11) : '',
+      car12: r.car12 != null ? String(r.car12) : '',
+      car13: r.car13 != null ? String(r.car13) : '',
+      k21:   r.k21   != null ? String(r.k21)   : '',
+      liab_term:      r.liabilities ? fmtN(String(r.liabilities.term_deposits))    : '',
+      liab_current:   r.liabilities ? fmtN(String(r.liabilities.current_accounts)) : '',
+      liab_interbank: r.liabilities ? fmtN(String(r.liabilities.interbank))        : '',
+      liab_other:     r.liabilities ? fmtN(String(r.liabilities.other))            : '',
+    })
+    setSources(
+      r.funding_sources && r.funding_sources.length > 0
+        ? r.funding_sources.map(s => ({ name: s.name, amount: fmtN(String(s.amount)), access_term: s.access_term, status: s.status }))
+        : [{ ...EMPTY_SRC }]
+    )
+    setGeneratedDoc(r.ai_conclusion || null)
+    setTab(1)
+    setError(null)
+    setShowModal(true)
   }
 
   // Generate
@@ -178,12 +206,12 @@ export default function CfpPage() {
     } finally { setGenerating(false) }
   }
 
-  // Save
+  // Save / Update
   async function handleSave() {
     if (!generatedDoc) return
     setSaving(true)
     try {
-      const { error: dbErr } = await supabase.from('cfp_reports').insert({
+      const payload = {
         report_name:  form.report_name,
         analyst_name: form.analyst_name,
         plan_period:  form.plan_period,
@@ -199,7 +227,10 @@ export default function CfpPage() {
           name: s.name, amount: parseN(s.amount), access_term: s.access_term, status: s.status,
         })),
         ai_conclusion: generatedDoc,
-      })
+      }
+      const { error: dbErr } = editingId
+        ? await supabase.from('cfp_reports').update(payload).eq('id', editingId)
+        : await supabase.from('cfp_reports').insert(payload)
       if (dbErr) throw new Error(dbErr.message)
       setShowModal(false); resetModal(); fetch_()
     } catch (err: unknown) {
@@ -310,8 +341,9 @@ export default function CfpPage() {
                     </td>
                     <td className="px-3 py-3">
                       <div className="flex items-center gap-1">
-                        <button onClick={() => setViewing(r)} className="p-1.5 text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg"><Eye className="w-3.5 h-3.5" /></button>
-                        <button onClick={() => handleDelete(r.id)} className="p-1.5 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg"><Trash2 className="w-3.5 h-3.5" /></button>
+                        <button onClick={() => setViewing(r)} className="p-1.5 text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg" title="Просмотр"><Eye className="w-3.5 h-3.5" /></button>
+                        <button onClick={() => handleEdit(r)} className="p-1.5 text-gray-400 hover:text-amber-600 hover:bg-amber-50 rounded-lg" title="Изменить и перегенерировать"><Edit2 className="w-3.5 h-3.5" /></button>
+                        <button onClick={() => handleDelete(r.id)} className="p-1.5 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg" title="Удалить"><Trash2 className="w-3.5 h-3.5" /></button>
                       </div>
                     </td>
                   </tr>
@@ -446,8 +478,10 @@ export default function CfpPage() {
             {/* Modal header */}
             <div className="flex items-center justify-between p-5 border-b border-gray-100">
               <div>
-                <h2 className="text-base font-semibold">Новый CFP · Инструкция НБТ №247</h2>
-                <p className="text-xs text-gray-500 mt-0.5">План финансирования на случай чрезвычайных ситуаций · ОАО «Алиф Банк»</p>
+                <h2 className="text-base font-semibold">{editingId ? 'Изменить CFP' : 'Новый CFP'} · Инструкция НБТ №247</h2>
+                <p className="text-xs text-gray-500 mt-0.5">
+                  {editingId ? 'Измените данные и перегенерируйте план' : 'План финансирования на случай чрезвычайных ситуаций'}
+                </p>
               </div>
               <button onClick={() => { setShowModal(false); resetModal() }} className="text-gray-400 hover:text-gray-600"><X className="w-5 h-5" /></button>
             </div>
@@ -652,13 +686,15 @@ export default function CfpPage() {
                     className="flex items-center gap-2 px-4 py-2 bg-[#1B8A4C] text-white rounded-lg text-sm font-medium hover:bg-[#177040] disabled:opacity-50">
                     {generating
                       ? <><Loader2 className="w-4 h-4 animate-spin" /> Генерация...</>
-                      : <><ShieldAlert className="w-4 h-4" /> Сгенерировать CFP</>}
+                      : <><ShieldAlert className="w-4 h-4" /> {editingId ? 'Перегенерировать CFP' : 'Сгенерировать CFP'}</>}
                   </button>
                 )}
                 {tab === 2 && generatedDoc && (
                   <button onClick={handleSave} disabled={saving}
                     className="flex items-center gap-2 px-4 py-2 bg-[#1B8A4C] text-white rounded-lg text-sm font-medium hover:bg-[#177040] disabled:opacity-50">
-                    {saving ? <><Loader2 className="w-4 h-4 animate-spin" /> Сохранение...</> : <><CheckCircle className="w-4 h-4" /> Сохранить CFP</>}
+                    {saving
+                      ? <><Loader2 className="w-4 h-4 animate-spin" /> Сохранение...</>
+                      : <><CheckCircle className="w-4 h-4" /> {editingId ? 'Сохранить изменения' : 'Сохранить CFP'}</>}
                   </button>
                 )}
               </div>
