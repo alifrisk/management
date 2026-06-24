@@ -641,16 +641,24 @@ export default function CfpPage() {
                 Отмена
               </button>
               <div className="flex items-center gap-2">
-                <button onClick={handleGenerate} disabled={generating}
-                  className="flex items-center gap-2 px-4 py-2 bg-[#1B8A4C] text-white rounded-lg text-sm font-medium hover:bg-[#177040] disabled:opacity-50">
-                  {generating
-                    ? <><Loader2 className="w-4 h-4 animate-spin" /> Генерация...</>
-                    : <><ShieldAlert className="w-4 h-4" /> Сгенерировать CFP</>}
-                </button>
-                {generatedDoc && (
+                {tab === 2 && (
+                  <button onClick={() => setTab(1)}
+                    className="px-4 py-2 border border-gray-200 rounded-lg text-sm text-gray-600 hover:bg-gray-50">
+                    ← Назад к форме
+                  </button>
+                )}
+                {tab === 1 && (
+                  <button onClick={handleGenerate} disabled={generating}
+                    className="flex items-center gap-2 px-4 py-2 bg-[#1B8A4C] text-white rounded-lg text-sm font-medium hover:bg-[#177040] disabled:opacity-50">
+                    {generating
+                      ? <><Loader2 className="w-4 h-4 animate-spin" /> Генерация...</>
+                      : <><ShieldAlert className="w-4 h-4" /> Сгенерировать CFP</>}
+                  </button>
+                )}
+                {tab === 2 && generatedDoc && (
                   <button onClick={handleSave} disabled={saving}
-                    className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg text-sm font-medium hover:bg-blue-700 disabled:opacity-50">
-                    {saving ? <><Loader2 className="w-4 h-4 animate-spin" /> Сохранение...</> : <><CheckCircle className="w-4 h-4" /> Сохранить</>}
+                    className="flex items-center gap-2 px-4 py-2 bg-[#1B8A4C] text-white rounded-lg text-sm font-medium hover:bg-[#177040] disabled:opacity-50">
+                    {saving ? <><Loader2 className="w-4 h-4 animate-spin" /> Сохранение...</> : <><CheckCircle className="w-4 h-4" /> Сохранить CFP</>}
                   </button>
                 )}
               </div>
