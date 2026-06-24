@@ -1,9 +1,10 @@
 'use client'
 import { useState, useEffect, useCallback } from 'react'
 import { supabase } from '@/supabase/client'
-import { Plus, Eye, Trash2, X, Loader2, CheckCircle, GitMerge } from 'lucide-react'
+import { Plus, Eye, Trash2, X, Loader2, CheckCircle, GitMerge, Download, Filter } from 'lucide-react'
 
 // ── Constants ──────────────────────────────────────────────────────────────────
+const MONTHS = ['Январь','Февраль','Март','Апрель','Май','Июнь','Июль','Август','Сентябрь','Октябрь','Ноябрь','Декабрь']
 const BUCKETS = ['до 1 дня', '2–7 дней', '8–30 дней', '31–90 дней', '91–180 дней', '181–365 дней', 'свыше 1 года']
 const BUCKETS_SHORT = ['≤1д', '2–7д', '8–30д', '31–90д', '91–180д', '181–365д', '>1г']
 
@@ -254,8 +255,10 @@ export default function GapAnalysisPage() {
   const [showModal, setShowModal] = useState(false)
   const [viewing,  setViewing]  = useState<GapReport | null>(null)
   const [tab,      setTab]      = useState<'assets' | 'liabilities' | 'results'>('assets')
-  const [saving,   setSaving]   = useState(false)
-  const [error,    setError]    = useState<string | null>(null)
+  const [saving,      setSaving]      = useState(false)
+  const [error,       setError]       = useState<string | null>(null)
+  const [filterYear,  setFilterYear]  = useState('')
+  const [filterMonth, setFilterMonth] = useState('')
 
   // Form state
   const [analystName, setAnalystName] = useState('')
@@ -265,11 +268,36 @@ export default function GapAnalysisPage() {
 
   const fetch_ = useCallback(async () => {
     setLoading(true)
-    const { data } = await supabase.from('gap_analysis').select('*').order('created_at', { ascending: false })
+    let query = supabase.from('gap_analysis').select('*').order('created_at', { ascending: false })
+    if (filterYear) {
+      const m = filterMonth ? filterMonth.padStart(2, '0') : null
+      if (m) {
+        query = query.gte('period_date', `${filterYear}-${m}-01`).lte('period_date', `${filterYear}-${m}-31`)
+      } else {
+        query = query.gte('period_date', `${filterYear}-01-01`).lte('period_date', `${filterYear}-12-31`)
+      }
+    }
+    const { data } = await query
     setReports(data || [])
     setLoading(false)
-  }, [])
+  }, [filterYear, filterMonth])
   useEffect(() => { fetch_() }, [fetch_])
+
+  async function downloadWord(r: GapReport) {
+    try {
+      const res = await fetch('/api/liquidity/gap/export-word', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ report: r }),
+      })
+      if (!res.ok) throw new Error('Ошибка сервера')
+      const blob = await res.blob()
+      const url = URL.createObjectURL(blob)
+      const a = document.createElement('a'); a.href = url
+      const period = r.period_date ? new Date(r.period_date).toLocaleDateString('ru-RU', { month: 'long', year: 'numeric' }) : 'period'
+      a.download = `GAP_${period}.docx`; a.click()
+      URL.revokeObjectURL(url)
+    } catch (e: unknown) { alert('Ошибка: ' + (e instanceof Error ? e.message : String(e))) }
+  }
 
   function resetModal() {
     setAnalystName(''); setPeriodDate('')
@@ -342,6 +370,27 @@ export default function GapAnalysisPage() {
         ))}
       </div>
 
+      {/* Filter bar */}
+      <div className="flex items-center gap-3 bg-white rounded-xl border border-gray-100 shadow-sm px-4 py-3">
+        <Filter className="w-4 h-4 text-gray-400 flex-shrink-0" />
+        <select value={filterYear} onChange={e => { setFilterYear(e.target.value); setFilterMonth('') }}
+          className="px-3 py-1.5 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#1B8A4C]">
+          <option value="">Все годы</option>
+          {[2024,2025,2026,2027].map(y => <option key={y} value={String(y)}>{y}</option>)}
+        </select>
+        <select value={filterMonth} onChange={e => setFilterMonth(e.target.value)} disabled={!filterYear}
+          className="px-3 py-1.5 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#1B8A4C] disabled:opacity-40">
+          <option value="">Все месяцы</option>
+          {MONTHS.map((m, i) => <option key={i} value={String(i + 1).padStart(2, '0')}>{m}</option>)}
+        </select>
+        {(filterYear || filterMonth) && (
+          <button onClick={() => { setFilterYear(''); setFilterMonth('') }}
+            className="flex items-center gap-1 text-xs text-gray-400 hover:text-gray-600">
+            <X className="w-3.5 h-3.5" /> Сбросить
+          </button>
+        )}
+      </div>
+
       {/* Table */}
       <div className="bg-white rounded-xl border border-gray-100 shadow-sm overflow-hidden">
         <div className="overflow-x-auto">
@@ -355,9 +404,9 @@ export default function GapAnalysisPage() {
             </thead>
             <tbody className="divide-y divide-gray-50">
               {loading
-                ? <tr><td colSpan={12} className="text-center py-12"><Loader2 className="w-5 h-5 animate-spin mx-auto text-gray-400" /></td></tr>
+                ? <tr><td colSpan={13} className="text-center py-12"><Loader2 className="w-5 h-5 animate-spin mx-auto text-gray-400" /></td></tr>
                 : reports.length === 0
-                ? <tr><td colSpan={12} className="text-center py-12 text-gray-400">
+                ? <tr><td colSpan={13} className="text-center py-12 text-gray-400">
                     <GitMerge className="w-8 h-8 mx-auto mb-2 opacity-30" />
                     <p>Нет ГЭП-анализов</p>
                   </td></tr>
@@ -382,6 +431,7 @@ export default function GapAnalysisPage() {
                       <td className="px-3 py-3">
                         <div className="flex items-center gap-1">
                           <button onClick={() => setViewing(r)} className="p-1.5 text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg" title="Просмотр"><Eye className="w-3.5 h-3.5" /></button>
+                          <button onClick={() => downloadWord(r)} className="p-1.5 text-gray-400 hover:text-[#1B8A4C] hover:bg-green-50 rounded-lg" title="Скачать Word"><Download className="w-3.5 h-3.5" /></button>
                           <button onClick={() => handleDelete(r.id)} className="p-1.5 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg" title="Удалить"><Trash2 className="w-3.5 h-3.5" /></button>
                         </div>
                       </td>

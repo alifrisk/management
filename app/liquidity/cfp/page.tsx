@@ -2,7 +2,7 @@
 import { useState, useEffect, useCallback } from 'react'
 import { supabase } from '@/supabase/client'
 import { apiFetch } from '@/lib/api-fetch'
-import { Plus, Eye, Trash2, X, Loader2, ShieldAlert, CheckCircle, Edit2 } from 'lucide-react'
+import { Plus, Eye, Trash2, X, Loader2, ShieldAlert, CheckCircle, Edit2, Download, Filter } from 'lucide-react'
 import {
   statusCar11, statusCar12, statusCar13, statusK21, normLabel,
   ewiN1, ewiLcr, ewiOutflow, ewiTop5, overallEwi,
@@ -35,6 +35,7 @@ interface CfpReport {
 }
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
+const MONTHS = ['Январь','Февраль','Март','Апрель','Май','Июнь','Июль','Август','Сентябрь','Октябрь','Ноябрь','Декабрь']
 const EMPTY_SRC: FundingSource = { name: '', amount: '', access_term: '', status: 'Доступен' }
 const SRC_STATUSES = ['Доступен', 'Условно доступен', 'Ограничен']
 
@@ -120,6 +121,8 @@ export default function CfpPage() {
   const [generatedDoc, setGeneratedDoc] = useState<string | null>(null)
   const [saving,      setSaving]      = useState(false)
   const [showWarning, setShowWarning] = useState(false)
+  const [filterYear,  setFilterYear]  = useState('')
+  const [filterMonth, setFilterMonth] = useState('')
 
   // Form state
   const [form, setForm] = useState({
@@ -136,11 +139,35 @@ export default function CfpPage() {
   // Fetch reports
   const fetch_ = useCallback(async () => {
     setLoading(true)
-    const { data } = await supabase.from('cfp_reports').select('*').order('created_at', { ascending: false })
+    let query = supabase.from('cfp_reports').select('*').order('created_at', { ascending: false })
+    if (filterYear) {
+      const m = filterMonth ? filterMonth.padStart(2, '0') : null
+      if (m) {
+        query = query.gte('created_at', `${filterYear}-${m}-01`).lte('created_at', `${filterYear}-${m}-31`)
+      } else {
+        query = query.gte('created_at', `${filterYear}-01-01`).lte('created_at', `${filterYear}-12-31`)
+      }
+    }
+    const { data } = await query
     setReports(data || [])
     setLoading(false)
-  }, [])
+  }, [filterYear, filterMonth])
   useEffect(() => { fetch_() }, [fetch_])
+
+  async function downloadWord(r: CfpReport) {
+    try {
+      const res = await fetch('/api/liquidity/cfp/export-word', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ report: r }),
+      })
+      if (!res.ok) throw new Error('Ошибка сервера')
+      const blob = await res.blob()
+      const url = URL.createObjectURL(blob)
+      const a = document.createElement('a'); a.href = url
+      a.download = `CFP_${r.report_name}.docx`; a.click()
+      URL.revokeObjectURL(url)
+    } catch (e: unknown) { alert('Ошибка: ' + (e instanceof Error ? e.message : String(e))) }
+  }
 
   function resetModal() {
     setForm({ report_name: '', analyst_name: '', plan_period: '', plan_date: '', car11: '', car12: '', car13: '', k21: '', liab_term: '', liab_current: '', liab_interbank: '', liab_other: '' })
@@ -293,6 +320,27 @@ export default function CfpPage() {
         ))}
       </div>
 
+      {/* Filter bar */}
+      <div className="flex items-center gap-3 bg-white rounded-xl border border-gray-100 shadow-sm px-4 py-3">
+        <Filter className="w-4 h-4 text-gray-400 flex-shrink-0" />
+        <select value={filterYear} onChange={e => { setFilterYear(e.target.value); setFilterMonth('') }}
+          className="px-3 py-1.5 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#1B8A4C]">
+          <option value="">Все годы</option>
+          {[2024,2025,2026,2027].map(y => <option key={y} value={String(y)}>{y}</option>)}
+        </select>
+        <select value={filterMonth} onChange={e => setFilterMonth(e.target.value)} disabled={!filterYear}
+          className="px-3 py-1.5 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#1B8A4C] disabled:opacity-40">
+          <option value="">Все месяцы</option>
+          {MONTHS.map((m, i) => <option key={i} value={String(i + 1).padStart(2, '0')}>{m}</option>)}
+        </select>
+        {(filterYear || filterMonth) && (
+          <button onClick={() => { setFilterYear(''); setFilterMonth('') }}
+            className="flex items-center gap-1 text-xs text-gray-400 hover:text-gray-600">
+            <X className="w-3.5 h-3.5" /> Сбросить
+          </button>
+        )}
+      </div>
+
       {/* Table */}
       <div className="bg-white rounded-xl border border-gray-100 shadow-sm overflow-hidden">
         <table className="w-full text-sm">
@@ -301,13 +349,14 @@ export default function CfpPage() {
               {['Название плана', 'Аналитик', 'Период', 'CAR 1.1', 'CAR 1.2', 'CAR 1.3', 'К2-1', 'Источников', 'Дата', ''].map(h => (
                 <th key={h} className="text-left px-3 py-3 text-xs font-medium text-gray-500 uppercase whitespace-nowrap">{h}</th>
               ))}
+
             </tr>
           </thead>
           <tbody className="divide-y divide-gray-50">
             {loading
-              ? <tr><td colSpan={10} className="text-center py-12"><Loader2 className="w-5 h-5 animate-spin mx-auto text-gray-400" /></td></tr>
+              ? <tr><td colSpan={11} className="text-center py-12"><Loader2 className="w-5 h-5 animate-spin mx-auto text-gray-400" /></td></tr>
               : reports.length === 0
-              ? <tr><td colSpan={10} className="text-center py-12 text-gray-400">
+              ? <tr><td colSpan={11} className="text-center py-12 text-gray-400">
                   <ShieldAlert className="w-8 h-8 mx-auto mb-2 opacity-30" />
                   <p>Нет CFP-отчётов</p>
                 </td></tr>
@@ -352,6 +401,7 @@ export default function CfpPage() {
                       <div className="flex items-center gap-1">
                         <button onClick={() => setViewing(r)} className="p-1.5 text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg" title="Просмотр"><Eye className="w-3.5 h-3.5" /></button>
                         <button onClick={() => handleEdit(r)} className="p-1.5 text-gray-400 hover:text-amber-600 hover:bg-amber-50 rounded-lg" title="Изменить и перегенерировать"><Edit2 className="w-3.5 h-3.5" /></button>
+                        <button onClick={() => downloadWord(r)} className="p-1.5 text-gray-400 hover:text-[#1B8A4C] hover:bg-green-50 rounded-lg" title="Скачать Word"><Download className="w-3.5 h-3.5" /></button>
                         <button onClick={() => handleDelete(r.id)} className="p-1.5 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg" title="Удалить"><Trash2 className="w-3.5 h-3.5" /></button>
                       </div>
                     </td>
