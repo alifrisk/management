@@ -187,7 +187,7 @@ export default function RiskovikPage() {
         } else if (context.includes('Кредитный риск')) {
           const { data } = await supabase
             .from('credit_conclusions')
-            .select('borrower_name, business_type, loan_amount, loan_term_months, interest_rate, currency, recommendation, risk_level, analyst_name, created_at, ai_conclusion, p1_label, p2_label, p1_net_profit, p2_net_profit, p1_net_rev, p2_net_rev, p1_total_assets, p2_total_assets')
+            .select('borrower_name, business_type, loan_amount, loan_term_months, interest_rate, loan_currency, recommendation, risk_level, analyst_name, created_at, ai_conclusion, p1_label, p2_label, p1_net_profit, p2_net_profit, p1_net_rev, p2_net_rev')
             .order('created_at', { ascending: false })
             .limit(20)
           if (data && data.length > 0) {
@@ -199,10 +199,10 @@ export default function RiskovikPage() {
             data.forEach((c, i) => {
               text += `━━━ Заключение ${i + 1}: ${c.borrower_name} ━━━\n`
               text += `Вид деятельности: ${c.business_type || '—'} | Аналитик: ${c.analyst_name || '—'} | Дата: ${c.created_at?.slice(0, 10)}\n`
-              text += `Кредит: ${Number(c.loan_amount).toLocaleString()} ${c.currency} | Срок: ${c.loan_term_months} мес. | Ставка: ${c.interest_rate}%\n`
+              text += `Кредит: ${Number(c.loan_amount).toLocaleString()} ${c.loan_currency} | Срок: ${c.loan_term_months} мес. | Ставка: ${c.interest_rate}%\n`
               text += `Периоды: ${c.p1_label || 'П1'} → ${c.p2_label || 'П2'}\n`
-              if (c.p2_net_rev || c.p2_total_assets) {
-                text += `Выручка: ${Number(c.p1_net_rev || 0).toLocaleString()} → ${Number(c.p2_net_rev || 0).toLocaleString()} | Активы: ${Number(c.p1_total_assets || 0).toLocaleString()} → ${Number(c.p2_total_assets || 0).toLocaleString()}\n`
+              if (c.p2_net_rev) {
+                text += `Выручка: ${Number(c.p1_net_rev || 0).toLocaleString()} → ${Number(c.p2_net_rev || 0).toLocaleString()}\n`
                 text += `Чистая прибыль: ${Number(c.p1_net_profit || 0).toLocaleString()} → ${Number(c.p2_net_profit || 0).toLocaleString()}\n`
               }
               text += `РЕШЕНИЕ: ${c.recommendation} | РИСК: ${c.risk_level}\n`
