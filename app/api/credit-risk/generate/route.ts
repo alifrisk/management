@@ -64,7 +64,7 @@ export async function POST(request: Request) {
     const p1_roe = div(p1_net, p1_equity) * 100
     const p2_roe = div(p2_net, p2_equity) * 100
 
-    // 5. Коэффициент финансирования (леверидж) = Капитал / Обязательства (>0.5 — норма)
+    // 5. Коэффициент финансирования (леверидж) = Капитал / Обязательства (норма ≤0.5)
     const p1_financing = div(p1_equity, p1_liab)
     const p2_financing = div(p2_equity, p2_liab)
 
@@ -154,9 +154,9 @@ ${(fd.collaterals||[]).map((c: {type:string;description:string;value:number}, i:
    П2: ${f(p2_net)} / ${f(p2_equity)} × 100% = ${pct(p2_roe)} ${p2_roe > 20 ? '✓ норма' : '✗ ниже нормы'}
 
 ПОКАЗАТЕЛИ ФИНАНСОВОЙ УСТОЙЧИВОСТИ:
-5. Коэффициент финансирования (леверидж) = Капитал / Обязательства [норма >0.5]
-   П1: ${f(p1_equity)} / ${f(p1_liab)} = ${rat(p1_financing)} ${p1_liab > 0 ? (p1_financing > 0.5 ? '✓ норма' : '✗ ниже нормы') : '(нет обяз.)'}
-   П2: ${f(p2_equity)} / ${f(p2_liab)} = ${rat(p2_financing)} ${p2_liab > 0 ? (p2_financing > 0.5 ? '✓ норма' : '✗ ниже нормы') : '(нет обяз.)'}
+5. Коэффициент финансирования (леверидж) = Капитал / Обязательства [норма ≤0.5]
+   П1: ${f(p1_equity)} / ${f(p1_liab)} = ${rat(p1_financing)} ${p1_liab > 0 ? (p1_financing <= 0.5 ? '✓ норма' : '✗ выше нормы') : '(нет обяз.)'}
+   П2: ${f(p2_equity)} / ${f(p2_liab)} = ${rat(p2_financing)} ${p2_liab > 0 ? (p2_financing <= 0.5 ? '✓ норма' : '✗ выше нормы') : '(нет обяз.)'}
 
 ПОКАЗАТЕЛИ КРЕДИТОСПОСОБНОСТИ:
 6. Покрытие долга (DSC) = Операц. ден. поток / Годовой платёж [норма >1.0]

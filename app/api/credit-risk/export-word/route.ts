@@ -398,7 +398,7 @@ export async function POST(request: Request) {
                 row('Рентабельность активов (ROA)', pv(roa1), pv(roa2), '>6%', isFinite(roa2) && roa2 > 6, 'ROA'),
                 row('Рентабельность собственных средств (ROE)', pv(roe1), pv(roe2), '>20%', isFinite(roe2) && roe2 > 20, 'ROE'),
                 grp('ПОКАЗАТЕЛИ ФИНАНСОВОЙ УСТОЙЧИВОСТИ'),
-                row('Коэффициент финансирования (леверидж)', rv(fin1), rv(fin2), '>0.5', isFinite(fin2) && fin2 > 0.5, 'Кфин'),
+                row('Коэффициент финансирования (леверидж)', rv(fin1), rv(fin2), '≤0.5', isFinite(fin2) && fin2 <= 0.5, 'Кфин'),
                 grp('ПОКАЗАТЕЛИ КРЕДИТОСПОСОБНОСТИ'),
                 row('Коэффициент покрытия долга (DSC)', '—', rv(dsc2), '>1.0', isFinite(dsc2) && dsc2 > 1.0, 'DSC'),
                 row('Коэффициент покрытия залогом', '—', pv(cov), '>120%', isFinite(cov) && cov > 120, 'Кзал'),
