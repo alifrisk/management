@@ -6,7 +6,7 @@ import {
 
 const b = { style: BorderStyle.SINGLE, size: 4, color: 'CCCCCC' }
 const borders = { top: b, bottom: b, left: b, right: b }
-const bGreen = { style: BorderStyle.SINGLE, size: 6, color: '1B8A4C' }
+const bGreen = { style: BorderStyle.SINGLE, size: 6, color: '333333' }
 const nob = { style: BorderStyle.NONE, size: 0, color: 'FFFFFF' }
 const noborders = { top: nob, bottom: nob, left: nob, right: nob }
 
@@ -20,7 +20,7 @@ const cell = (text: string, opts: {
   columnSpan: opts.colSpan,
   verticalAlign: VerticalAlign.CENTER,
   shading: opts.bg ? { fill: opts.bg, type: ShadingType.CLEAR }
-    : opts.green ? { fill: 'E8F4E8', type: ShadingType.CLEAR }
+    : opts.green ? { fill: 'F0F0F0', type: ShadingType.CLEAR }
     : opts.gray ? { fill: 'F5F5F5', type: ShadingType.CLEAR }
     : undefined,
   margins: { top: 70, bottom: 70, left: 120, right: 120 },
@@ -55,10 +55,10 @@ const para = (text: string, opts: {
 // Section header with green underline
 const sectionHead = (num: string, title: string) => new Paragraph({
   spacing: { before: 240, after: 100 },
-  border: { bottom: { style: BorderStyle.SINGLE, size: 6, color: '1B8A4C' } },
+  border: { bottom: { style: BorderStyle.SINGLE, size: 6, color: '333333' } },
   children: [
-    new TextRun({ text: `${num}. `, size: 24, bold: true, color: '1B8A4C', font: 'Times New Roman' }),
-    new TextRun({ text: title, size: 24, bold: true, color: '1B8A4C', font: 'Times New Roman' }),
+    new TextRun({ text: `${num}. `, size: 24, bold: true, color: '000000', font: 'Times New Roman' }),
+    new TextRun({ text: title, size: 24, bold: true, color: '000000', font: 'Times New Roman' }),
   ]
 })
 
@@ -147,9 +147,9 @@ export async function POST(request: Request) {
     const monthly = rate > 0 ? Math.round(loanAmt * rate / (1 - Math.pow(1 + rate, -months))) : Math.round(loanAmt / months)
 
     // Recommendation styling
-    const recColor = c.recommendation?.includes('Отклонить') ? 'C00000' : c.recommendation?.includes('Условно') ? 'BF8F00' : '1B8A4C'
-    const recBg = c.recommendation?.includes('Отклонить') ? 'FFE7E7' : c.recommendation?.includes('Условно') ? 'FFF9E6' : 'E8F4E8'
-    const riskColor = c.risk_level === 'Высокий' ? 'C00000' : c.risk_level === 'Средний' ? 'BF8F00' : '1B8A4C'
+    const recColor = c.recommendation?.includes('Отклонить') ? 'C00000' : c.recommendation?.includes('Условно') ? 'BF8F00' : '000000'
+    const recBg = c.recommendation?.includes('Отклонить') ? 'FFE7E7' : c.recommendation?.includes('Условно') ? 'FFF9E6' : 'F0F0F0'
+    const riskColor = c.risk_level === 'Высокий' ? 'C00000' : c.risk_level === 'Средний' ? 'BF8F00' : '000000'
 
     // AI conclusion paragraphs - styled
     const conclusionParagraphs = (c.ai_conclusion || '').split('\n').filter((l: string) => l.trim() && !l.trim().startsWith('Руководитель СУР')).map((line: string) => {
@@ -157,8 +157,8 @@ export async function POST(request: Request) {
       if (/^\d+\./.test(text)) {
         return new Paragraph({
           spacing: { before: 180, after: 80 },
-          border: { bottom: { style: BorderStyle.SINGLE, size: 4, color: '1B8A4C' } },
-          children: [new TextRun({ text, size: 22, bold: true, color: '1B8A4C', font: 'Times New Roman' })]
+          border: { bottom: { style: BorderStyle.SINGLE, size: 4, color: '333333' } },
+          children: [new TextRun({ text, size: 22, bold: true, color: '000000', font: 'Times New Roman' })]
         })
       }
       if (text.toUpperCase().includes('РЕКОМЕНДАЦИЯ:') || text.toUpperCase().includes('РЕШЕНИЕ:')) {
@@ -192,9 +192,16 @@ export async function POST(request: Request) {
         children: [
 
           // ── ШАПКА ──
-          para('ОАО «Алиф Банк»', { bold: true, size: 30, center: true, after: 40 }),
-          para('Служба управления рисками', { size: 20, center: true, after: 40, color: '555555' }),
-          // Горизонтальная линия
+          para('ЗАКЛЮЧЕНИЕ', { bold: true, size: 32, center: true, after: 40 }),
+          para('по кредитной заявке', { size: 22, center: true, after: 40 }),
+          para(c.borrower_name || '—', { bold: true, size: 26, center: true, after: 160 }),
+          new Table({
+            width: { size: 9354, type: WidthType.DXA }, columnWidths: [4677, 4677],
+            rows: [new TableRow({ children: [
+              new TableCell({ borders: noborders, children: [new Paragraph({ children: [new TextRun({ text: `№ ___________`, size: 22, font: 'Times New Roman' })] })] }),
+              new TableCell({ borders: noborders, children: [new Paragraph({ alignment: AlignmentType.RIGHT, children: [new TextRun({ text: today, size: 22, font: 'Times New Roman' })] })] }),
+            ]})]
+          }),
           new Table({
             width: { size: 9354, type: WidthType.DXA }, columnWidths: [9354],
             rows: [new TableRow({ children: [new TableCell({
@@ -202,10 +209,7 @@ export async function POST(request: Request) {
               children: [new Paragraph({ children: [] })]
             })] })]
           }),
-          para('', { after: 100 }),
-          para('ЗАКЛЮЧЕНИЕ О КРЕДИТОСПОСОБНОСТИ', { bold: true, size: 28, center: true, after: 40 }),
-          para('Субъект малого и среднего бизнеса (SME)', { size: 20, center: true, after: 40, color: '555555' }),
-          para(`Дата составления: ${today}`, { size: 20, center: true, after: 300, color: '555555' }),
+          para('', { after: 200 }),
 
           // ── 1. ПАРАМЕТРЫ ──
           sectionHead('1', 'ПАРАМЕТРЫ КРЕДИТНОЙ ЗАЯВКИ'),
@@ -357,9 +361,9 @@ export async function POST(request: Request) {
             const cov = loanAmt > 0 ? totalCollateral / loanAmt * 100 : NaN
             const grp = (title: string) => new TableRow({ children: [new TableCell({
               borders, columnSpan: 6,
-              shading: { fill: 'E8F4E8', type: ShadingType.CLEAR },
+              shading: { fill: 'F0F0F0', type: ShadingType.CLEAR },
               margins: { top: 60, bottom: 60, left: 120, right: 120 },
-              children: [new Paragraph({ children: [new TextRun({ text: title, size: 20, bold: true, color: '1B8A4C', font: 'Times New Roman' })] })]
+              children: [new Paragraph({ children: [new TextRun({ text: title, size: 20, bold: true, color: '000000', font: 'Times New Roman' })] })]
             })] })
             const row = (name: string, v1: string, v2: string, norm: string, meets: boolean, sym: string) => new TableRow({ children: [
               cell(name, { size: 18 }),
@@ -397,7 +401,7 @@ export async function POST(request: Request) {
                 row('Коэффициент финансирования (леверидж)', rv(fin1), rv(fin2), '>0.5', isFinite(fin2) && fin2 > 0.5, 'Кфин'),
                 grp('ПОКАЗАТЕЛИ КРЕДИТОСПОСОБНОСТИ'),
                 row('Коэффициент покрытия долга (DSC)', '—', rv(dsc2), '>1.0', isFinite(dsc2) && dsc2 > 1.0, 'DSC'),
-                row('Коэффициент покрытия залогом', '—', pv(cov), '>200%', isFinite(cov) && cov > 200, 'Кзал'),
+                row('Коэффициент покрытия залогом', '—', pv(cov), '>120%', isFinite(cov) && cov > 120, 'Кзал'),
               ]
             })
           })(),
@@ -503,24 +507,22 @@ export async function POST(request: Request) {
 
           // ── ПОДПИСИ ──
           new Table({
-            width: { size: 9354, type: WidthType.DXA }, columnWidths: [4677, 4677],
+            width: { size: 9354, type: WidthType.DXA }, columnWidths: [9354],
             rows: [
-              new TableRow({ children: [
-                new TableCell({ borders: noborders, children: [
-                  para('Руководитель СУР: _________________', { after: 40 }),
-                  para('(Сангинова Ф.)', { size: 20, after: 0, color: '555555' }),
-                ]}),
-                new TableCell({ borders: noborders, children: [
-                  para(`г. Душанбе, ${today}`, { center: true, after: 0, color: '555555' }),
-                ]}),
-              ]}),
-              new TableRow({ children: [
-                new TableCell({ borders: noborders, children: [
-                  para('Аналитик: _________________', { after: 40, before: 120 }),
-                  para(c.analyst_name ? `(${c.analyst_name})` : '(Ф.И.О.)', { size: 20, after: 0, color: '555555' }),
-                ]}),
-                new TableCell({ borders: noborders, children: [new Paragraph({ children: [] })] }),
-              ]}),
+              new TableRow({ children: [new TableCell({ borders: noborders, children: [
+                new Paragraph({ children: [
+                  new TextRun({ text: 'Руководитель', size: 22, font: 'Times New Roman' }),
+                ] }),
+                new Paragraph({ spacing: { after: 120 }, children: [
+                  new TextRun({ text: 'Службы управления рисками:  _____________  Сангинова Ф. И.', size: 22, font: 'Times New Roman' }),
+                ] }),
+                new Paragraph({ children: [
+                  new TextRun({ text: 'Аналитик', size: 22, font: 'Times New Roman' }),
+                ] }),
+                new Paragraph({ spacing: { after: 0 }, children: [
+                  new TextRun({ text: `Службы управления рисками:  _____________  ${c.analyst_name || '___________________'}`, size: 22, font: 'Times New Roman' }),
+                ] }),
+              ]}) ]}),
             ]
           }),
         ]
