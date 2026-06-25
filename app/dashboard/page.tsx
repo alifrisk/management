@@ -1,6 +1,7 @@
 import { Shield, FileText, TrendingUp, Droplets, ArrowRight, FolderOpen, ClipboardCheck, ListTodo, LineChart, Bot } from 'lucide-react'
 import Link from 'next/link'
 import CfpDashboardCard from '@/components/dashboard/CfpDashboardCard'
+import GapDashboardCard from '@/components/dashboard/GapDashboardCard'
 
 export default function DashboardPage() {
   return (
@@ -82,6 +83,9 @@ export default function DashboardPage() {
 
         {/* Ликвидность — CFP (live widget) */}
         <CfpDashboardCard />
+
+        {/* Ликвидность — ГЭП (live widget) */}
+        <GapDashboardCard />
 
         {/* Индикаторы рынка */}
         <Link href="/market-risk/indicators" className="group block bg-white rounded-xl border border-gray-100 p-4 shadow-sm hover:shadow-md transition-all">
