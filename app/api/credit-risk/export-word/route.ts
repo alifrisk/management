@@ -152,7 +152,7 @@ export async function POST(request: Request) {
     const riskColor = c.risk_level === 'Высокий' ? 'C00000' : c.risk_level === 'Средний' ? 'BF8F00' : '1B8A4C'
 
     // AI conclusion paragraphs - styled
-    const conclusionParagraphs = (c.ai_conclusion || '').split('\n').filter((l: string) => l.trim()).map((line: string) => {
+    const conclusionParagraphs = (c.ai_conclusion || '').split('\n').filter((l: string) => l.trim() && !l.trim().startsWith('Руководитель СУР')).map((line: string) => {
       const text = line.trim().replace(/\*\*/g, '').replace(/\*/g, '')
       if (/^\d+\./.test(text)) {
         return new Paragraph({
@@ -337,32 +337,70 @@ export async function POST(request: Request) {
 
           // ── 5. КОЭФФИЦИЕНТЫ ──
           sectionHead('5', 'КЛЮЧЕВЫЕ ФИНАНСОВЫЕ КОЭФФИЦИЕНТЫ'),
-          new Table({
-            width: { size: 9354, type: WidthType.DXA },
-            columnWidths: [3400, 1700, 1700, 2554],
-            rows: [
-              new TableRow({ children: [
-                cell('Коэффициент', { green: true, bold: true }),
-                cell(p1, { green: true, bold: true, center: true }),
-                cell(p2, { green: true, bold: true, center: true }),
-                cell('Норматив', { green: true, bold: true, center: true }),
-              ]}),
-              ...([
-                ['Рентабельность продаж (ROS)', pct(p1netProfit, p1rev), pct(p2netProfit, p2rev), 'Норма: >5%'],
-                ['Текущая ликвидность (КА/КО)', p1cl > 0 ? (p1ca/p1cl).toFixed(2) : '—', p2cl > 0 ? (p2ca/p2cl).toFixed(2) : '—', 'Норма: ≥1.5'],
-                ['Долговая нагрузка (Обяз/Актив)', pct(p1l, p1a), pct(p2l, p2a), 'Норма: <70%'],
-                ['Коэффициент автономии (Кап/Актив)', pct(p1e, p1a), pct(p2e, p2a), 'Норма: >30%'],
-                ['Покрытие долга опер. потоком', p1l > 0 ? (p1opCF/p1l).toFixed(2) : '—', p2l > 0 ? (p2opCF/p2l).toFixed(2) : '—', 'Норма: >1'],
-                ['Долговая нагрузка по платежу', p1opCF > 0 ? (monthly*12/p1opCF*100).toFixed(1)+'%' : '—', p2opCF > 0 ? (monthly*12/p2opCF*100).toFixed(1)+'%' : '—', 'Норма: <40%'],
-                ['Покрытие залогом (Залог/Кредит)', totalCollateral > 0 && loanAmt > 0 ? (totalCollateral/loanAmt*100).toFixed(1)+'%' : '—', '—', 'Норма: >120%'],
-              ] as [string,string,string,string][]).map(([label, v1, v2, norm]) => new TableRow({ children: [
-                cell(label),
-                cell(v1, { center: true }),
-                cell(v2, { center: true }),
-                cell(norm, { center: true, color: '555555' }),
-              ]})),
-            ]
-          }),
+          (() => {
+            const p1inv = c.p1_inventory || 0
+            const p2inv = c.p2_inventory || 0
+            const rv = (v: number) => isFinite(v) && !isNaN(v) ? v.toFixed(2) : '—'
+            const pv = (v: number) => isFinite(v) && !isNaN(v) ? v.toFixed(1) + '%' : '—'
+            const lc1 = p1cl > 0 ? p1ca / p1cl : NaN
+            const lc2 = p2cl > 0 ? p2ca / p2cl : NaN
+            const lq1 = p1cl > 0 ? (p1ca - p1inv) / p1cl : NaN
+            const lq2 = p2cl > 0 ? (p2ca - p2inv) / p2cl : NaN
+            const roa1 = p1a > 0 ? p1netProfit / p1a * 100 : NaN
+            const roa2 = p2a > 0 ? p2netProfit / p2a * 100 : NaN
+            const roe1 = p1e > 0 ? p1netProfit / p1e * 100 : NaN
+            const roe2 = p2e > 0 ? p2netProfit / p2e * 100 : NaN
+            const fin1 = p1l > 0 ? p1e / p1l : NaN
+            const fin2 = p2l > 0 ? p2e / p2l : NaN
+            const ann = monthly * 12
+            const dsc2 = ann > 0 ? p2opCF / ann : NaN
+            const cov = loanAmt > 0 ? totalCollateral / loanAmt * 100 : NaN
+            const grp = (title: string) => new TableRow({ children: [new TableCell({
+              borders, columnSpan: 6,
+              shading: { fill: 'E8F4E8', type: ShadingType.CLEAR },
+              margins: { top: 60, bottom: 60, left: 120, right: 120 },
+              children: [new Paragraph({ children: [new TextRun({ text: title, size: 20, bold: true, color: '1B8A4C', font: 'Times New Roman' })] })]
+            })] })
+            const row = (name: string, v1: string, v2: string, norm: string, meets: boolean, sym: string) => new TableRow({ children: [
+              cell(name, { size: 18 }),
+              cell(v1, { center: true, size: 18 }),
+              cell(v2, { center: true, size: 18 }),
+              cell(norm, { center: true, size: 18, color: '555555' }),
+              new TableCell({
+                borders,
+                verticalAlign: VerticalAlign.CENTER,
+                shading: meets ? { fill: 'E8F4E8', type: ShadingType.CLEAR } : undefined,
+                margins: { top: 60, bottom: 60, left: 120, right: 120 },
+                children: [new Paragraph({ alignment: AlignmentType.CENTER, children: [new TextRun({ text: meets ? 'Да' : 'Нет', size: 18, bold: meets, color: meets ? '1B8A4C' : '000000', font: 'Times New Roman' })] })]
+              }),
+              cell(sym, { center: true, size: 18, color: '555555' }),
+            ]})
+            return new Table({
+              width: { size: 9354, type: WidthType.DXA },
+              columnWidths: [2800, 1100, 1200, 1400, 1300, 1554],
+              rows: [
+                new TableRow({ children: [
+                  cell('Наименование показателя', { green: true, bold: true, size: 18 }),
+                  cell(p1, { green: true, bold: true, center: true, size: 16 }),
+                  cell(p2, { green: true, bold: true, center: true, size: 16 }),
+                  cell('Рек. норма', { green: true, bold: true, center: true, size: 18 }),
+                  cell('Соответствует', { green: true, bold: true, center: true, size: 16 }),
+                  cell('Обозн.', { green: true, bold: true, center: true, size: 18 }),
+                ]}),
+                grp('ПОКАЗАТЕЛИ ЛИКВИДНОСТИ'),
+                row('Коэффициент текущей ликвидности', rv(lc1), rv(lc2), '>2.0 (>200%)', isFinite(lc2) && lc2 > 2.0, 'Ктл'),
+                row('Коэффициент быстрой ликвидности', rv(lq1), rv(lq2), '>1.0 (>100%)', isFinite(lq2) && lq2 > 1.0, 'Кбл'),
+                grp('ПОКАЗАТЕЛИ РЕНТАБЕЛЬНОСТИ'),
+                row('Рентабельность активов (ROA)', pv(roa1), pv(roa2), '>6%', isFinite(roa2) && roa2 > 6, 'ROA'),
+                row('Рентабельность собственных средств (ROE)', pv(roe1), pv(roe2), '>20%', isFinite(roe2) && roe2 > 20, 'ROE'),
+                grp('ПОКАЗАТЕЛИ ФИНАНСОВОЙ УСТОЙЧИВОСТИ'),
+                row('Коэффициент финансирования (леверидж)', rv(fin1), rv(fin2), '>0.5', isFinite(fin2) && fin2 > 0.5, 'Кфин'),
+                grp('ПОКАЗАТЕЛИ КРЕДИТОСПОСОБНОСТИ'),
+                row('Коэффициент покрытия долга (DSC)', '—', rv(dsc2), '>1.0', isFinite(dsc2) && dsc2 > 1.0, 'DSC'),
+                row('Коэффициент покрытия залогом', '—', pv(cov), '>200%', isFinite(cov) && cov > 200, 'Кзал'),
+              ]
+            })
+          })(),
           para('', { after: 60 }),
 
           // ── 6. ЗАЛОГ ──
@@ -466,15 +504,24 @@ export async function POST(request: Request) {
           // ── ПОДПИСИ ──
           new Table({
             width: { size: 9354, type: WidthType.DXA }, columnWidths: [4677, 4677],
-            rows: [new TableRow({ children: [
-              new TableCell({ borders: noborders, children: [
-                para('Аналитик: _________________', { after: 60 }),
-                para(c.analyst_name ? `(${c.analyst_name})` : '(Ф.И.О.)', { size: 20, after: 0, color: '555555' }),
+            rows: [
+              new TableRow({ children: [
+                new TableCell({ borders: noborders, children: [
+                  para('Руководитель СУР: _________________', { after: 40 }),
+                  para('(Сангинова Ф.)', { size: 20, after: 0, color: '555555' }),
+                ]}),
+                new TableCell({ borders: noborders, children: [
+                  para(`г. Душанбе, ${today}`, { center: true, after: 0, color: '555555' }),
+                ]}),
               ]}),
-              new TableCell({ borders: noborders, children: [
-                para(`г. Душанбе, ${today}`, { center: true, after: 0, color: '555555' }),
+              new TableRow({ children: [
+                new TableCell({ borders: noborders, children: [
+                  para('Аналитик: _________________', { after: 40, before: 120 }),
+                  para(c.analyst_name ? `(${c.analyst_name})` : '(Ф.И.О.)', { size: 20, after: 0, color: '555555' }),
+                ]}),
+                new TableCell({ borders: noborders, children: [new Paragraph({ children: [] })] }),
               ]}),
-            ]})]
+            ]
           }),
         ]
       }]
