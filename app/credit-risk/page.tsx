@@ -462,6 +462,8 @@ export default function CreditRiskPage() {
         p1_total_cl, p2_total_cl,
         p1_total_equity, p2_total_equity,
         p1_cf_net_op, p2_cf_net_op,
+        p1_cf_net_inv, p2_cf_net_inv,
+        p1_cf_net_fin, p2_cf_net_fin,
         p1_cf_cash_end: p1_cash_end, p2_cf_cash_end: p2_cash_end,
         monthly_payment: monthlyPayment,
         collateral_total, collateral_coverage_pct,

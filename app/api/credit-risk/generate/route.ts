@@ -9,6 +9,15 @@ export async function POST(request: Request) {
     const pct = (v: number) => isFinite(v) && !isNaN(v) ? `${v.toFixed(1)}%` : 'н/д'
     const rat = (v: number) => isFinite(v) && !isNaN(v) ? v.toFixed(2) : 'н/д'
     const div = (a: number, b: number) => b !== 0 ? a / b : 0
+    const getMonths = (label: string) => {
+      const m = label?.match(/\d{2}\.(\d{2})\.\d{4}/)
+      if (m) return parseInt(m[1]) || 12
+      if (/март|mar/i.test(label)) return 3
+      if (/июн|jun/i.test(label)) return 6
+      if (/сент|sep/i.test(label)) return 9
+      if (/дек|dec/i.test(label)) return 12
+      return 12
+    }
     const trend = (v1: number, v2: number) => {
       if (!v1 || !v2) return ''
       const chg = (v2 - v1) / Math.abs(v1) * 100
@@ -35,11 +44,17 @@ export async function POST(request: Request) {
     const p2_revenue = Number(fd.p2_net_rev || 0)
     const p1_net     = Number(fd.p1_net || 0)
     const p2_net     = Number(fd.p2_net || 0)
-    const p1_op_cf   = Number(fd.p1_cf_net_op || 0)  // чистый поток от операционной деятельности
+    const p1_op_cf   = Number(fd.p1_cf_net_op || 0)
     const p2_op_cf   = Number(fd.p2_cf_net_op || 0)
+    const p1_inv_cf  = Number(fd.p1_cf_net_inv || 0)
+    const p2_inv_cf  = Number(fd.p2_cf_net_inv || 0)
+    const p1_fin_cf  = Number(fd.p1_cf_net_fin || 0)
+    const p2_fin_cf  = Number(fd.p2_cf_net_fin || 0)
+
+    const p1_months = getMonths(fd.p1_label || '')
+    const p2_months = getMonths(fd.p2_label || '')
 
     const monthly_payment   = Number(fd.monthly_payment || 0)
-    const annual_payment    = monthly_payment * 12
     const loan_amount       = Number(fd.loan_amount || 0)
     const collateral_total  = (fd.collaterals || []).reduce((s: number, c: {value: number}) => s + (c.value || 0), 0)
     const conclusion_type      = fd.conclusion_type || 'Одобрение кредитной линии'
@@ -56,21 +71,23 @@ export async function POST(request: Request) {
     const p1_liq_quick = div(p1_liquid - Number(fd.p1_inventory || 0), p1_cl)
     const p2_liq_quick = div(p2_liquid - Number(fd.p2_inventory || 0), p2_cl)
 
-    // 3. Рентабельность активов (ROA) = Чистая прибыль / Активы × 100% (>6% — норма)
-    const p1_roa = div(p1_net, p1_assets) * 100
-    const p2_roa = div(p2_net, p2_assets) * 100
+    // 3. ROA аннуализировано = (Чистая прибыль / Активы × 100%) / мес.периода × 12
+    const p1_roa = div(p1_net, p1_assets) * 100 / p1_months * 12
+    const p2_roa = div(p2_net, p2_assets) * 100 / p2_months * 12
 
-    // 4. Рентабельность собственных средств (ROE) = Чистая прибыль / Капитал × 100% (>20% — норма)
-    const p1_roe = div(p1_net, p1_equity) * 100
-    const p2_roe = div(p2_net, p2_equity) * 100
+    // 4. ROE аннуализировано = (Чистая прибыль / Капитал × 100%) / мес.периода × 12
+    const p1_roe = div(p1_net, p1_equity) * 100 / p1_months * 12
+    const p2_roe = div(p2_net, p2_equity) * 100 / p2_months * 12
 
     // 5. Коэффициент финансирования (леверидж) = Капитал / Обязательства (норма ≤0.5)
     const p1_financing = div(p1_equity, p1_liab)
     const p2_financing = div(p2_equity, p2_liab)
 
-    // 6. DSC (покрытие долга) = Операционный ден. поток / Годовой платёж (>1.0 — норма)
-    const p1_dsc = annual_payment > 0 ? div(p1_op_cf, annual_payment) : 0
-    const p2_dsc = annual_payment > 0 ? div(p2_op_cf, annual_payment) : 0
+    // 6. DSCR = (Опер+Инв+Фин поток) / мес.периода / Ежемес.платёж (>1.0 — норма)
+    const p1_total_cf = p1_op_cf + p1_inv_cf + p1_fin_cf
+    const p2_total_cf = p2_op_cf + p2_inv_cf + p2_fin_cf
+    const p1_dsc = monthly_payment > 0 ? div(p1_total_cf / p1_months, monthly_payment) : 0
+    const p2_dsc = monthly_payment > 0 ? div(p2_total_cf / p2_months, monthly_payment) : 0
 
     // 8. Обеспеченность залогом = Залог / Кредит × 100%
     const collateral_coverage = div(collateral_total, loan_amount) * 100
@@ -145,13 +162,13 @@ ${(fd.collaterals||[]).map((c: {type:string;description:string;value:number}, i:
    П2: (${f(p2_liquid)} - ${f(Number(fd.p2_inventory||0))}) / ${f(p2_cl)} = ${rat(p2_liq_quick)} ${p2_cl > 0 ? (p2_liq_quick > 1.0 ? '✓ норма' : p2_liq_quick >= 0.7 ? '⚠ допустимо' : '✗ ниже нормы') : '(нет КО)'}
 
 ПОКАЗАТЕЛИ РЕНТАБЕЛЬНОСТИ:
-3. Рентабельность активов (ROA) = Чистая прибыль / Активы × 100% [норма >6%]
-   П1: ${f(p1_net)} / ${f(p1_assets)} × 100% = ${pct(p1_roa)} ${p1_roa > 6 ? '✓ норма' : '✗ ниже нормы'}
-   П2: ${f(p2_net)} / ${f(p2_assets)} × 100% = ${pct(p2_roa)} ${p2_roa > 6 ? '✓ норма' : '✗ ниже нормы'}
+3. Рентабельность активов (ROA) = (Чистая прибыль / Активы × 100%) / мес.периода × 12 [норма >6%]
+   П1 (${p1_months}м.): (${f(p1_net)} / ${f(p1_assets)} × 100%) / ${p1_months} × 12 = ${pct(p1_roa)} ${p1_roa > 6 ? '✓ норма' : '✗ ниже нормы'}
+   П2 (${p2_months}м.): (${f(p2_net)} / ${f(p2_assets)} × 100%) / ${p2_months} × 12 = ${pct(p2_roa)} ${p2_roa > 6 ? '✓ норма' : '✗ ниже нормы'}
 
-4. Рентабельность собственных средств (ROE) = Чистая прибыль / Капитал × 100% [норма >20%]
-   П1: ${f(p1_net)} / ${f(p1_equity)} × 100% = ${pct(p1_roe)} ${p1_roe > 20 ? '✓ норма' : '✗ ниже нормы'}
-   П2: ${f(p2_net)} / ${f(p2_equity)} × 100% = ${pct(p2_roe)} ${p2_roe > 20 ? '✓ норма' : '✗ ниже нормы'}
+4. Рентабельность собственных средств (ROE) = (Чистая прибыль / Капитал × 100%) / мес.периода × 12 [норма >20%]
+   П1 (${p1_months}м.): (${f(p1_net)} / ${f(p1_equity)} × 100%) / ${p1_months} × 12 = ${pct(p1_roe)} ${p1_roe > 20 ? '✓ норма' : '✗ ниже нормы'}
+   П2 (${p2_months}м.): (${f(p2_net)} / ${f(p2_equity)} × 100%) / ${p2_months} × 12 = ${pct(p2_roe)} ${p2_roe > 20 ? '✓ норма' : '✗ ниже нормы'}
 
 ПОКАЗАТЕЛИ ФИНАНСОВОЙ УСТОЙЧИВОСТИ:
 5. Коэффициент финансирования (леверидж) = Капитал / Обязательства [норма ≤0.5]
@@ -159,10 +176,10 @@ ${(fd.collaterals||[]).map((c: {type:string;description:string;value:number}, i:
    П2: ${f(p2_equity)} / ${f(p2_liab)} = ${rat(p2_financing)} ${p2_liab > 0 ? (p2_financing <= 0.5 ? '✓ норма' : '✗ выше нормы') : '(нет обяз.)'}
 
 ПОКАЗАТЕЛИ КРЕДИТОСПОСОБНОСТИ:
-6. Покрытие долга (DSC) = Операц. ден. поток / Годовой платёж [норма >1.0]
-   Годовой платёж: ${f(annual_payment)} TJS
-   П1: ${f(p1_op_cf)} / ${f(annual_payment)} = ${annual_payment > 0 ? rat(p1_dsc) : 'н/д'} ${annual_payment > 0 ? (p1_dsc > 1.0 ? '✓ норма' : p1_dsc >= 0.8 ? '⚠ допустимо' : '✗ недостаточно') : ''}
-   П2: ${f(p2_op_cf)} / ${f(annual_payment)} = ${annual_payment > 0 ? rat(p2_dsc) : 'н/д'} ${annual_payment > 0 ? (p2_dsc > 1.0 ? '✓ норма' : p2_dsc >= 0.8 ? '⚠ допустимо' : '✗ недостаточно') : ''}
+6. Покрытие долга (DSCR) = (Опер+Инв+Фин поток) / мес.периода / Ежемес.платёж [норма >1.0]
+   Ежемесячный платёж: ${f(monthly_payment)} TJS
+   П1 (${p1_months}м.): (${f(p1_op_cf)}+${f(p1_inv_cf)}+${f(p1_fin_cf)}) / ${p1_months} / ${f(monthly_payment)} = ${monthly_payment > 0 ? rat(p1_dsc) : 'н/д'} ${monthly_payment > 0 ? (p1_dsc > 1.0 ? '✓ норма' : p1_dsc >= 0.8 ? '⚠ допустимо' : '✗ недостаточно') : ''}
+   П2 (${p2_months}м.): (${f(p2_op_cf)}+${f(p2_inv_cf)}+${f(p2_fin_cf)}) / ${p2_months} / ${f(monthly_payment)} = ${monthly_payment > 0 ? rat(p2_dsc) : 'н/д'} ${monthly_payment > 0 ? (p2_dsc > 1.0 ? '✓ норма' : p2_dsc >= 0.8 ? '⚠ допустимо' : '✗ недостаточно') : ''}
 
 7. Покрытие залогом = Залог / ${is_collateral_change ? 'Остаток кредита' : 'Кредит'} × 100% [норма >200%]
    ${f(collateral_total)} / ${f(is_collateral_change ? existing_balance : loan_amount)} × 100% = ${pct(is_collateral_change ? collateral_coverage_existing : collateral_coverage)} ${(is_collateral_change ? collateral_coverage_existing : collateral_coverage) > 200 ? '✓ норма' : (is_collateral_change ? collateral_coverage_existing : collateral_coverage) >= 150 ? '⚠ допустимо' : '✗ ниже нормы'}

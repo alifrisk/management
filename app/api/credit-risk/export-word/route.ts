@@ -350,14 +350,25 @@ export async function POST(request: Request) {
             const lc2 = p2cl > 0 ? p2ca / p2cl : NaN
             const lq1 = p1cl > 0 ? (p1ca - p1inv) / p1cl : NaN
             const lq2 = p2cl > 0 ? (p2ca - p2inv) / p2cl : NaN
-            const roa1 = p1a > 0 ? p1netProfit / p1a * 100 : NaN
-            const roa2 = p2a > 0 ? p2netProfit / p2a * 100 : NaN
-            const roe1 = p1e > 0 ? p1netProfit / p1e * 100 : NaN
-            const roe2 = p2e > 0 ? p2netProfit / p2e * 100 : NaN
+            const getMonths = (label: string) => {
+              const m = label?.match(/\d{2}\.(\d{2})\.\d{4}/)
+              if (m) return parseInt(m[1]) || 12
+              if (/март|mar/i.test(label)) return 3
+              if (/июн|jun/i.test(label)) return 6
+              if (/сент|sep/i.test(label)) return 9
+              if (/дек|dec/i.test(label)) return 12
+              return 12
+            }
+            const pm1 = getMonths(p1)
+            const pm2 = getMonths(p2)
+            const roa1 = p1a > 0 ? (p1netProfit / p1a * 100) / pm1 * 12 : NaN
+            const roa2 = p2a > 0 ? (p2netProfit / p2a * 100) / pm2 * 12 : NaN
+            const roe1 = p1e > 0 ? (p1netProfit / p1e * 100) / pm1 * 12 : NaN
+            const roe2 = p2e > 0 ? (p2netProfit / p2e * 100) / pm2 * 12 : NaN
             const fin1 = p1l > 0 ? p1e / p1l : NaN
             const fin2 = p2l > 0 ? p2e / p2l : NaN
-            const ann = monthly * 12
-            const dsc2 = ann > 0 ? p2opCF / ann : NaN
+            const dsc1 = monthly > 0 ? (p1opCF + p1invCF + p1finCF) / pm1 / monthly : NaN
+            const dsc2 = monthly > 0 ? (p2opCF + p2invCF + p2finCF) / pm2 / monthly : NaN
             const cov = loanAmt > 0 ? totalCollateral / loanAmt * 100 : NaN
             const grp = (title: string) => new TableRow({ children: [new TableCell({
               borders, columnSpan: 6,
@@ -400,7 +411,7 @@ export async function POST(request: Request) {
                 grp('ПОКАЗАТЕЛИ ФИНАНСОВОЙ УСТОЙЧИВОСТИ'),
                 row('Коэффициент финансирования (леверидж)', rv(fin1), rv(fin2), '≤0.5', isFinite(fin2) && fin2 <= 0.5, 'Кфин'),
                 grp('ПОКАЗАТЕЛИ КРЕДИТОСПОСОБНОСТИ'),
-                row('Коэффициент покрытия долга (DSC)', '—', rv(dsc2), '>1.0', isFinite(dsc2) && dsc2 > 1.0, 'DSC'),
+                row('Коэффициент покрытия долга (DSC)', rv(dsc1), rv(dsc2), '>1.0', isFinite(dsc2) && dsc2 > 1.0, 'DSC'),
                 row('Коэффициент покрытия залогом', '—', pv(cov), '>120%', isFinite(cov) && cov > 120, 'Кзал'),
               ]
             })
