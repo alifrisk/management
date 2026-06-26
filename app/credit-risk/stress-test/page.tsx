@@ -1,6 +1,7 @@
 'use client'
-import { useState } from 'react'
-import { Download, Printer, TrendingDown, Info } from 'lucide-react'
+import { useState, useEffect } from 'react'
+import { Download, Printer, TrendingDown, Info, Save } from 'lucide-react'
+import { supabase } from '@/supabase/client'
 
 const fmt  = (n: number) => n ? new Intl.NumberFormat('ru-RU').format(Math.round(n)) : '—'
 const fmtN = (v: string) => { const n = v.replace(/\D/g,''); return n ? new Intl.NumberFormat('ru-RU').format(Number(n)) : '' }
@@ -31,6 +32,17 @@ export default function CreditStressTest() {
   const [reportDate, setReportDate] = useState(() => new Date().toISOString().split('T')[0])
   const [tab, setTab]         = useState<1|2>(1)
   const [horizonIdx, setHorizonIdx] = useState(3) // default: 1 год
+  const [saving, setSaving]   = useState(false)
+  const [analystName, setAnalystName] = useState('')
+
+  useEffect(() => {
+    supabase.auth.getUser().then(({ data }) => {
+      if (data.user) {
+        supabase.from('profiles').select('full_name').eq('id', data.user.id).single()
+          .then(({ data: p }) => { if (p) setAnalystName(p.full_name || '') })
+      }
+    })
+  }, [])
 
   const P  = parseN(portfolio)
   const CP = parseFloat(currentPar)  || 0   // текущий PAR30 %
@@ -52,6 +64,41 @@ export default function CreditStressTest() {
   const currentHorizon = CREDIT_HORIZONS[horizonIdx]
   const pess = { par: Math.round(CP * currentHorizon.pessMultiplier * 10) / 10, cov: 80 }
   const cat  = { par: Math.round(CP * currentHorizon.catMultiplier  * 10) / 10, cov: 80 }
+
+  // ── Сохранить в реестр ───────────────────────────
+  async function saveToRegistry() {
+    setSaving(true)
+    const scenarios = [
+      { name: 'Бюджетный',        par: budget.par, cov: budget.cov },
+      { name: 'Пессимистичный',   par: pess.par,   cov: pess.cov   },
+      { name: 'Катастрофический', par: cat.par,     cov: cat.cov    },
+    ].map(sc => ({
+      ...sc,
+      reserve:    Math.round(Math.max(0, addReserve(sc.par, sc.cov))),
+      effect:     -Math.round(Math.max(0, addReserve(sc.par, sc.cov))),
+      adj_profit: BP > 0 ? Math.round(adjProfit(sc.par, sc.cov)) : null,
+    }))
+    const catSc = scenarios[2]
+    const conclusion = [
+      `Дата отчётности: ${new Date(reportDate).toLocaleDateString('ru-RU')}. Горизонт: ${currentHorizon.label}.`,
+      P > 0 ? `Портфель: ${fmt(P)} TJS. Текущий PAR30: ${CP}%, Coverage: ${CC}%.` : null,
+      `Бюджетный: PAR=${budget.par.toFixed(1)}%, доп. резерв ${fmt(scenarios[0].reserve)} TJS.`,
+      `Пессимистичный: PAR=${pess.par.toFixed(1)}%, доп. резерв ${fmt(scenarios[1].reserve)} TJS.`,
+      `Катастрофический: PAR=${cat.par.toFixed(1)}%, доп. резерв ${fmt(catSc.reserve)} TJS${BP > 0 && catSc.adj_profit !== null ? `, скорр. прибыль ${fmt(catSc.adj_profit)} TJS` : ''}.`,
+    ].filter(Boolean).join(' ')
+    const { error } = await supabase.from('stress_test_registry').insert({
+      risk_type: 'Кредитный риск',
+      analyst_name: analystName,
+      period: new Date(reportDate).toLocaleDateString('ru-RU'),
+      inputs: { report_date: reportDate, portfolio: P, current_par: CP, current_cov: CC, base_profit: BP, budget_par: budgetPar || null, budget_cov: budgetCov || null, horizon: currentHorizon.label },
+      results: { scenarios },
+      conclusion,
+      status: 'Проведён',
+    })
+    setSaving(false)
+    if (error) alert('Ошибка: ' + error.message)
+    else alert('Стресс-тест сохранён в реестр')
+  }
 
   // Excel экспорт
   function exportExcel() {
@@ -140,6 +187,10 @@ export default function CreditStressTest() {
           <button onClick={() => window.print()}
             className="flex items-center gap-1.5 px-3 py-2 border border-gray-200 rounded-lg text-sm text-gray-600 hover:bg-gray-50">
             <Printer className="w-4 h-4" /> PDF
+          </button>
+          <button onClick={saveToRegistry} disabled={saving}
+            className="flex items-center gap-1.5 px-3 py-2 bg-[#1B8A4C] text-white rounded-lg text-sm hover:bg-[#166a3a] disabled:opacity-50">
+            <Save className="w-4 h-4" /> {saving ? 'Сохранение...' : 'Сохранить в реестр'}
           </button>
         </div>
       </div>

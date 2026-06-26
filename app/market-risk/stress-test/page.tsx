@@ -1,6 +1,7 @@
 'use client'
-import { useState } from 'react'
-import { RefreshCw, Download, Printer, TrendingDown, TrendingUp, Info, Database } from 'lucide-react'
+import { useState, useEffect } from 'react'
+import { RefreshCw, Download, Printer, TrendingDown, TrendingUp, Info, Database, Save } from 'lucide-react'
+import { supabase } from '@/supabase/client'
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, BarChart, Bar, Cell } from 'recharts'
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
@@ -102,6 +103,17 @@ const HORIZONS = [
 // ── Component ─────────────────────────────────────────────────────────────────
 export default function MarketStressTest() {
   const [model, setModel] = useState<1 | 2>(1)
+  const [saving, setSaving]       = useState(false)
+  const [analystName, setAnalystName] = useState('')
+
+  useEffect(() => {
+    supabase.auth.getUser().then(({ data }) => {
+      if (data.user) {
+        supabase.from('profiles').select('full_name').eq('id', data.user.id).single()
+          .then(({ data: p }) => { if (p) setAnalystName(p.full_name || '') })
+      }
+    })
+  }, [])
 
   // Model 1 — source
   const [currency,   setCurrency]   = useState('USD')
@@ -182,6 +194,45 @@ export default function MarketStressTest() {
   const calcIncome = (g: number, r: number) =>
     gdp0 * (1 + g / 100) * (r / 100) * (aShare / 100) * (mgn / 100)
 
+  // ── Сохранить в реестр ───────────────────────────────────────────────────────
+  async function saveToRegistry() {
+    setSaving(true)
+    let inputs: Record<string, unknown> = {}
+    let results: Record<string, unknown> = {}
+    let conclusion = ''
+    let period = ''
+    if (model === 1) {
+      if (!mcResult) { alert('Сначала запустите Монте Карло'); setSaving(false); return }
+      inputs = { currency, date_from: dateFrom, date_to: dateTo, mean, std_dev: stdDev, iterations: iters, horizon_days: horizon }
+      results = { var95_hist: mcResult.histVar95, var99_hist: mcResult.histVar99, var95_param: mcResult.paramVar95, var99_param: mcResult.paramVar99, cvar95: mcResult.cvar95, cvar99: mcResult.cvar99, expected: mcResult.expected, median: mcResult.median, appreciation_pct: mcResult.appreciationPct, depreciation_pct: mcResult.depreciationPct }
+      period = `${dateFrom} — ${dateTo}`
+      const h = HORIZONS.find(h => h.days === horizon)?.label || `${horizon} дн.`
+      conclusion = `Модель 1 — Монте Карло (${currency}/TJS). Горизонт: ${h}. Итераций: ${iters.toLocaleString('ru-RU')}. μ=${mean}%, σ=${stdDev}%. VaR 95%: ${mcResult.histVar95}%, VaR 99%: ${mcResult.histVar99}%. CVaR 95%: ${mcResult.cvar95}%, CVaR 99%: ${mcResult.cvar99}%. Вероятность ослабления TJS: ${mcResult.depreciationPct}%, укрепления: ${mcResult.appreciationPct}%.`
+    } else {
+      const scenarios = [
+        { name: 'Базовый',          g: parseFloat(gdpGrowth), r: parseFloat(remitShare) },
+        { name: 'Пессимистичный',   g: 0,  r: 15 },
+        { name: 'Катастрофический', g: -5, r: 10 },
+      ].map(sc => ({ ...sc, income: Math.round(calcIncome(sc.g, sc.r)), effect: Math.round(calcIncome(sc.g, sc.r) - biVal) }))
+      inputs = { gdp_base: gdp0, gdp_growth: gdpGrowth, remit_share: remitShare, alif_share: alifShare, margin, base_income: biVal }
+      results = { scenarios }
+      period = new Date().getFullYear().toString()
+      conclusion = `Модель 2 — Денежные переводы (макро). ВВП: ${fmtNum(gdp0)} сом. Базовый доход: ${fmtNum(biVal)} сом. Пессимистичный (ВВП 0%, переводы 15%): ${fmtNum(scenarios[1].income)} сом (${scenarios[1].effect >= 0 ? '+' : ''}${fmtNum(scenarios[1].effect)}). Катастрофический (ВВП -5%, переводы 10%): ${fmtNum(scenarios[2].income)} сом (${scenarios[2].effect >= 0 ? '+' : ''}${fmtNum(scenarios[2].effect)}).`
+    }
+    const { error } = await supabase.from('stress_test_registry').insert({
+      risk_type: 'Рыночный риск',
+      analyst_name: analystName,
+      period,
+      inputs,
+      results,
+      conclusion,
+      status: 'Проведён',
+    })
+    setSaving(false)
+    if (error) alert('Ошибка: ' + error.message)
+    else alert('Стресс-тест сохранён в реестр')
+  }
+
   // ── Export ──────────────────────────────────────────────────────────────────
   function exportExcel() {
     const rows: string[][] = []
@@ -226,6 +277,10 @@ export default function MarketStressTest() {
           </button>
           <button onClick={() => window.print()} className="flex items-center gap-1.5 px-3 py-2 border border-gray-200 rounded-lg text-sm text-gray-600 hover:bg-gray-50">
             <Printer className="w-4 h-4" /> PDF
+          </button>
+          <button onClick={saveToRegistry} disabled={saving}
+            className="flex items-center gap-1.5 px-3 py-2 bg-[#1B8A4C] text-white rounded-lg text-sm hover:bg-[#166a3a] disabled:opacity-50">
+            <Save className="w-4 h-4" /> {saving ? 'Сохранение...' : 'Сохранить в реестр'}
           </button>
         </div>
       </div>

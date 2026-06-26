@@ -183,6 +183,24 @@ export default function LiquidityPage() {
         coverage_cash_t30: computed.t30.cov_cash, coverage_only_t30: computed.t30.cov_only, risk_t30: computed.t30.risk,
       })
       if (dbErr) throw new Error(dbErr.message)
+
+      // Дублируем в общий реестр стресс-тестов
+      const conclusion = [
+        `Сценарий: ${scenario}.`,
+        `T+1 — потребность: ${fmt(computed.t1.need)} TJS, покрытие: ${(computed.t1.cov_cash*100).toFixed(0)}%, риск: ${riskLabel(computed.t1.risk)}.`,
+        `T+7 — потребность: ${fmt(computed.t7.need)} TJS, покрытие: ${(computed.t7.cov_cash*100).toFixed(0)}%, риск: ${riskLabel(computed.t7.risk)}.`,
+        `T+30 — потребность: ${fmt(computed.t30.need)} TJS, покрытие: ${(computed.t30.cov_cash*100).toFixed(0)}%, риск: ${riskLabel(computed.t30.risk)}.`,
+      ].join(' ')
+      await supabase.from('stress_test_registry').insert({
+        risk_type: 'Риск ликвидности',
+        analyst_name: form.analyst_name,
+        period: form.test_name,
+        inputs: { ...inputs, scenario },
+        results: { scenario, t1: computed.t1, t7: computed.t7, t30: computed.t30 },
+        conclusion,
+        status: 'Проведён',
+      })
+
       setShowModal(false); setForm(EMPTY); setScenario('Пессимистичный'); fetch_()
     } catch (err: unknown) {
       setError('Ошибка: ' + (err instanceof Error ? err.message : String(err)))

@@ -1,7 +1,7 @@
 'use client'
 import { useState, useEffect, useCallback } from 'react'
 import { supabase } from '@/supabase/client'
-import { RefreshCw, Download, Printer } from 'lucide-react'
+import { RefreshCw, Download, Printer, Save } from 'lucide-react'
 import {
   BarChart, Bar, LineChart, Line, XAxis, YAxis, CartesianGrid,
   Tooltip, Legend, ResponsiveContainer, LabelList
@@ -49,6 +49,18 @@ export default function OpStressTest() {
   const [baseProfit, setBaseProfit] = useState('')
   // ── Активная вкладка ─────────────────────────────
   const [tab, setTab] = useState<1|2>(1)
+  // ── Реестр ───────────────────────────────────────
+  const [saving, setSaving] = useState(false)
+  const [analystName, setAnalystName] = useState('')
+
+  useEffect(() => {
+    supabase.auth.getUser().then(({ data }) => {
+      if (data.user) {
+        supabase.from('profiles').select('full_name').eq('id', data.user.id).single()
+          .then(({ data: p }) => { if (p) setAnalystName(p.full_name || '') })
+      }
+    })
+  }, [])
 
   const fetchHist = useCallback(async () => {
     setLoading(true)
@@ -116,6 +128,33 @@ export default function OpStressTest() {
   // ── What-If ──────────────────────────────────────
   const bp = parseN(baseProfit)
   const adjProfit = (loss: number, rec: number) => bp - loss * (1 - rec)
+
+  // ── Сохранить в реестр ───────────────────────────
+  async function saveToRegistry() {
+    setSaving(true)
+    const budgetTotal = totalFor(budget)
+    const pessTotal   = pess ? totalFor(pess) : null
+    const catTotal    = cat  ? totalFor(cat)  : null
+    const conclusion  = [
+      `Период истории: ${dateFrom} — ${dateTo} (${hist?.months || '—'} мес.), горизонт: ${forecastMonths} мес.`,
+      `Бюджетный: ${budgetTotal.incidents} инц., ущерб ${fmt(budgetTotal.loss)} TJS, чистый ущерб ${fmt(budgetTotal.netLoss)} TJS.`,
+      pessTotal ? `Пессимистичный: ${pessTotal.incidents} инц., ущерб ${fmt(pessTotal.loss)} TJS, чистый ущерб ${fmt(pessTotal.netLoss)} TJS.` : null,
+      catTotal  ? `Катастрофический: ${catTotal.incidents} инц., ущерб ${fmt(catTotal.loss)} TJS, чистый ущерб ${fmt(catTotal.netLoss)} TJS.` : null,
+      bp > 0 && catTotal ? `Скорр. прибыль при катастрофе: ${fmt(bp - catTotal.netLoss)} TJS.` : null,
+    ].filter(Boolean).join(' ')
+    const { error } = await supabase.from('stress_test_registry').insert({
+      risk_type: 'Операционный риск',
+      analyst_name: analystName,
+      period: `${dateFrom} — ${dateTo}`,
+      inputs: { date_from: dateFrom, date_to: dateTo, forecast_months: forecastMonths, budget_incidents: bInc || null, budget_loss: bLoss || null, budget_recovery: bRec || null, base_profit: baseProfit || null },
+      results: { historical: hist, scenarios: { budget: budgetTotal, pessimistic: pessTotal, catastrophic: catTotal } },
+      conclusion,
+      status: 'Проведён',
+    })
+    setSaving(false)
+    if (error) alert('Ошибка: ' + error.message)
+    else alert('Стресс-тест сохранён в реестр')
+  }
 
   // ── Excel экспорт ────────────────────────────────
   function exportExcel() {
@@ -208,6 +247,10 @@ export default function OpStressTest() {
           <button onClick={() => window.print()}
             className="flex items-center gap-1.5 px-3 py-2 border border-gray-200 rounded-lg text-sm text-gray-600 hover:bg-gray-50">
             <Printer className="w-4 h-4" /> PDF
+          </button>
+          <button onClick={saveToRegistry} disabled={saving}
+            className="flex items-center gap-1.5 px-3 py-2 bg-[#1B8A4C] text-white rounded-lg text-sm hover:bg-[#166a3a] disabled:opacity-50">
+            <Save className="w-4 h-4" /> {saving ? 'Сохранение...' : 'Сохранить в реестр'}
           </button>
         </div>
       </div>
