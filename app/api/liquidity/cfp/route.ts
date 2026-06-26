@@ -1,199 +1,167 @@
 import { NextResponse } from 'next/server'
 import { aiGenerateText } from '@/lib/ai-provider'
-import {
-  statusCar11, statusCar12, statusCar13, statusK21, normLabel,
-  ewiN1, ewiLcr, ewiOutflow, ewiTop5, overallEwi,
-  calcSurvivalHorizon, calcReserveCoverage,
-  EWI_EMOJI, EWI_LABEL, READINESS_LEVELS,
-} from '@/lib/cfpCalculations'
+import { statusCar11, statusCar12, statusCar13, statusK21, normLabel } from '@/lib/cfpCalculations'
+
+const GAP_MONTHS = ['Июль', 'Август', 'Сентябрь', 'Октябрь', 'Ноябрь', 'Декабрь']
+const GAP_ASSETS = ['Денежные средства', 'Ограниченные ден. ср-ва', 'Кредиты выданные']
+const GAP_LIAB   = ['Счета клиентов', 'Привлечённые займы', 'Субординированный займ']
 
 export async function POST(req: Request) {
   try {
     const d = await req.json()
 
-    // ── Определяем формат данных (новый vs старый) ────────────────────────────
-    const isNewFormat = d.car11 != null || d.car12 != null || d.car13 != null
+    const car11 = Number(d.car11) || 0
+    const car12 = Number(d.car12) || 0
+    const car13 = Number(d.car13) || 0
+    const k21   = Number(d.k21)   || 0
 
-    if (isNewFormat) {
-      // ── НОВЫЙ ФОРМАТ: нормативы НБТ №176 и №247 ─────────────────────────────
-      const car11 = Number(d.car11) || 0
-      const car12 = Number(d.car12) || 0
-      const car13 = Number(d.car13) || 0
-      const k21   = Number(d.k21)   || 0
+    const s11  = statusCar11(car11)
+    const s12  = statusCar12(car12)
+    const s13  = statusCar13(car13)
+    const sk21 = statusK21(k21)
 
-      const s11  = statusCar11(car11)
-      const s12  = statusCar12(car12)
-      const s13  = statusCar13(car13)
-      const sk21 = statusK21(k21)
+    // ── GAP data ──────────────────────────────────────────────────────────────
+    const gapRows: number[][] = d.gap_data?.rows || Array(6).fill([0,0,0,0,0,0])
+    const assetsRows = gapRows.slice(0, 3)
+    const liabRows   = gapRows.slice(3, 6)
 
-      const liab          = d.liabilities || {}
-      const termDeposits  = Number(liab.term_deposits)   || 0
-      const currentAccs   = Number(liab.current_accounts) || 0
-      const interbank     = Number(liab.interbank)        || 0
-      const other         = Number(liab.other)            || 0
-      const totalLiab     = termDeposits + currentAccs + interbank + other
+    const totAssets = GAP_MONTHS.map((_, mi) => assetsRows.reduce((s, r) => s + (r[mi] || 0), 0))
+    const totLiab   = GAP_MONTHS.map((_, mi) => liabRows.reduce((s, r) => s + (r[mi] || 0), 0))
+    const gaps      = GAP_MONTHS.map((_, mi) => totAssets[mi] - totLiab[mi])
 
-      const fundingSources: { name: string; amount: number; access_term: string; status: string }[] = d.funding_sources || []
-      const totalFunding = fundingSources.reduce((s, r) => s + (Number(r.amount) || 0), 0)
+    const gapLines = [
+      'АКТИВЫ:',
+      ...GAP_ASSETS.map((name, ri) =>
+        `  ${name}: ${GAP_MONTHS.map((m, mi) => `${m}=${assetsRows[ri]?.[mi] ?? 0}`).join(', ')}`
+      ),
+      `  Итого активы: ${GAP_MONTHS.map((m, mi) => `${m}=${totAssets[mi]}`).join(', ')}`,
+      'ОБЯЗАТЕЛЬСТВА:',
+      ...GAP_LIAB.map((name, ri) =>
+        `  ${name}: ${GAP_MONTHS.map((m, mi) => `${m}=${liabRows[ri]?.[mi] ?? 0}`).join(', ')}`
+      ),
+      `  Итого обязательства: ${GAP_MONTHS.map((m, mi) => `${m}=${totLiab[mi]}`).join(', ')}`,
+      `ГЭП: ${GAP_MONTHS.map((m, mi) => `${m}=${gaps[mi] >= 0 ? '+' : ''}${gaps[mi]}`).join(', ')}`,
+    ]
 
-      const planPeriod = d.plan_period || ''
+    // ── Financing sources ─────────────────────────────────────────────────────
+    const sources: { priority: number; source: string; status: string; currency: string; amount: string; cost: string; term: string }[] =
+      d.financing_sources || []
 
-      // Округляем суммы до ближайших 50 млн — точные цифры не уходят в AI
-      const r50 = (n: number) => Math.round(n / 50) * 50
+    const totalAvail   = sources.filter(s => s.status === 'available').reduce((sum, s) => sum + (Number(s.amount) || 0), 0)
+    const totalCond    = sources.filter(s => s.status === 'conditional').reduce((sum, s) => sum + (Number(s.amount) || 0), 0)
+    const totalSources = totalAvail + totalCond
 
-      const cfpBuckets: { label: string; outflow: number; inflow: number; net: number; cumulative_net: number; status: string }[] = d.cfp_buckets || []
-      const bucketsBlock = cfpBuckets.length > 0
-        ? cfpBuckets.map(b => {
-            const statusLabel = b.status === 'red' ? 'ДЕФИЦИТ' : b.status === 'yellow' ? 'Внимание' : 'Профицит'
-            return `  ${b.label}: Оттоки ~${r50(b.outflow)} | Поступления ~${r50(b.inflow)} | Чистая ~${b.net >= 0 ? '+' : ''}${r50(b.net)} | ${statusLabel}`
-          }).join('\n')
-        : 'Данные по срочным корзинам не предоставлены'
+    const sourcesLines = sources.length === 0
+      ? ['  Источники не указаны']
+      : sources.map(s => {
+          const stLabel = s.status === 'available' ? 'Доступен' : s.status === 'conditional' ? 'Условный' : 'Недоступен'
+          return `  ${s.priority}. ${s.source} | ${s.currency} ${s.amount} млн | ${stLabel} | Стоимость: ${s.cost} | Срок: ${s.term}`
+        })
 
-      const anyBreach  = [s11, s12, s13, sk21].includes('red')
-      const anyWarning = [s11, s12, s13, sk21].includes('yellow')
-      const overallComplianceLabel = anyBreach ? '🔴 ЕСТЬ НАРУШЕНИЯ НОРМАТИВОВ' : anyWarning ? '⚠️ НОРМАТИВЫ БЛИЗКО К НАРУШЕНИЮ' : '🟢 ВСЕ НОРМАТИВЫ СОБЛЮДЕНЫ'
+    // ── Stress amounts ────────────────────────────────────────────────────────
+    const baseMonthLiab = totLiab[0] || 0
+    const pessOutflow   = Math.round(baseMonthLiab * 0.20)
+    const catOutflow    = Math.round(baseMonthLiab * 0.40)
+    const pessCovPct    = pessOutflow > 0 ? Math.round((totalSources / pessOutflow) * 100) : 0
+    const catCovPct     = catOutflow  > 0 ? Math.round((totalAvail    / catOutflow)  * 100) : 0
 
-      const tD50  = r50(termDeposits)
-      const cA50  = r50(currentAccs)
-      const ib50  = r50(interbank)
-      const oth50 = r50(other)
-      const tot50 = tD50 + cA50 + ib50 + oth50
-      const totF50 = r50(totalFunding)
+    // ── Buffer ────────────────────────────────────────────────────────────────
+    const bufferCashEq   = Number(d.liquidity_buffer?.cash_equivalents) || 0
+    const bufferCash     = Number(d.liquidity_buffer?.cash_only)         || 0
+    const avgMonthlyLiab = totLiab.reduce((s, v) => s + v, 0) / 6 || 1
+    const avgDailyOutflow = Math.round(avgMonthlyLiab / 30) || 1
+    const horizonDays     = bufferCashEq > 0 ? Math.round(bufferCashEq / avgDailyOutflow) : 0
 
-      const sourcesBlock = fundingSources.length === 0
-        ? 'Источники не указаны'
-        : fundingSources.map((r, i) =>
-            `  ${i + 1}. ${r.name} — ~${r50(Number(r.amount))} млн TJS | Доступность: ${r.access_term} | Статус: ${r.status}`
-          ).join('\n')
+    const planPeriod = d.plan_period || 'II полугодие 2026'
 
-      // Стресс-сценарии (только нормативы в % — точные значения нужны для расчёта)
-      const k21Gap  = k21 > 0 ? k21 - 30 : 0   // запас до минимума НБТ
-      const k21Mild = Math.max(k21 - 5, 0)       // умеренный стресс
-      const k21Mod  = Math.max(k21 - 10, 0)      // средний стресс
-      const k21Sev  = Math.max(k21 - 15, 0)      // жёсткий стресс
+    const prompt = `Ты риск-менеджер банка. Составь ПЛАН ФИНАНСИРОВАНИЯ НА СЛУЧАЙ ЧРЕЗВЫЧАЙНЫХ СИТУАЦИЙ (CFP) строго в соответствии с Инструкцией №247 НБТ РТ. Запрещено упоминать международные стандарты (Базель, LCR, НSFR, ISO и пр.) — ТОЛЬКО Инструкция №247 НБТ РТ.
 
-      const prompt = `Ты опытный риск-менеджер банка. Составь ОПЕРАТИВНЫЙ ПЛАН — не аналитическую справку, а конкретный документ «что делать и кто делает» в случае кризиса ликвидности.
+ПЕРИОД ПЛАНА: ${planPeriod}
 
-ИСХОДНЫЕ ДАННЫЕ БАНКА:
-Нормативы достаточности капитала (Инструкция НБТ №176):
-  CAR 1.1 = ${car11}% (норма >= 12%, ${normLabel(s11)}, запас ${car11 > 12 ? (car11 - 12).toFixed(1) : '—'} п.п.)
-  CAR 1.2 = ${car12}% (норма >= 10%, ${normLabel(s12)}, запас ${car12 > 10 ? (car12 - 10).toFixed(1) : '—'} п.п.)
-  CAR 1.3 = ${car13}% (норма >= 10%, ${normLabel(s13)}, запас ${car13 > 10 ? (car13 - 10).toFixed(1) : '—'} п.п.)
-Норматив ликвидности (Инструкция НБТ №247):
-  К2-1 = ${k21}% (норма >= 30%, ${normLabel(sk21)}, запас ${k21Gap > 0 ? k21Gap.toFixed(1) + ' п.п.' : 'нет — нарушение'})
-CFP-ПОЗИЦИЯ ПО ВРЕМЕННЫМ КОРЗИНАМ (млн TJS, округлено до 50):
-${bucketsBlock}
-${planPeriod ? `Период плана: ${planPeriod}` : ''}
+НОРМАТИВЫ:
+  CAR 1.1 = ${car11}% (норма ≥ 12%): ${normLabel(s11)}
+  CAR 1.2 = ${car12}% (норма ≥ 10%): ${normLabel(s12)}
+  CAR 1.3 = ${car13}% (норма ≥ 10%): ${normLabel(s13)}
+  К2-1 = ${k21}% (норма ≥ 30%): ${normLabel(sk21)}
 
-СТРУКТУРА ДОКУМЕНТА — составь каждый раздел как оперативный план, не как аналитику:
+ГЭП-АНАЛИЗ (млн TJS):
+${gapLines.join('\n')}
 
-РАЗДЕЛ 1. ОЦЕНКА ТЕКУЩЕЙ ПОЗИЦИИ ЛИКВИДНОСТИ
-Таблица нормативов: для каждого из 4 показателей — значение, норма НБТ, отклонение (+/-), статус (Норма/Нарушение).
-Итоговый вывод: есть ли нарушения, каков запас прочности по К2-1, критические риски.
+ИСТОЧНИКИ ФИНАНСИРОВАНИЯ:
+${sourcesLines.join('\n')}
+  Итого доступные: ${totalAvail} млн TJS | Условные: ${totalCond} млн TJS | Всего: ${totalSources} млн TJS
 
-РАЗДЕЛ 2. ПЛАН РОСТА ЛИКВИДНЫХ АКТИВОВ
-Перечень конкретных мер по наращиванию ликвидности при стрессе. Для каждой меры в формате строки:
-Мера — Плановый объём (млн TJS) — Горизонт (Тек.дата / 1–30 дн. / 31–90 дн. / 91–180 дн. / 181–365 дн. / 1–3 года / свыше 3 лет) — Ответственный
-Включить минимум 6 мер: сокращение новых выдач кредитов, продажа/РЕПО ценных бумаг, привлечение срочных депозитов, рефинансирование НБТ, пролонгация МБК, субординированный займ от акционеров, приостановка дивидендов.
-При выборе горизонта ориентируйся на данные CFP-корзин выше — прежде всего закрывай корзины со статусом ДЕФИЦИТ или Внимание.
+БУФЕР ЛИКВИДНОСТИ:
+  Денежные средства и эквиваленты: ${bufferCashEq} млн TJS
+  Только денежные средства: ${bufferCash} млн TJS
+  Расчётный горизонт покрытия (среднедневной отток ~${avgDailyOutflow} млн): ~${horizonDays} дней
 
-РАЗДЕЛ 3. ЗАПАС ЛИКВИДНОСТИ (СТРЕСС-ТЕСТ)
-На основе текущего К2-1 = ${k21}% рассчитай три сценария:
-Сценарий 1 (умеренный): К2-1 снижается до ${k21Mild.toFixed(1)}% (−5 п.п.) — оцени достаточность ликвидности
-Сценарий 2 (средний): К2-1 снижается до ${k21Mod.toFixed(1)}% (−10 п.п.) — оцени дефицит/профицит
-Сценарий 3 (жёсткий): К2-1 снижается до ${k21Sev.toFixed(1)}% (−15 п.п.) — экстренные меры
-Для каждого сценария: статус норматива, оценочный дефицит ликвидности (млн TJS), какие источники активировать.
+---
 
-РАЗДЕЛ 4. ИСТОЧНИКИ ЭКСТРЕННОГО ФИНАНСИРОВАНИЯ
-Полная таблица в формате строк:
-Источник — Объём (млн TJS, оценочно) — Срок активации — Ответственный — Статус
-Сначала заявленные источники банка, затем стандартные по НБТ №247.
+Составь документ из РОВНО 6 разделов. Официальный банковский стиль, конкретные цифры из данных выше. Без общих фраз. Не используй markdown (**, *, #, _). Не указывай конкретные даты.
 
-РАЗДЕЛ 5. ШАГИ РЕАГИРОВАНИЯ И ОТВЕТСТВЕННЫЕ ЛИЦА
-Таблица действий при активации CFP (минимум 10 шагов), каждый шаг в формате:
-Шаг N. [Описание действия] | Триггер: К2-1 < X% или CAR < Y% | Срок: [часы/дни] | Ответственный: [подразделение]
-Охватить весь цикл: от обнаружения сигнала → уведомление КУАП → экстренное заседание → активация источников → коммуникация с НБТ → мониторинг → стабилизация → выход из кризиса.
-Отдельным блоком — матрица ответственности:
-КУАП: [конкретные полномочия и решения]
-Казначейство: [конкретные оперативные действия]
-СУР: [мониторинг, отчётность, триггеры]
-Правление: [стратегические решения, коммуникация]
-Наблюдательный совет: [надзор, утверждение экстренных мер]
+РАЗДЕЛ 1. ПЛАН РОСТА АКТИВОВ
+На основе ГЭП-анализа оцени позицию каждого месяца. Для каждого из 6 месяцев (${GAP_MONTHS.join(', ')}):
+- Укажи значение ГЭПа и статус (профицит / дефицит)
+- При отрицательном ГЭПе — конкретные меры по наращиванию ликвидных активов
+- При положительном ГЭПе — меры по оптимальному размещению
+Итог: сводная таблица (Месяц | ГЭП млн TJS | Статус | Плановые меры).
 
-РАЗДЕЛ 6. ПЛАН ДЕЙСТВИЙ ПО CFP-КОРЗИНАМ
-Для каждой временной корзины из CFP-данных составь конкретный план действий с учётом статуса:
-Текущая дата: нумерованный список экстренных мер на сегодня (кор.счета, кассовая позиция, МБК overnight)
-1–30 дн.: нумерованный список мер краткосрочной стабилизации (пролонгации, РЕПО, NCD)
-31–90 дн.: меры среднесрочного восстановления (срочные депозиты, продажа ценных бумаг)
-91–180 дн.: меры по нормализации структуры обязательств
-181–365 дн.: стратегические меры по укреплению ликвидной подушки
-1–3 года: долгосрочные программы управления активами и обязательствами (ALM)
-свыше 3 лет: структурные изменения баланса, капитальные меры
-Для корзин со статусом Профицит — указать меры сохранения и оптимизации. Для корзин с Дефицитом — экстренные меры ликвидации дефицита.
+РАЗДЕЛ 2. ПОТЕНЦИАЛЬНЫЕ ИСТОЧНИКИ ФИНАНСИРОВАНИЯ
+Таблица источников из данных выше (Источник | Статус | Валюта | Объём млн TJS | Стоимость | Срок).
+Стресс-анализ по двум сценариям Инструкции №247:
+Пессимистический (отток 20% обязательств базового месяца = ${pessOutflow} млн TJS):
+  Совокупные источники ${totalSources} млн TJS покрывают ${pessCovPct}% оттока. Вывод об адекватности.
+Катастрофический (отток 40% = ${catOutflow} млн TJS):
+  Только доступные источники ${totalAvail} млн TJS покрывают ${catCovPct}% оттока. Вывод об адекватности и дополнительных мерах.
 
-НЕ пиши общие слова и информационные параграфы — только конкретные действия, цифры, ответственных.
-НЕ используй markdown (**, *, #, _).
-НЕ указывай конкретные даты.
-Стиль: официальный внутренний документ банка.`
+РАЗДЕЛ 3. МЕРЫ ПО ПОДДЕРЖАНИЮ ЛИКВИДНОСТИ
+Блок А — Мониторинг (в соответствии с Инструкцией №247 НБТ РТ):
+  ГЭП-позиция: не реже 1 раза в месяц
+  Норматив К2-1: ежедневно
+  Нормативы CAR 1.1/1.2/1.3: ежемесячно
+Блок Б — Стресс-тестирование:
+  Периодичность: не реже 1 раза в 6 месяцев (требование Инструкции №247)
+  Сценарии: пессимистический (отток 20%) и катастрофический (отток 40%)
+Блок В — Прогнозирование:
+  Ежемесячный прогноз денежных потоков на горизонте 6 месяцев
+Блок Г — Резервные источники:
+  Нумерованный перечень источников из введённых данных с указанием порядка активации.
 
-      const text = await aiGenerateText(prompt, 4000)
-      return NextResponse.json({ conclusion: text })
+РАЗДЕЛ 4. БУФЕР ЛИКВИДНОСТИ
+Параметры буфера: ДС и эквиваленты ${bufferCashEq} млн TJS | Только ДС ${bufferCash} млн TJS.
+Коэффициент покрытия оттоков буфером (среднедневной отток ~${avgDailyOutflow} млн TJS):
+  T+1 (1 день): оценка покрытия
+  T+7 (7 дней): оценка покрытия
+  T+30 (30 дней): горизонт ~${horizonDays} дней
+Три зоны риска:
+  Целевая зона: горизонт покрытия T+30 и более
+  Зона риска: горизонт T+7 — T+30
+  Регуляторный минимум (НБТ №247): горизонт T+1 — T+7
+Пессимистический сценарий: буфер снижается на 20% → пересчёт горизонта
+Катастрофический сценарий: буфер снижается на 40% → пересчёт горизонта
+Итоговый вывод: в какой зоне находится банк и какие действия требуются.
 
-    } else {
-      // ── СТАРЫЙ ФОРМАТ: EWI + HQLA (обратная совместимость) ─────────────────
-      const n1      = Number(d.n1) || 0
-      const lcr     = Number(d.lcr) || 0
-      const outflow7d = Number(d.deposit_outflow_7d) || 0
-      const top5    = Number(d.top5_share) || 0
-      const hqlaL1  = Number(d.hqla_l1) || 0
-      const hqlaL2a = Number(d.hqla_l2a) || 0
-      const hqlaL2b = Number(d.hqla_l2b) || 0
-      const hqlaTotal = hqlaL1 + hqlaL2a + hqlaL2b
-      const obInterbank = Number(d.ob_interbank) || 0
-      const obCurrent   = Number(d.ob_current) || 0
-      const obSavings   = Number(d.ob_savings) || 0
-      const obTerm      = Number(d.ob_term) || 0
-      const obCreditLines = Number(d.ob_credit_lines) || 0
-      const totalDeposits   = obCurrent + obSavings + obTerm
-      const totalObligations = obInterbank + totalDeposits + obCreditLines
-      const reserveSources: { name: string; amount: number; status: string; access_term: string }[] = d.reserve_sources || []
-      const reserveTotal        = reserveSources.reduce((s, r) => s + (Number(r.amount) || 0), 0)
-      const pessimisticOutflow  = totalDeposits * (outflow7d / 100)
-      const readinessLevel      = Number(d.readiness_level) || 1
+РАЗДЕЛ 5. ЭКСТРЕННЫЕ МЕРЫ
+Перечисли РОВНО 8 мер в указанном порядке — для каждой: ответственное подразделение, срок реализации и конкретное содержание:
+1. Созыв заседания КУАП в экстренном режиме
+2. Создание рабочей группы по управлению ликвидностью
+3. Активация Плана финансирования на случай ЧС (CFP)
+4. Поддержание остатков на корреспондентских счетах на максимальном уровне
+5. Снижение кредитной активности — приостановка новых выдач
+6. Ограничение выплат дивидендов, бонусов и прочих необязательных расходов
+7. Ускорение расчётов с партнёрами и дебиторами
+8. Реализация высоколиквидных активов (ценных бумаг, РЕПО)
 
-      const s_n1   = ewiN1(n1)
-      const s_lcr  = ewiLcr(lcr)
-      const s_out  = ewiOutflow(outflow7d)
-      const s_top5 = ewiTop5(top5)
-      const overall = overallEwi([s_n1, s_lcr, s_out, s_top5])
+РАЗДЕЛ 6. ПЛАН КОММУНИКАЦИИ
+Зафиксируй следующий порядок (обязателен по Инструкции №247 НБТ РТ):
+1. Отдел операций фиксирует сигналы ухудшения ликвидности и инициирует уведомление ответственных лиц
+2. КУАП рассматривает ситуацию, оценивает масштаб угрозы и принимает решение о необходимости активации CFP
+3. Активация CFP осуществляется исключительно решением КУАП
+Дополнительно: порядок уведомления НБТ РТ, контрагентов и Правления; сроки уведомления; каналы коммуникации; режим отчётности в период действия CFP.`
 
-      const survivalHorizon = calcSurvivalHorizon(hqlaTotal, totalDeposits, outflow7d)
-      const reserveCoverage = calcReserveCoverage(reserveTotal, pessimisticOutflow)
-      const rl = READINESS_LEVELS[readinessLevel]
-
-      const prompt = `Ты эксперт по управлению ликвидностью банка.
-Составь CFP-заключение для ОАО «Алиф Банк».
-
-EWI: Н1=${n1}% ${EWI_EMOJI[s_n1]} | LCR=${lcr}% ${EWI_EMOJI[s_lcr]} | Отток 7д=${outflow7d}% ${EWI_EMOJI[s_out]} | Топ-5=${top5}% ${EWI_EMOJI[s_top5]}
-Общий EWI: ${EWI_EMOJI[overall]} ${EWI_LABEL[overall]}
-HQLA: ${hqlaTotal} млн TJS (после haircut: ${(hqlaTotal * 0.65).toFixed(1)} млн)
-Survival Horizon: ${survivalHorizon === 999 ? '∞' : survivalHorizon + ' дней'}
-Резервные источники: ${reserveTotal} млн TJS | Покрытие: ${reserveCoverage}%
-Уровень готовности: ${readinessLevel} — ${rl.label}
-Обязательства: МБК=${obInterbank} | Текущие=${obCurrent} | Накопит.=${obSavings} | Срочные=${obTerm} | Кред.линии=${obCreditLines} млн TJS
-
-Разделы: 1.EWI-СТАТУС 2.SURVIVAL HORIZON 3.УРОВЕНЬ КРИЗИСНОЙ ГОТОВНОСТИ 4.ПОКРЫТИЕ РЕЗЕРВНЫМИ ИСТОЧНИКАМИ 5.ПЛАН ДЕЙСТВИЙ 6.НАРРАТИВ ДЛЯ КУАП
-Без markdown, без конкретных дат.`
-
-      const text = await aiGenerateText(prompt, 2000)
-      return NextResponse.json({
-        conclusion: text,
-        survival_horizon: survivalHorizon,
-        reserve_coverage: reserveCoverage,
-        overall_status: overall,
-        ewi: { n1: s_n1, lcr: s_lcr, outflow: s_out, top5: s_top5 },
-      })
-    }
+    const text = await aiGenerateText(prompt, 4000)
+    return NextResponse.json({ sections: text })
 
   } catch (err) {
     console.error('CFP generate error:', err)
