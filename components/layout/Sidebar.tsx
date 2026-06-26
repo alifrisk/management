@@ -6,7 +6,7 @@ import { supabase } from '@/supabase/client'
 import { UserProfile } from '@/types'
 import { cn } from '@/lib/utils'
 import { useI18n, type TranslationKey, type Lang } from '@/lib/i18n'
-import { Shield, FileText, TrendingUp, Droplets, LayoutDashboard, ChevronDown, ChevronRight, LogOut, Settings, Users, Menu, X, ClipboardList, BarChart3, Map, FolderOpen, ClipboardCheck, BookUser, Activity, Building2, ListTodo, Newspaper, Bot, LineChart, Sun, Moon, ShieldAlert, GitMerge } from 'lucide-react'
+import { Shield, FileText, TrendingUp, Droplets, LayoutDashboard, ChevronDown, ChevronRight, LogOut, Settings, Users, Menu, X, ClipboardList, BarChart3, Map, FolderOpen, ClipboardCheck, BookUser, Activity, Building2, ListTodo, Newspaper, Bot, LineChart, Sun, Moon, ShieldAlert, GitMerge, FlaskConical } from 'lucide-react'
 
 interface SidebarProps { user: UserProfile }
 
@@ -51,6 +51,7 @@ const NAV_ITEMS = [
   { titleKey: 'nav.vnd' as TranslationKey, href: '/vnd', icon: <FolderOpen className="w-4 h-4" />, adminOnly: false, children: [{ titleKey: 'nav.documents' as TranslationKey, href: '/vnd', icon: <FolderOpen className="w-3.5 h-3.5" /> }] },
   { titleKey: 'nav.recommendations' as TranslationKey, href: '/recommendations', icon: <ClipboardCheck className="w-4 h-4" />, adminOnly: false, children: [{ titleKey: 'nav.recommendationsList' as TranslationKey, href: '/recommendations', icon: <ClipboardList className="w-3.5 h-3.5" /> }] },
   { titleKey: 'nav.tasks' as TranslationKey, href: '/tasks', icon: <ListTodo className="w-4 h-4" />, adminOnly: true },
+  { titleKey: 'nav.stressTestRegistry' as TranslationKey, href: '/stress-test-registry', icon: <FlaskConical className="w-4 h-4" />, adminOnly: false },
   { titleKey: 'nav.aiAgent' as TranslationKey, href: '/ai-agent', icon: <Bot className="w-4 h-4" />, adminOnly: false },
 ]
 export default function Sidebar({ user }: SidebarProps) {
