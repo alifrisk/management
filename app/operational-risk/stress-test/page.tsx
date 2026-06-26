@@ -135,19 +135,31 @@ export default function OpStressTest() {
     const budgetTotal = totalFor(budget)
     const pessTotal   = pess ? totalFor(pess) : null
     const catTotal    = cat  ? totalFor(cat)  : null
+
+    // Модель 2 — ключевые точки What-If матрицы
+    const model2 = bp > 0 ? {
+      base_profit: bp,
+      pess_point: pessTotal ? { loss: Math.round(pessTotal.loss), recovery: `${(pessTotal.recovery*100).toFixed(0)}%`, adj_profit: Math.round(adjProfit(pessTotal.loss, pessTotal.recovery)) } : null,
+      cat_point:  catTotal  ? { loss: Math.round(catTotal.loss),  recovery: `${(catTotal.recovery*100).toFixed(0)}%`,  adj_profit: Math.round(adjProfit(catTotal.loss,  catTotal.recovery))  } : null,
+    } : null
+
     const conclusion  = [
       `Период истории: ${dateFrom} — ${dateTo} (${hist?.months || '—'} мес.), горизонт: ${forecastMonths} мес.`,
-      `Бюджетный: ${budgetTotal.incidents} инц., ущерб ${fmt(budgetTotal.loss)} TJS, чистый ущерб ${fmt(budgetTotal.netLoss)} TJS.`,
+      `Модель 1 — Бюджетный: ${budgetTotal.incidents} инц., ущерб ${fmt(budgetTotal.loss)} TJS, чистый ущерб ${fmt(budgetTotal.netLoss)} TJS.`,
       pessTotal ? `Пессимистичный: ${pessTotal.incidents} инц., ущерб ${fmt(pessTotal.loss)} TJS, чистый ущерб ${fmt(pessTotal.netLoss)} TJS.` : null,
       catTotal  ? `Катастрофический: ${catTotal.incidents} инц., ущерб ${fmt(catTotal.loss)} TJS, чистый ущерб ${fmt(catTotal.netLoss)} TJS.` : null,
-      bp > 0 && catTotal ? `Скорр. прибыль при катастрофе: ${fmt(bp - catTotal.netLoss)} TJS.` : null,
+      model2?.cat_point ? `Модель 2 — What-If: скорр. прибыль при катастрофе: ${fmt(model2.cat_point.adj_profit)} TJS.` : null,
     ].filter(Boolean).join(' ')
+
     const { error } = await supabase.from('stress_test_registry').insert({
       risk_type: 'Операционный риск',
       analyst_name: analystName,
       period: `${dateFrom} — ${dateTo}`,
       inputs: { date_from: dateFrom, date_to: dateTo, forecast_months: forecastMonths, budget_incidents: bInc || null, budget_loss: bLoss || null, budget_recovery: bRec || null, base_profit: baseProfit || null },
-      results: { historical: hist, scenarios: { budget: budgetTotal, pessimistic: pessTotal, catastrophic: catTotal } },
+      results: {
+        model1: { historical: hist, scenarios: { budget: budgetTotal, pessimistic: pessTotal, catastrophic: catTotal } },
+        model2,
+      },
       conclusion,
       status: 'Проведён',
     })

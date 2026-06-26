@@ -79,19 +79,34 @@ export default function CreditStressTest() {
       adj_profit: BP > 0 ? Math.round(adjProfit(sc.par, sc.cov)) : null,
     }))
     const catSc = scenarios[2]
+
+    // Модель 2 — ключевые точки What-If матрицы
+    const model2 = P > 0 ? {
+      par_rows: PAR_ROWS,
+      cov_cols: COV_COLS,
+      base_profit: BP,
+      pess_point: { par: pess.par, cov: pess.cov, reserve: Math.round(Math.max(0, addReserve(pess.par, pess.cov))), adj_profit: BP > 0 ? Math.round(adjProfit(pess.par, pess.cov)) : null },
+      cat_point:  { par: cat.par,  cov: cat.cov,  reserve: Math.round(Math.max(0, addReserve(cat.par,  cat.cov))),  adj_profit: BP > 0 ? Math.round(adjProfit(cat.par,  cat.cov))  : null },
+    } : null
+
     const conclusion = [
       `Дата отчётности: ${new Date(reportDate).toLocaleDateString('ru-RU')}. Горизонт: ${currentHorizon.label}.`,
       P > 0 ? `Портфель: ${fmt(P)} TJS. Текущий PAR30: ${CP}%, Coverage: ${CC}%.` : null,
-      `Бюджетный: PAR=${budget.par.toFixed(1)}%, доп. резерв ${fmt(scenarios[0].reserve)} TJS.`,
+      `Модель 1 — Бюджетный: PAR=${budget.par.toFixed(1)}%, доп. резерв ${fmt(scenarios[0].reserve)} TJS.`,
       `Пессимистичный: PAR=${pess.par.toFixed(1)}%, доп. резерв ${fmt(scenarios[1].reserve)} TJS.`,
       `Катастрофический: PAR=${cat.par.toFixed(1)}%, доп. резерв ${fmt(catSc.reserve)} TJS${BP > 0 && catSc.adj_profit !== null ? `, скорр. прибыль ${fmt(catSc.adj_profit)} TJS` : ''}.`,
+      model2?.cat_point?.adj_profit != null ? `Модель 2 — What-If: при катастрофе скорр. прибыль ${fmt(model2.cat_point.adj_profit)} TJS.` : null,
     ].filter(Boolean).join(' ')
+
     const { error } = await supabase.from('stress_test_registry').insert({
       risk_type: 'Кредитный риск',
       analyst_name: analystName,
       period: new Date(reportDate).toLocaleDateString('ru-RU'),
       inputs: { report_date: reportDate, portfolio: P, current_par: CP, current_cov: CC, base_profit: BP, budget_par: budgetPar || null, budget_cov: budgetCov || null, horizon: currentHorizon.label },
-      results: { scenarios },
+      results: {
+        model1: { scenarios },
+        model2,
+      },
       conclusion,
       status: 'Проведён',
     })
