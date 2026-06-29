@@ -6,6 +6,17 @@ import { Plus, Eye, Trash2, X, Loader2, CheckCircle2, AlertCircle, Download, Fil
 
 const MONTHS = ['Январь','Февраль','Март','Апрель','Май','Июнь','Июль','Август','Сентябрь','Октябрь','Ноябрь','Декабрь']
 
+function stripMarkdown(text: string): string {
+  return text
+    .replace(/\*\*(.+?)\*\*/g, '$1')
+    .replace(/\*(.+?)\*/g, '$1')
+    .replace(/#{1,6}\s*/g, '')
+    .replace(/^[\s]*[-•]\s+/gm, '')
+    .replace(/✓|✗|►|▪|→|═+/g, '')
+    .replace(/\n{3,}/g, '\n\n')
+    .trim()
+}
+
 const CURRENCIES = [
   { code: 'USD', name: 'Доллар США', symbol: '$' },
   { code: 'RUB', name: 'Российский рубль', symbol: '₽' },
@@ -703,8 +714,8 @@ export default function FinancialAnalysisPage() {
               {viewing.ai_conclusion && (
                 <div>
                   <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">AI МСФО Анализ</p>
-                  <div className="bg-blue-50 border border-blue-100 rounded-lg p-4">
-                    <p className="text-sm text-gray-800 whitespace-pre-wrap">{viewing.ai_conclusion}</p>
+                  <div className="border border-gray-100 rounded-lg p-4">
+                    <p className="text-sm text-gray-900 whitespace-pre-wrap">{stripMarkdown(viewing.ai_conclusion)}</p>
                   </div>
                 </div>
               )}
