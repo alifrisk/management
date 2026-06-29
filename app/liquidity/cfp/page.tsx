@@ -6,8 +6,8 @@ import { Plus, Eye, Trash2, X, Loader2, ShieldAlert, CheckCircle, Download } fro
 import { statusCar11, statusCar12, statusCar13, statusK21, normLabel, EWI_EMOJI, type EwiStatus } from '@/lib/cfpCalculations'
 
 // ── Constants ─────────────────────────────────────────────────────────────────
-const GAP_MONTHS_FULL  = ['Июль', 'Август', 'Сентябрь', 'Октябрь', 'Ноябрь', 'Декабрь']
-const GAP_MONTHS_SHORT = ['Июл', 'Авг', 'Сен', 'Окт', 'Ноя', 'Дек']
+const ALL_MONTHS_FULL  = ['Январь','Февраль','Март','Апрель','Май','Июнь','Июль','Август','Сентябрь','Октябрь','Ноябрь','Декабрь']
+const ALL_MONTHS_SHORT = ['Янв','Фев','Мар','Апр','Май','Июн','Июл','Авг','Сен','Окт','Ноя','Дек']
 const GAP_ASSETS = ['Денежные средства', 'Ограниченные ден. ср-ва', 'Кредиты выданные']
 const GAP_LIAB   = ['Счета клиентов', 'Привлечённые займы', 'Субординированный займ']
 
@@ -127,6 +127,11 @@ export default function CfpPage() {
   const assetTotals = colSum(0, 3)
   const liabTotals  = colSum(3, 6)
   const gapRow      = assetTotals.map((a, i) => a - liabTotals[i])
+
+  // ── Dynamic GAP month labels ──────────────────────────────────────────────
+  const _gapStart   = planDate ? (new Date(planDate + 'T00:00:00').getMonth() + 1) % 12 : 6
+  const gapMonthsFull  = Array.from({ length: 6 }, (_, i) => ALL_MONTHS_FULL[(_gapStart + i) % 12])
+  const gapMonthsShort = Array.from({ length: 6 }, (_, i) => ALL_MONTHS_SHORT[(_gapStart + i) % 12])
 
   // ── Load reports ──────────────────────────────────────────────────────────
   const loadReports = useCallback(async () => {
@@ -280,14 +285,14 @@ export default function CfpPage() {
         {/* GAP Table */}
         <div>
           <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">
-            ГЭП-таблица (млн TJS) · {GAP_MONTHS_FULL[0]}–{GAP_MONTHS_FULL[5]}
+            ГЭП-таблица (млн TJS) · {gapMonthsFull[0]}–{gapMonthsFull[5]}
           </p>
           <div className="overflow-x-auto">
             <table className="w-full text-xs border-collapse">
               <thead>
                 <tr className="bg-gray-50">
                   <th className="text-left px-3 py-2 text-gray-600 font-medium border border-gray-200" style={{ minWidth: 200 }}>Статья</th>
-                  {GAP_MONTHS_SHORT.map(m => (
+                  {gapMonthsShort.map(m => (
                     <th key={m} className="px-2 py-2 text-gray-600 font-medium text-center border border-gray-200" style={{ minWidth: 76 }}>{m}</th>
                   ))}
                 </tr>
@@ -303,8 +308,10 @@ export default function CfpPage() {
                     <td className="px-3 py-1 text-gray-700 border border-gray-200 bg-white">{name}</td>
                     {Array(6).fill(0).map((_, ci) => (
                       <td key={ci} className="px-1 py-1 border border-gray-200 bg-white">
-                        <input type="text" inputMode="numeric" value={gapMatrix[ri][ci]}
-                          onChange={e => setGapCell(ri, ci, e.target.value.replace(/\D/g, ''))}
+                        <input type="text" inputMode="decimal" value={gapMatrix[ri][ci]}
+                          onChange={e => setGapCell(ri, ci, e.target.value.replace(/[^\d.]/g, ''))}
+                          onFocus={() => { const v = parseN(gapMatrix[ri][ci]); setGapCell(ri, ci, v > 0 ? String(v) : '') }}
+                          onBlur={() => { const v = Math.round(parseN(gapMatrix[ri][ci])); setGapCell(ri, ci, v > 0 ? v.toLocaleString('ru-RU') : '') }}
                           placeholder="0"
                           className="w-full px-2 py-1.5 border border-gray-200 rounded text-right text-xs focus:outline-none focus:ring-1 focus:ring-[#1B8A4C] bg-white" />
                       </td>
@@ -329,8 +336,10 @@ export default function CfpPage() {
                     <td className="px-3 py-1 text-gray-700 border border-gray-200 bg-white">{name}</td>
                     {Array(6).fill(0).map((_, ci) => (
                       <td key={ci} className="px-1 py-1 border border-gray-200 bg-white">
-                        <input type="text" inputMode="numeric" value={gapMatrix[ri + 3][ci]}
-                          onChange={e => setGapCell(ri + 3, ci, e.target.value.replace(/\D/g, ''))}
+                        <input type="text" inputMode="decimal" value={gapMatrix[ri + 3][ci]}
+                          onChange={e => setGapCell(ri + 3, ci, e.target.value.replace(/[^\d.]/g, ''))}
+                          onFocus={() => { const v = parseN(gapMatrix[ri + 3][ci]); setGapCell(ri + 3, ci, v > 0 ? String(v) : '') }}
+                          onBlur={() => { const v = Math.round(parseN(gapMatrix[ri + 3][ci])); setGapCell(ri + 3, ci, v > 0 ? v.toLocaleString('ru-RU') : '') }}
                           placeholder="0"
                           className="w-full px-2 py-1.5 border border-gray-200 rounded text-right text-xs focus:outline-none focus:ring-1 focus:ring-[#1B8A4C] bg-white" />
                       </td>
