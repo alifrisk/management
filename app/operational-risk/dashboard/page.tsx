@@ -22,6 +22,7 @@ export default function DashboardPage() {
   const [year, setYear] = useState(new Date().getFullYear())
   const [filterMonth, setFilterMonth] = useState('')
   const [prevIncidents, setPrevIncidents] = useState<{loss_amount_tjs: number; recovery_amount: number; risk_level: string; incident_status: string}[]>([])
+  const [allIncidents, setAllIncidents]   = useState<{loss_amount_tjs: number; recovery_amount: number; discovery_date: string}[]>([])
   const dashboardRef = useRef<HTMLDivElement>(null)
   const fetchData = useCallback(async () => {
     setLoading(true)
@@ -46,6 +47,12 @@ export default function DashboardPage() {
     setLoading(false)
   }, [year, filterMonth])
   useEffect(() => { fetchData() }, [fetchData])
+  useEffect(() => {
+    supabase
+      .from('operational_incidents')
+      .select('loss_amount_tjs, recovery_amount, discovery_date')
+      .then(({ data }) => setAllIncidents(data || []))
+  }, [])
   const fmt = (n: number) => new Intl.NumberFormat('ru-RU').format(Math.round(n))
   const total = incidents.length
   const totalLoss = incidents.reduce((s, i) => s + (i.loss_amount_tjs || 0), 0)
@@ -87,6 +94,24 @@ export default function DashboardPage() {
   const frequencyData = ['Часто повторяющиеся', 'Редко повторяющиеся', 'Единичный случай'].map(f => ({ name: f, value: incidents.filter(i => i.frequency === f).length })).filter(d => d.value > 0)
   const clientStatusData = ['В процессе обзвона', 'В ожидании возмещения', 'Возмещенно', 'Невозмещаемый', 'Нефинансовый инцидент', 'Процесс возмещения не начался', 'Процесс возмещения не идет'].map(s => ({ name: s.length > 22 ? s.slice(0, 22) + '…' : s, count: incidents.filter(i => i.client_work_status === s).length })).filter(d => d.count > 0)
   const deptData = Object.entries(incidents.reduce((acc, i) => { if (i.department) acc[i.department] = (acc[i.department] || 0) + 1; return acc }, {} as Record<string, number>)).sort((a, b) => b[1] - a[1]).slice(0, 10).map(([name, count]) => ({ name: name.length > 25 ? name.slice(0, 25) + '…' : name, count }))
+  const yearData = Object.entries(
+    allIncidents.reduce((acc, i) => {
+      if (!i.discovery_date) return acc
+      const y = String(new Date(i.discovery_date).getFullYear())
+      if (!acc[y]) acc[y] = { loss: 0, recovery: 0, count: 0 }
+      acc[y].loss     += i.loss_amount_tjs || 0
+      acc[y].recovery += i.recovery_amount || 0
+      acc[y].count    += 1
+      return acc
+    }, {} as Record<string, { loss: number; recovery: number; count: number }>)
+  ).sort((a, b) => Number(a[0]) - Number(b[0]))
+   .map(([yr, v]) => ({
+     year: yr,
+     loss:      Math.round(v.loss),
+     recovery:  Math.round(v.recovery),
+     remainder: Math.round(Math.max(0, v.loss - v.recovery)),
+     count:     v.count,
+   }))
 
   async function handleDownload() {
     try {
@@ -400,6 +425,71 @@ export default function DashboardPage() {
           </BarChart>
         </ResponsiveContainer>
       </div>
+
+      {/* Динамика по годам */}
+      {yearData.length > 0 && (
+        <div className={card}>
+          <p className={title}>Динамика по годам</p>
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            <div>
+              <p className="text-xs text-gray-500 mb-2 font-medium">Сумма ущерба по годам (TJS)</p>
+              <ResponsiveContainer width="100%" height={200}>
+                <BarChart data={yearData}>
+                  <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
+                  <XAxis dataKey="year" tick={{ fontSize: 11 }} />
+                  <YAxis tick={{ fontSize: 10 }} tickFormatter={v => fmt(v)} />
+                  <Tooltip formatter={(v: number) => [fmt(v), 'Ущерб (TJS)']} />
+                  <Bar dataKey="loss" name="Ущерб (TJS)" fill="#EF4444" radius={[4,4,0,0]}>
+                    <LabelList dataKey="loss" position="top" style={{ fontSize: 9 }} formatter={(v: number) => v > 0 ? fmt(v) : ''} />
+                  </Bar>
+                </BarChart>
+              </ResponsiveContainer>
+            </div>
+            <div>
+              <p className="text-xs text-gray-500 mb-2 font-medium">Сумма возмещения по годам (TJS)</p>
+              <ResponsiveContainer width="100%" height={200}>
+                <BarChart data={yearData}>
+                  <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
+                  <XAxis dataKey="year" tick={{ fontSize: 11 }} />
+                  <YAxis tick={{ fontSize: 10 }} tickFormatter={v => fmt(v)} />
+                  <Tooltip formatter={(v: number) => [fmt(v), 'Возмещение (TJS)']} />
+                  <Bar dataKey="recovery" name="Возмещение (TJS)" fill="#1B8A4C" radius={[4,4,0,0]}>
+                    <LabelList dataKey="recovery" position="top" style={{ fontSize: 9 }} formatter={(v: number) => v > 0 ? fmt(v) : ''} />
+                  </Bar>
+                </BarChart>
+              </ResponsiveContainer>
+            </div>
+            <div>
+              <p className="text-xs text-gray-500 mb-2 font-medium">Остаток (ущерб − возмещение) по годам (TJS)</p>
+              <ResponsiveContainer width="100%" height={200}>
+                <BarChart data={yearData}>
+                  <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
+                  <XAxis dataKey="year" tick={{ fontSize: 11 }} />
+                  <YAxis tick={{ fontSize: 10 }} tickFormatter={v => fmt(v)} />
+                  <Tooltip formatter={(v: number) => [fmt(v), 'Остаток (TJS)']} />
+                  <Bar dataKey="remainder" name="Остаток (TJS)" fill="#F97316" radius={[4,4,0,0]}>
+                    <LabelList dataKey="remainder" position="top" style={{ fontSize: 9 }} formatter={(v: number) => v > 0 ? fmt(v) : ''} />
+                  </Bar>
+                </BarChart>
+              </ResponsiveContainer>
+            </div>
+            <div>
+              <p className="text-xs text-gray-500 mb-2 font-medium">Количество инцидентов по годам</p>
+              <ResponsiveContainer width="100%" height={200}>
+                <BarChart data={yearData}>
+                  <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
+                  <XAxis dataKey="year" tick={{ fontSize: 11 }} />
+                  <YAxis tick={{ fontSize: 11 }} allowDecimals={false} />
+                  <Tooltip formatter={(v: number) => [v, 'Инциденты']} />
+                  <Bar dataKey="count" name="Инциденты" fill="#3B82F6" radius={[4,4,0,0]}>
+                    <LabelList dataKey="count" position="top" style={{ fontSize: 11, fontWeight: 'bold' }} />
+                  </Bar>
+                </BarChart>
+              </ResponsiveContainer>
+            </div>
+          </div>
+        </div>
+      )}
 
       {total === 0 && (
         <div className="text-center py-16 text-gray-400">
