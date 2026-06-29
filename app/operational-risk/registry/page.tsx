@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useCallback } from 'react'
 import { supabase } from '@/supabase/client'
-import { Plus, Search, Filter, Download, Eye, Edit2, Trash2, Bell, X, CheckCircle2, Clock, AlertCircle, FileWarning } from 'lucide-react'
+import { Plus, Search, Filter, Download, Eye, Edit2, Trash2, Bell, X, CheckCircle2, Clock, AlertCircle, FileWarning, ShieldAlert, BellRing } from 'lucide-react'
 import { formatDate, cn } from '@/lib/utils'
 import { BUSINESS_PROCESSES, RISK_FACTORS, SYSTEMS, DEPARTMENTS, INCIDENT_STATUSES, EVENT_CATEGORIES_L1, EVENT_CATEGORIES_L2, CURRENCIES, PROBABILITY_SCORES, IMPACT_SCORES, CONTROL_SCORES, INCIDENT_FREQUENCIES, CLIENT_WORK_STATUSES } from '@/lib/constants'
 
@@ -125,6 +125,11 @@ export default function RegistryPage() {
   const [viewingIncident, setViewingIncident] = useState<Incident | null>(null)
   const [currentPage, setCurrentPage] = useState(1)
 
+  // ── Alert state ─────────────────────────────────────────────────────────────
+  const [nbtReported, setNbtReported] = useState<Record<string, boolean>>({})
+  const [qDismissed,  setQDismissed]  = useState<Record<string, boolean>>({})
+  const [nowMs,       setNowMs]       = useState(Date.now())
+
   const fetchIncidents = useCallback(async () => {
     setLoading(true)
     let query = supabase.from('operational_incidents').select('*').order('incident_number', { ascending: false })
@@ -147,6 +152,47 @@ export default function RegistryPage() {
   }, [])
 
   useEffect(() => { fetchIncidents(); fetchPendingForms() }, [fetchIncidents, fetchPendingForms])
+
+  // Load alert dismissal state from localStorage
+  useEffect(() => {
+    try {
+      const r = localStorage.getItem('or_nbt_reported'); if (r) setNbtReported(JSON.parse(r))
+      const q = localStorage.getItem('or_q_dismissed');  if (q) setQDismissed(JSON.parse(q))
+    } catch {}
+  }, [])
+
+  // Live countdown — ticks every second
+  useEffect(() => {
+    const id = setInterval(() => setNowMs(Date.now()), 1000)
+    return () => clearInterval(id)
+  }, [])
+
+  // ── Alert helpers ──────────────────────────────────────────────────────────
+  function markNbtDone(incidentId: string) {
+    const u = { ...nbtReported, [incidentId]: true }
+    setNbtReported(u); localStorage.setItem('or_nbt_reported', JSON.stringify(u))
+  }
+  function dismissQuarter(key: string) {
+    const u = { ...qDismissed, [key]: true }
+    setQDismissed(u); localStorage.setItem('or_q_dismissed', JSON.stringify(u))
+  }
+  function fmtCountdown(ms: number): string {
+    if (ms <= 0) return 'ПРОСРОЧЕНО'
+    const h = Math.floor(ms / 3_600_000)
+    const m = Math.floor((ms % 3_600_000) / 60_000)
+    const s = Math.floor((ms % 60_000) / 1_000)
+    return `${String(h).padStart(2,'0')}:${String(m).padStart(2,'0')}:${String(s).padStart(2,'0')}`
+  }
+  function getQuarterInfo(ts: number) {
+    const d = new Date(ts)
+    const month = d.getMonth()
+    const endMonth = ([2, 5, 8, 11] as const).find(m => month <= m) ?? 11
+    const qNum = Math.floor(endMonth / 3) + 1
+    const endDate = new Date(d.getFullYear(), endMonth + 1, 0, 23, 59, 59)
+    const msLeft = endDate.getTime() - ts
+    const daysLeft = Math.ceil(msLeft / 86_400_000)
+    return { qNum, year: d.getFullYear(), daysLeft, key: `Q${qNum}-${d.getFullYear()}`, show: daysLeft >= 0 && daysLeft <= 21 }
+  }
 
   function handleChange(field: string, value: unknown) {
     setFormData(prev => {
@@ -245,6 +291,29 @@ export default function RegistryPage() {
       disclosure: form.disclosure, department: form.department, _form_id: form.id } as Record<string, unknown>)
     setShowFormsModal(false); setActiveTab(1); setShowModal(true)
   }
+
+  // ── Computed alerts ────────────────────────────────────────────────────────
+  const nbtAlerts = incidents.filter(i =>
+    i.loss_amount_tjs != null && i.loss_amount_tjs >= 5000 &&
+    !nbtReported[i.id] &&
+    (nowMs - new Date(i.created_at).getTime()) < 7 * 86_400_000
+  )
+  const qInfo = getQuarterInfo(nowMs)
+
+  // Change browser tab title when alerts are active (annoying on purpose)
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  useEffect(() => {
+    const overdue = nbtAlerts.filter(i => nowMs - new Date(i.created_at).getTime() > 86_400_000)
+    const urgent  = nbtAlerts.filter(i => {
+      const rem = new Date(i.created_at).getTime() + 86_400_000 - nowMs
+      return rem > 0 && rem < 4 * 3_600_000
+    })
+    if (overdue.length > 0)      document.title = `🚨 ПРОСРОЧЕНО! ${overdue.length} отчёт НБТ не отправлен!`
+    else if (urgent.length > 0)  document.title = `⏰ СРОЧНО! ${urgent.length} отчёт НБТ — менее 4 часов!`
+    else if (nbtAlerts.length > 0) document.title = `⚠️ ${nbtAlerts.length} инцидент(а) требуют отчёта НБТ`
+    else                         document.title = 'Реестр операционных инцидентов'
+    return () => { document.title = 'Реестр операционных инцидентов' }
+  })
 
   const filtered = incidents.filter(i =>
     !search ||
@@ -352,6 +421,121 @@ export default function RegistryPage() {
       </div>
 
       <div className="space-y-4 mt-5">
+
+      {/* ── NBT 24h Alerts ─────────────────────────────────────────────────── */}
+      {nbtAlerts.map(incident => {
+        const deadline  = new Date(incident.created_at).getTime() + 86_400_000
+        const remaining = deadline - nowMs
+        const isOverdue = remaining <= 0
+        const isUrgent  = !isOverdue && remaining < 4 * 3_600_000
+        const timeStr   = isOverdue ? null : fmtCountdown(remaining)
+        const hoursLate = isOverdue ? Math.floor((nowMs - deadline) / 3_600_000) : 0
+        return (
+          <div key={incident.id}
+            className={`rounded-xl border-2 p-4 ${
+              isOverdue  ? 'bg-red-50 border-red-500 animate-pulse' :
+              isUrgent   ? 'bg-orange-50 border-orange-400' :
+                           'bg-amber-50 border-amber-300'
+            }`}>
+            <div className="flex items-start justify-between gap-4">
+              <div className="flex items-start gap-3 min-w-0">
+                <ShieldAlert className={`w-6 h-6 flex-shrink-0 mt-0.5 ${
+                  isOverdue ? 'text-red-600 animate-bounce' :
+                  isUrgent  ? 'text-orange-600 animate-pulse' : 'text-amber-600'
+                }`} />
+                <div className="min-w-0">
+                  <p className={`font-bold text-sm ${
+                    isOverdue ? 'text-red-700' : isUrgent ? 'text-orange-700' : 'text-amber-700'
+                  }`}>
+                    {isOverdue
+                      ? `🚨 ПРОСРОЧЕНО! Отчёт в НБТ не был отправлен (${hoursLate} ч. назад)`
+                      : '⚠️ ТРЕБУЕТСЯ ОТЧЁТ В НБТ РТ В ТЕЧЕНИЕ 24 ЧАСОВ!'}
+                  </p>
+                  <p className="text-xs text-gray-600 mt-0.5">
+                    Инцидент #{incident.incident_number}
+                    {' · '}Ущерб: <span className="font-semibold">{new Intl.NumberFormat('ru-RU').format(incident.loss_amount_tjs!)} TJS</span>
+                    {' · '}Обнаружен: {formatDate(incident.discovery_date)}
+                    {' · '}Зарегистрирован: {new Date(incident.created_at).toLocaleString('ru-RU')}
+                  </p>
+                  {!isOverdue && timeStr && (
+                    <div className={`mt-2 inline-flex items-center gap-2 px-3 py-1.5 rounded-lg font-mono font-bold text-base ${
+                      isUrgent ? 'bg-orange-100 text-orange-800' : 'bg-amber-100 text-amber-800'
+                    }`}>
+                      <Clock className="w-4 h-4" />
+                      До дедлайна: {timeStr}
+                    </div>
+                  )}
+                  {isOverdue && (
+                    <p className="mt-1.5 text-xs font-semibold text-red-700">
+                      Дедлайн 24ч истёк {hoursLate} ч. назад. Немедленно уведомите НБТ РТ и зафиксируйте отправку!
+                    </p>
+                  )}
+                </div>
+              </div>
+              <div className="flex flex-col gap-2 flex-shrink-0">
+                <button
+                  onClick={() => { generateNBTReport(incident); markNbtDone(incident.id) }}
+                  className={`flex items-center gap-1.5 px-3 py-2 rounded-lg text-xs font-semibold text-white whitespace-nowrap ${
+                    isOverdue ? 'bg-red-600 hover:bg-red-700' : 'bg-[#1B8A4C] hover:bg-[#177040]'
+                  }`}>
+                  <FileWarning className="w-3.5 h-3.5" /> Сформировать отчёт НБТ
+                </button>
+                <button
+                  onClick={() => markNbtDone(incident.id)}
+                  className="flex items-center gap-1.5 px-3 py-2 border border-gray-300 rounded-lg text-xs font-medium text-gray-600 bg-white hover:bg-gray-50 whitespace-nowrap">
+                  <CheckCircle2 className="w-3.5 h-3.5 text-green-600" /> Отмечено как отправлено
+                </button>
+              </div>
+            </div>
+          </div>
+        )
+      })}
+
+      {/* ── Quarterly Alert ─────────────────────────────────────────────────── */}
+      {qInfo.show && !qDismissed[qInfo.key] && (
+        <div className={`rounded-xl border-2 p-4 ${
+          qInfo.daysLeft <= 3  ? 'bg-red-50 border-red-500' :
+          qInfo.daysLeft <= 7  ? 'bg-orange-50 border-orange-400' :
+          qInfo.daysLeft <= 14 ? 'bg-yellow-50 border-yellow-300' :
+                                  'bg-blue-50 border-blue-200'
+        }`}>
+          <div className="flex items-center justify-between gap-4">
+            <div className="flex items-center gap-3">
+              <BellRing className={`w-6 h-6 flex-shrink-0 ${
+                qInfo.daysLeft <= 3  ? 'text-red-600 animate-bounce' :
+                qInfo.daysLeft <= 7  ? 'text-orange-600 animate-bounce' :
+                qInfo.daysLeft <= 14 ? 'text-yellow-600' : 'text-blue-600'
+              }`} />
+              <div>
+                <p className={`font-bold text-sm ${
+                  qInfo.daysLeft <= 3  ? 'text-red-700' :
+                  qInfo.daysLeft <= 7  ? 'text-orange-700' :
+                  qInfo.daysLeft <= 14 ? 'text-yellow-700' : 'text-blue-700'
+                }`}>
+                  📊 КВАРТАЛЬНЫЙ ОТЧЁТ НБТ РТ · Q{qInfo.qNum} {qInfo.year}
+                </p>
+                <p className="text-xs text-gray-600 mt-0.5">
+                  {qInfo.daysLeft <= 0
+                    ? '🚨 Срок подачи квартального отчёта истёк! Немедленно отправьте в НБТ РТ!'
+                    : qInfo.daysLeft === 1
+                    ? '🚨 ПОСЛЕДНИЙ ДЕНЬ! Квартальный отчёт по операционным рискам нужно сдать СЕГОДНЯ!'
+                    : qInfo.daysLeft <= 3
+                    ? `🔴 Осталось ${qInfo.daysLeft} дня до конца квартала — подготовьте и отправьте отчёт в НБТ РТ!`
+                    : qInfo.daysLeft <= 7
+                    ? `До конца Q${qInfo.qNum} осталось ${qInfo.daysLeft} дней — не забудьте квартальный отчёт НБТ РТ по операционным рискам.`
+                    : `До конца Q${qInfo.qNum} ${qInfo.year} осталось ${qInfo.daysLeft} дней. Начните подготовку квартального отчёта НБТ РТ.`
+                  }
+                </p>
+              </div>
+            </div>
+            <button
+              onClick={() => dismissQuarter(qInfo.key)}
+              className="flex items-center gap-1.5 px-3 py-2 border border-gray-300 rounded-lg text-xs font-medium text-gray-600 bg-white hover:bg-gray-50 whitespace-nowrap flex-shrink-0">
+              <CheckCircle2 className="w-3.5 h-3.5 text-green-600" /> Понял, не забуду
+            </button>
+          </div>
+        </div>
+      )}
 
       <div className="bg-white rounded-xl border border-gray-100 p-4 shadow-sm">
         <div className="flex items-center gap-3">
