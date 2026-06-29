@@ -197,12 +197,12 @@ export default function IncidentFormPage() {
       {/* Sticky header */}
       <div className="sticky top-0 z-30 border-b border-white/10"
         style={{background: 'rgba(11,49,28,0.97)', backdropFilter: 'blur(12px)', boxShadow: '0 4px 24px rgba(0,0,0,0.35)'}}>
-        <div className="max-w-2xl mx-auto px-4 py-3 flex items-center justify-between">
-          <div>
+        <div className="max-w-2xl mx-auto px-4 py-3 relative flex items-center justify-center">
+          <div className="text-center">
             <p className="text-white font-bold text-sm">Анкета операционного инцидента</p>
             <p className="text-green-400/60 text-xs">ОАО «Алиф Банк» · Служба управления рисками</p>
           </div>
-          <span className={`text-xs flex items-center gap-1 transition-opacity duration-300 ${draftSaved ? 'opacity-100 text-green-400' : 'opacity-0'}`}>
+          <span className={`absolute right-4 text-xs flex items-center gap-1 transition-opacity duration-300 ${draftSaved ? 'opacity-100 text-green-400' : 'opacity-0'}`}>
             <Check className="w-3 h-3" /> Черновик сохранён
           </span>
         </div>
