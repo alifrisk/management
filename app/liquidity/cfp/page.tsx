@@ -60,6 +60,17 @@ const SRC_STATUS_COLOR: Record<string, string> = {
   unavailable: 'bg-red-100 text-red-700',
 }
 
+// ── Half-year helper ─────────────────────────────────────────────────────────
+function getHalfYearInfo(now: number) {
+  const d    = new Date(now)
+  const year = d.getFullYear()
+  const half = d.getMonth() < 6 ? 1 : 2
+  const key  = `H${half}-${year}`
+  const end  = new Date(half === 1 ? `${year}-06-30T23:59:59` : `${year}-12-31T23:59:59`)
+  const daysLeft = Math.ceil((end.getTime() - now) / 86_400_000)
+  return { key, half, year, daysLeft }
+}
+
 // ── NormRow ───────────────────────────────────────────────────────────────────
 function NormRow({ code, norm, value, status, onChange }: {
   code: string; norm: string; value: string; status: EwiStatus | null; onChange: (v: string) => void
@@ -113,6 +124,10 @@ export default function CfpPage() {
   const [error,        setError]        = useState<string | null>(null)
   const [saving,       setSaving]       = useState(false)
 
+  // half-year alert
+  const [hyDismissed, setHyDismissed] = useState<Record<string, boolean>>({})
+  const [nowMs,       setNowMs]       = useState(Date.now())
+
   // computed statuses
   const s11  = car11 ? statusCar11(parseN(car11)) : null
   const s12  = car12 ? statusCar12(parseN(car12)) : null
@@ -141,11 +156,36 @@ export default function CfpPage() {
     setLoadingList(false)
   }, [])
   useEffect(() => { loadReports() }, [loadReports])
+  useEffect(() => {
+    try {
+      const stored = localStorage.getItem('cfp_hy_dismissed')
+      if (stored) setHyDismissed(JSON.parse(stored))
+    } catch {}
+  }, [])
+  useEffect(() => {
+    const id = setInterval(() => setNowMs(Date.now()), 60_000)
+    return () => clearInterval(id)
+  }, [])
 
   // ── GAP cell update ───────────────────────────────────────────────────────
   function setGapCell(row: number, col: number, val: string) {
     setGapMatrix(prev => prev.map((r, ri) => ri === row ? r.map((c, ci) => ci === col ? val : c) : r))
   }
+
+  // ── Half-year alert logic ─────────────────────────────────────────────────
+  function dismissHY(key: string) {
+    const next = { ...hyDismissed, [key]: true }
+    setHyDismissed(next)
+    localStorage.setItem('cfp_hy_dismissed', JSON.stringify(next))
+  }
+  const hyInfo = getHalfYearInfo(nowMs)
+  const hasPlanForHY = reports.some(r => {
+    const ds = r.plan_date || r.created_at
+    if (!ds) return false
+    const d = new Date(ds)
+    return d.getFullYear() === hyInfo.year && (d.getMonth() < 6 ? 1 : 2) === hyInfo.half
+  })
+  const showHyAlert = !hasPlanForHY && !hyDismissed[hyInfo.key]
 
   // ── Sources management ────────────────────────────────────────────────────
   function addSource() {
@@ -254,6 +294,35 @@ export default function CfpPage() {
         <h1 className="text-xl font-semibold text-gray-900">План финансирования на ЧС (CFP)</h1>
         <p className="text-sm text-gray-500 mt-0.5">Инструкция №247 НБТ РТ · Contingency Funding Plan</p>
       </div>
+
+      {/* Half-year NBT alert */}
+      {showHyAlert && (
+        <div className={`flex items-start gap-3 px-4 py-3 rounded-xl border text-sm ${
+          hyInfo.daysLeft <= 7
+            ? 'bg-red-50 border-red-300 text-red-800 animate-pulse'
+            : hyInfo.daysLeft <= 30
+            ? 'bg-orange-50 border-orange-200 text-orange-800'
+            : 'bg-amber-50 border-amber-200 text-amber-800'
+        }`}>
+          <ShieldAlert className={`w-5 h-5 mt-0.5 flex-shrink-0 ${
+            hyInfo.daysLeft <= 7 ? 'text-red-600' : hyInfo.daysLeft <= 30 ? 'text-orange-500' : 'text-amber-600'
+          }`} />
+          <div className="flex-1 min-w-0">
+            <p className="font-semibold">
+              НБТ: CFP за {hyInfo.half === 1 ? 'I' : 'II'} полугодие {hyInfo.year} не сформирован
+            </p>
+            <p className="text-xs mt-0.5 opacity-80">
+              {hyInfo.daysLeft > 0
+                ? `До конца полугодия осталось ${hyInfo.daysLeft} ${hyInfo.daysLeft === 1 ? 'день' : hyInfo.daysLeft < 5 ? 'дня' : 'дней'} · Требование Инструкции №247 НБТ РТ`
+                : 'Срок полугодия истёк — срочно сформируйте CFP-план согласно Инструкции №247 НБТ РТ'}
+            </p>
+          </div>
+          <button onClick={() => dismissHY(hyInfo.key)}
+            className="text-xs underline opacity-60 hover:opacity-100 whitespace-nowrap flex-shrink-0 mt-0.5">
+            Понял, не забуду
+          </button>
+        </div>
+      )}
 
       {/* ── FORM ─────────────────────────────────────────────────────────────── */}
       <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-6 space-y-6">
