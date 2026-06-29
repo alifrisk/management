@@ -227,7 +227,7 @@ export default function IncidentFormPage() {
         </div>
       )}
 
-      <div className="max-w-2xl mx-auto px-4 pt-5 pb-10">
+      <div className="max-w-2xl mx-auto px-4 pt-10 pb-10">
         <div className="bg-white rounded-3xl shadow-2xl overflow-hidden">
 
           {/* ── Step indicator ─────────────────────────────────────────── */}
