@@ -423,14 +423,6 @@ export default function CfpPage() {
                     </td>
                   ))}
                 </tr>
-                <tr className="bg-gray-100">
-                  <td className="px-3 py-2 text-xs font-bold text-gray-700 border border-gray-200">ГЭП (Активы − Обязательства)</td>
-                  {gapRow.map((v, i) => (
-                    <td key={i} className={`px-2 py-2 text-center text-xs font-bold border border-gray-200 ${v > 0 ? 'text-[#1B8A4C]' : v < 0 ? 'text-red-600' : 'text-gray-400'}`}>
-                      {v !== 0 ? (v > 0 ? '+' : '') + v.toLocaleString('ru-RU') : '—'}
-                    </td>
-                  ))}
-                </tr>
               </tbody>
             </table>
           </div>
@@ -581,28 +573,19 @@ export default function CfpPage() {
           <table className="w-full text-sm">
             <thead>
               <tr className="bg-gray-50 border-b border-gray-100">
-                {['Период плана', 'Дата', 'CAR 1.1', 'К2-1', 'ГЭП статус', 'Действия'].map(h => (
+                {['Период плана', 'Дата', 'CAR 1.1', 'К2-1', 'Действия'].map(h => (
                   <th key={h} className="text-left px-4 py-3 text-xs font-medium text-gray-500 uppercase whitespace-nowrap">{h}</th>
                 ))}
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-50">
               {loadingList
-                ? <tr><td colSpan={6} className="text-center py-10"><Loader2 className="w-5 h-5 animate-spin mx-auto text-gray-300" /></td></tr>
+                ? <tr><td colSpan={5} className="text-center py-10"><Loader2 className="w-5 h-5 animate-spin mx-auto text-gray-300" /></td></tr>
                 : reports.length === 0
-                ? <tr><td colSpan={6} className="text-center py-10 text-gray-400 text-sm">Нет сохранённых CFP-планов</td></tr>
+                ? <tr><td colSpan={5} className="text-center py-10 text-gray-400 text-sm">Нет сохранённых CFP-планов</td></tr>
                 : reports.map(r => {
                     const rs11  = r.car11 != null ? statusCar11(r.car11) : null
                     const rsk21 = r.k21   != null ? statusK21(r.k21)     : null
-                    // Determine GAP status from stored data
-                    const stored = r.outflows_data?.rows
-                    let gapLabel = '—'
-                    if (stored && stored.length === 6) {
-                      const aT = Array(6).fill(0).map((_, ci) => stored.slice(0,3).reduce((s, row) => s + (row[ci]||0), 0))
-                      const lT = Array(6).fill(0).map((_, ci) => stored.slice(3,6).reduce((s, row) => s + (row[ci]||0), 0))
-                      const neg = aT.some((a, i) => a - lT[i] < 0)
-                      gapLabel = neg ? '🔴 Дефицит' : '🟢 Профицит'
-                    }
                     return (
                       <tr key={r.id} className="hover:bg-gray-50">
                         <td className="px-4 py-3 font-medium text-gray-900">{r.plan_period || r.report_name || '—'}</td>
@@ -615,7 +598,6 @@ export default function CfpPage() {
                         <td className="px-4 py-3 text-xs">
                           {rsk21 ? <span className="font-medium">{r.k21}% {EWI_EMOJI[rsk21]}</span> : <span className="text-gray-300">—</span>}
                         </td>
-                        <td className="px-4 py-3 text-xs">{gapLabel}</td>
                         <td className="px-4 py-3">
                           <div className="flex items-center gap-1">
                             <button onClick={() => setViewing(r)} title="Просмотр"
