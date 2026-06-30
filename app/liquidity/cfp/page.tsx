@@ -240,11 +240,10 @@ export default function CfpPage() {
         car12:         parseN(car12)  || null,
         car13:         parseN(car13)  || null,
         k21:           parseN(k21)    || null,
-        outflows_data: { rows: gapMatrix.map(r => r.map(parseN)), type: 'gap' },
-        cfp_results:   { buffer: { cash_equivalents: parseN(bufferCashEq), cash_only: parseN(bufferCash) } },
+        outflows_data:   { rows: gapMatrix.map(r => r.map(parseN)), type: 'gap' },
+        cfp_results:     { buffer: { cash_equivalents: parseN(bufferCashEq), cash_only: parseN(bufferCash) } },
         funding_sources: sources.filter(s => s.source.trim()),
-        ai_conclusion: generatedDoc,
-        inflows_data:  null,
+        ai_conclusion:   generatedDoc,
       }
       const { error: dbErr } = await supabase.from('cfp_reports').insert(payload)
       if (dbErr) throw new Error(dbErr.message)
