@@ -405,7 +405,22 @@ export default function CreditStressTest() {
                   placeholder={currentCov || '80'} className={inp} />
               </div>
             </div>
-            <p className="text-xs text-gray-500 mt-2">💡 Оставьте пустым — подставятся текущие значения · Загрузите Excel для автопрогноза</p>
+            <div className="mt-3 grid grid-cols-2 gap-2">
+              <div className="flex items-start gap-2 bg-white border border-gray-200 rounded-lg px-3 py-2">
+                <span className="text-base mt-0.5">✍️</span>
+                <div>
+                  <p className="text-xs font-semibold text-gray-700">Ручной ввод</p>
+                  <p className="text-[11px] text-gray-400 mt-0.5">Введите PAR30 и Coverage Rate вручную — например, из бюджета или экспертной оценки</p>
+                </div>
+              </div>
+              <div className="flex items-start gap-2 bg-white border border-blue-200 rounded-lg px-3 py-2">
+                <span className="text-base mt-0.5">📊</span>
+                <div>
+                  <p className="text-xs font-semibold text-blue-700">Автопрогноз из Excel</p>
+                  <p className="text-[11px] text-gray-400 mt-0.5">Загрузите исторические данные (мин. 6 точек) — система сама рассчитает прогноз через линейную регрессию</p>
+                </div>
+              </div>
+            </div>
           </div>
 
           {/* 3 карточки */}
