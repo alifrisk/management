@@ -1,7 +1,8 @@
 'use client'
-import { useState, useEffect } from 'react'
-import { Download, Printer, TrendingDown, Info, Save } from 'lucide-react'
+import { useState, useEffect, useRef } from 'react'
+import { Download, Printer, TrendingDown, Info, Save, Upload } from 'lucide-react'
 import { supabase } from '@/supabase/client'
+import { read, utils } from 'xlsx'
 
 const fmt  = (n: number) => n ? new Intl.NumberFormat('ru-RU').format(Math.round(n)) : '—'
 const fmtN = (v: string) => { const n = v.replace(/\D/g,''); return n ? new Intl.NumberFormat('ru-RU').format(Number(n)) : '' }
@@ -28,6 +29,10 @@ export default function CreditStressTest() {
   // Бюджетный сценарий
   const [budgetPar, setBudgetPar] = useState('')
   const [budgetCov, setBudgetCov] = useState('')
+
+  const [forecastSource, setForecastSource] = useState<'manual' | 'excel'>('manual')
+  const [excelWarning,   setExcelWarning]   = useState<string | null>(null)
+  const excelRef = useRef<HTMLInputElement>(null)
 
   const [reportDate, setReportDate] = useState(() => new Date().toISOString().split('T')[0])
   const [tab, setTab]         = useState<1|2>(1)
@@ -64,6 +69,77 @@ export default function CreditStressTest() {
   const currentHorizon = CREDIT_HORIZONS[horizonIdx]
   const pess = { par: Math.round(CP * currentHorizon.pessMultiplier * 10) / 10, cov: 80 }
   const cat  = { par: Math.round(CP * currentHorizon.catMultiplier  * 10) / 10, cov: 80 }
+
+  // Ближайшие строки PAR_ROWS для подсветки в Модели 2
+  const nearestPessPar = PAR_ROWS.reduce((a, b) => Math.abs(b - pess.par) < Math.abs(a - pess.par) ? b : a)
+  const nearestCatPar  = PAR_ROWS.reduce((a, b) => Math.abs(b - cat.par)  < Math.abs(a - cat.par)  ? b : a)
+
+  // ── Линейная регрессия (МНК) ──────────────────────
+  function linearReg(xs: number[], ys: number[]) {
+    const n = xs.length
+    const mx = xs.reduce((a, b) => a + b, 0) / n
+    const my = ys.reduce((a, b) => a + b, 0) / n
+    const num = xs.reduce((s, x, i) => s + (x - mx) * (ys[i] - my), 0)
+    const den = xs.reduce((s, x) => s + (x - mx) ** 2, 0)
+    const slope = den === 0 ? 0 : num / den
+    return { slope, intercept: my - slope * mx }
+  }
+
+  // ── Загрузка исторических данных из Excel ─────────
+  async function handleExcelUpload(file: File) {
+    try {
+      const buffer = await file.arrayBuffer()
+      const wb = read(buffer, { cellDates: true })
+      const ws = wb.Sheets[wb.SheetNames[0]]
+      const rows = utils.sheet_to_json<Record<string, unknown>>(ws, { raw: false })
+      if (!rows.length) { setExcelWarning('Файл пустой'); return }
+
+      const keys = Object.keys(rows[0])
+      const dateKey = keys.find(k => /дата|date/i.test(k)) ?? keys[0]
+      const parKey  = keys.find(k => /par30|par 30|пар30/i.test(k))
+      const covKey  = keys.find(k => /coverage|покрыт/i.test(k))
+
+      if (!parKey) {
+        setExcelWarning('Не найдена колонка PAR30. Ожидаемые заголовки: «дата отчётности», «PAR30 (%)», «Coverage Rate (%)», «кредитный портфель (TJS)»')
+        return
+      }
+
+      const MS_MONTH = 1000 * 60 * 60 * 24 * 30.44
+      const points = rows.map(r => ({
+        date: r[dateKey] ? new Date(r[dateKey] as string) : null,
+        par:  parseFloat(String(r[parKey]).replace(',', '.')),
+        cov:  covKey ? parseFloat(String(r[covKey]).replace(',', '.')) : NaN,
+      })).filter(p => p.date && !isNaN(p.date.getTime()) && !isNaN(p.par))
+
+      if (points.length < 6) {
+        setExcelWarning(`Недостаточно данных: ${points.length} точек, нужно минимум 6`)
+        return
+      }
+
+      points.sort((a, b) => a.date!.getTime() - b.date!.getTime())
+      const t0 = points[0].date!.getTime()
+      const xs = points.map(p => (p.date!.getTime() - t0) / MS_MONTH)
+      const lastX   = xs[xs.length - 1]
+      const futureX = lastX + CREDIT_HORIZONS[horizonIdx].months
+
+      const { slope: ps, intercept: pi } = linearReg(xs, points.map(p => p.par))
+      const fPar = Math.max(0, ps * futureX + pi)
+      setBudgetPar(fPar.toFixed(2))
+
+      const covPoints = points.filter(p => !isNaN(p.cov))
+      if (covPoints.length >= 6) {
+        const covXs = covPoints.map(p => (p.date!.getTime() - t0) / MS_MONTH)
+        const { slope: cs, intercept: ci } = linearReg(covXs, covPoints.map(p => p.cov))
+        const fCov = Math.min(100, Math.max(0, cs * futureX + ci))
+        setBudgetCov(fCov.toFixed(1))
+      }
+
+      setForecastSource('excel')
+      setExcelWarning(null)
+    } catch {
+      setExcelWarning('Ошибка чтения файла. Проверьте формат Excel (.xlsx / .xls).')
+    }
+  }
 
   // ── Сохранить в реестр ───────────────────────────
   async function saveToRegistry() {
@@ -153,9 +229,9 @@ export default function CreditStressTest() {
   const lbl  = "block text-xs font-medium text-gray-600 mb-1"
   const card = "bg-white rounded-xl border border-gray-100 shadow-sm p-5"
 
-  const ScenCard = ({ title, icon, color, bg, border, par, cov }: {
+  const ScenCard = ({ title, icon, color, bg, border, par, cov, sourceLabel }: {
     title: string; icon: string; color: string; bg: string; border: string
-    par: number; cov: number
+    par: number; cov: number; sourceLabel?: string
   }) => {
     const res = Math.max(0, addReserve(par, cov))
     const eff = -res
@@ -164,7 +240,13 @@ export default function CreditStressTest() {
       <div className={`rounded-xl border-2 ${border} ${bg} p-4`}>
         <p className={`text-sm font-bold ${color} mb-3`}>{icon} {title}</p>
         <div className="space-y-2 text-xs">
-          <div className="flex justify-between"><span className="text-gray-500">PAR30:</span><span className="font-semibold">{par.toFixed(1)}%</span></div>
+          <div className="flex justify-between items-start">
+            <span className="text-gray-500">PAR30:</span>
+            <div className="text-right">
+              <span className="font-semibold">{par.toFixed(1)}%</span>
+              {sourceLabel && <p className="text-[10px] text-gray-400 mt-0.5">{sourceLabel}</p>}
+            </div>
+          </div>
           <div className="flex justify-between"><span className="text-gray-500">Coverage Rate:</span><span className="font-semibold">{cov}%</span></div>
           <div className="flex justify-between border-t border-gray-200 pt-2 mt-2">
             <span className="text-gray-500">Доп. резерв:</span>
@@ -195,6 +277,12 @@ export default function CreditStressTest() {
           <p className="text-sm text-gray-500 mt-0.5">Сценарный анализ PAR30 · Горизонт: {CREDIT_HORIZONS[horizonIdx].label}{reportDate && ` · ${new Date(reportDate).toLocaleDateString('ru-RU', {month:'long',year:'numeric'})}`}</p>
         </div>
         <div className="flex items-center gap-2 print:hidden">
+          <input ref={excelRef} type="file" accept=".xlsx,.xls,.csv" className="hidden"
+            onChange={e => { const f = e.target.files?.[0]; if (f) handleExcelUpload(f); e.target.value = '' }} />
+          <button onClick={() => excelRef.current?.click()}
+            className="flex items-center gap-1.5 px-3 py-2 border border-blue-200 bg-blue-50 rounded-lg text-sm text-blue-700 hover:bg-blue-100">
+            <Upload className="w-4 h-4" /> Загрузить Excel
+          </button>
           <button onClick={exportExcel}
             className="flex items-center gap-1.5 px-3 py-2 border border-gray-200 rounded-lg text-sm text-gray-600 hover:bg-gray-50">
             <Download className="w-4 h-4" /> Excel
@@ -287,29 +375,41 @@ export default function CreditStressTest() {
         <div className="space-y-5">
           {/* Бюджетный ввод */}
           <div className="p-4 border-2 border-green-200 bg-green-50 rounded-xl print:hidden">
-            <p className="text-xs font-bold text-green-700 mb-3">📈 Бюджетный сценарий — ввод вручную</p>
+            <div className="flex items-center justify-between mb-3">
+              <p className="text-xs font-bold text-green-700">📈 Бюджетный сценарий</p>
+              {forecastSource === 'excel'
+                ? <span className="text-[11px] bg-blue-100 text-blue-700 px-2 py-0.5 rounded-full font-medium">📊 прогноз по истории</span>
+                : <span className="text-[11px] bg-gray-100 text-gray-500 px-2 py-0.5 rounded-full">✍️ ручной ввод</span>}
+            </div>
+            {excelWarning && (
+              <div className="mb-3 flex items-start gap-2 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2">
+                <span className="text-amber-500 text-sm flex-shrink-0">⚠</span>
+                <p className="text-xs text-amber-700">{excelWarning}</p>
+              </div>
+            )}
             <div className="grid grid-cols-2 gap-3 max-w-sm">
               <div>
                 <label className={lbl}>PAR30 (%)</label>
                 <input type="text" inputMode="decimal" value={budgetPar}
-                  onChange={e => setBudgetPar(e.target.value)}
+                  onChange={e => { setBudgetPar(e.target.value); setForecastSource('manual') }}
                   placeholder={currentPar || '2.50'} className={inp} />
               </div>
               <div>
                 <label className={lbl}>Coverage Rate (%)</label>
                 <input type="text" inputMode="decimal" value={budgetCov}
-                  onChange={e => setBudgetCov(e.target.value)}
+                  onChange={e => { setBudgetCov(e.target.value); setForecastSource('manual') }}
                   placeholder={currentCov || '80'} className={inp} />
               </div>
             </div>
-            <p className="text-xs text-gray-500 mt-2">💡 Оставьте пустым — подставятся текущие значения</p>
+            <p className="text-xs text-gray-500 mt-2">💡 Оставьте пустым — подставятся текущие значения · Загрузите Excel для автопрогноза</p>
           </div>
 
           {/* 3 карточки */}
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
             <ScenCard title="Бюджетный" icon="📈"
               color="text-green-700" bg="bg-green-50" border="border-green-200"
-              par={budget.par} cov={budget.cov} />
+              par={budget.par} cov={budget.cov}
+              sourceLabel={forecastSource === 'excel' ? '📊 прогноз по истории' : '✍️ ручной ввод'} />
             <ScenCard title="Пессимистичный" icon="📉"
               color="text-yellow-700" bg="bg-yellow-50" border="border-yellow-200"
               par={pess.par} cov={pess.cov} />
@@ -429,15 +529,15 @@ export default function CreditStressTest() {
                   </thead>
                   <tbody>
                     {PAR_ROWS.map((par, pi) => {
-                      const isPess = Math.abs(par - pess.par) < 0.15
-                      const isCat  = Math.abs(par - cat.par)  < 0.15
+                      const isCat  = par === nearestCatPar
+                      const isPess = par === nearestPessPar && !isCat
                       const rowBg  = isCat ? 'bg-red-50' : isPess ? 'bg-yellow-50' : pi%2===0 ? 'bg-white' : 'bg-gray-50'
                       return (
                         <tr key={par} className={rowBg}>
                           <td className="px-3 py-1.5 font-semibold text-gray-700 whitespace-nowrap border-r border-gray-200 sticky left-0 bg-inherit">
                             {par.toFixed(1)}%
                             {isCat  && <span className="ml-1 text-[10px] text-red-500">⚠️</span>}
-                            {isPess && !isCat && <span className="ml-1 text-[10px] text-yellow-500">📉</span>}
+                            {isPess && <span className="ml-1 text-[10px] text-yellow-500">📧</span>}
                           </td>
                           {COV_COLS.map(cov => {
                             const val = BP > 0 ? adjProfit(par, cov) : -Math.round(Math.max(0, addReserve(par, cov)))
@@ -463,7 +563,7 @@ export default function CreditStressTest() {
                 <span className="flex items-center gap-1"><span className="w-3 h-3 bg-yellow-100 rounded inline-block"/> 0–90% базовой</span>
                 <span className="flex items-center gap-1"><span className="w-3 h-3 bg-red-100 rounded inline-block"/> Убыток</span>
                 <span className="flex items-center gap-1"><span className="w-3 h-3 bg-[#1B8A4C]/20 rounded inline-block"/> Coverage 80% (текущий норматив)</span>
-                <span>📉 Пессимистичный · ⚠️ Катастрофический</span>
+                <span>📧 Пессимистичный · ⚠️ Катастрофический (ближайшая строка к PAR из Модели 1)</span>
               </div>
             </>
           )}
