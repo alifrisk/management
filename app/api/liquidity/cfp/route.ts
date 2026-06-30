@@ -2,9 +2,6 @@ import { NextResponse } from 'next/server'
 import { aiGenerateText } from '@/lib/ai-provider'
 import { statusCar11, statusCar12, statusCar13, statusK21, normLabel } from '@/lib/cfpCalculations'
 
-const GAP_MONTHS = ['Июль', 'Август', 'Сентябрь', 'Октябрь', 'Ноябрь', 'Декабрь']
-const GAP_ASSETS = ['Денежные средства', 'Ограниченные ден. ср-ва', 'Кредиты выданные']
-const GAP_LIAB   = ['Счета клиентов', 'Привлечённые займы', 'Субординированный займ']
 
 export async function POST(req: Request) {
   try {
@@ -20,28 +17,10 @@ export async function POST(req: Request) {
     const s13  = statusCar13(car13)
     const sk21 = statusK21(k21)
 
-    // ── GAP data ──────────────────────────────────────────────────────────────
+    // ── Liabilities total (for stress calculations) ───────────────────────────
     const gapRows: number[][] = d.gap_data?.rows || Array(6).fill([0,0,0,0,0,0])
-    const assetsRows = gapRows.slice(0, 3)
-    const liabRows   = gapRows.slice(3, 6)
-
-    const totAssets = GAP_MONTHS.map((_, mi) => assetsRows.reduce((s, r) => s + (r[mi] || 0), 0))
-    const totLiab   = GAP_MONTHS.map((_, mi) => liabRows.reduce((s, r) => s + (r[mi] || 0), 0))
-    const gaps      = GAP_MONTHS.map((_, mi) => totAssets[mi] - totLiab[mi])
-
-    const gapLines = [
-      'АКТИВЫ:',
-      ...GAP_ASSETS.map((name, ri) =>
-        `  ${name}: ${GAP_MONTHS.map((m, mi) => `${m}=${assetsRows[ri]?.[mi] ?? 0}`).join(', ')}`
-      ),
-      `  Итого активы: ${GAP_MONTHS.map((m, mi) => `${m}=${totAssets[mi]}`).join(', ')}`,
-      'ОБЯЗАТЕЛЬСТВА:',
-      ...GAP_LIAB.map((name, ri) =>
-        `  ${name}: ${GAP_MONTHS.map((m, mi) => `${m}=${liabRows[ri]?.[mi] ?? 0}`).join(', ')}`
-      ),
-      `  Итого обязательства: ${GAP_MONTHS.map((m, mi) => `${m}=${totLiab[mi]}`).join(', ')}`,
-      `ГЭП: ${GAP_MONTHS.map((m, mi) => `${m}=${gaps[mi] >= 0 ? '+' : ''}${gaps[mi]}`).join(', ')}`,
-    ]
+    const liabRows = gapRows.slice(3, 6)
+    const totLiab  = Array(6).fill(0).map((_, mi) => liabRows.reduce((s: number, r: number[]) => s + (r[mi] || 0), 0))
 
     // ── Financing sources ─────────────────────────────────────────────────────
     const sources: { priority: number; source: string; status: string; currency: string; amount: string; cost: string; term: string }[] =
@@ -89,9 +68,6 @@ export async function POST(req: Request) {
   CAR 1.3 = ${car13}% (норма ≥ 10%): ${normLabel(s13)}
   К2-1 = ${k21}% (норма ≥ 30%): ${normLabel(sk21)}
 
-ГЭП-АНАЛИЗ (млн TJS):
-${gapLines.join('\n')}
-
 ИСТОЧНИКИ ФИНАНСИРОВАНИЯ:
 ${sourcesLines.join('\n')}
   Итого доступные: ${totalAvail} млн TJS | Условные: ${totalCond} млн TJS | Всего: ${totalSources} млн TJS
@@ -105,12 +81,13 @@ ${sourcesLines.join('\n')}
 
 Составь документ из РОВНО 6 разделов. Официальный банковский стиль, конкретные цифры из данных выше. Без общих фраз. Не используй markdown (**, *, #, _). Не указывай конкретные даты.
 
-РАЗДЕЛ 1. ПЛАН РОСТА АКТИВОВ
-На основе ГЭП-анализа оцени позицию каждого месяца. Для каждого из 6 месяцев (${GAP_MONTHS.join(', ')}):
-- Укажи значение ГЭПа и статус (профицит / дефицит)
-- При отрицательном ГЭПе — конкретные меры по наращиванию ликвидных активов
-- При положительном ГЭПе — меры по оптимальному размещению
-Итог: сводная таблица (Месяц | ГЭП млн TJS | Статус | Плановые меры).
+РАЗДЕЛ 1. ОЦЕНКА ЛИКВИДНОЙ ПОЗИЦИИ
+На основе нормативов оцени текущее состояние ликвидности банка:
+- CAR 1.1 = ${car11}% (норма ≥ 12%): ${normLabel(s11)} — анализ достаточности капитала первого уровня и рекомендации
+- CAR 1.2 = ${car12}% (норма ≥ 10%): ${normLabel(s12)} — анализ достаточности совокупного капитала и рекомендации
+- CAR 1.3 = ${car13}% (норма ≥ 10%): ${normLabel(s13)} — анализ достаточности с учётом операционного риска и рекомендации
+- К2-1 = ${k21}% (норма ≥ 30%): ${normLabel(sk21)} — анализ норматива текущей ликвидности и рекомендации
+Итоговый вывод: общая оценка ликвидной позиции банка, выявленные риски и приоритетные меры реагирования на период плана.
 
 РАЗДЕЛ 2. ПОТЕНЦИАЛЬНЫЕ ИСТОЧНИКИ ФИНАНСИРОВАНИЯ
 Таблица источников из данных выше (Источник | Статус | Валюта | Объём млн TJS | Стоимость | Срок).
@@ -122,7 +99,6 @@ ${sourcesLines.join('\n')}
 
 РАЗДЕЛ 3. МЕРЫ ПО ПОДДЕРЖАНИЮ ЛИКВИДНОСТИ
 Блок А — Мониторинг (в соответствии с Инструкцией №247 НБТ РТ):
-  ГЭП-позиция: не реже 1 раза в месяц
   Норматив К2-1: ежедневно
   Нормативы CAR 1.1/1.2/1.3: ежемесячно
 Блок Б — Стресс-тестирование:
