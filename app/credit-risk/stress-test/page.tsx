@@ -62,16 +62,25 @@ export default function CreditStressTest() {
   // Сценарии
   const currentHorizon = CREDIT_HORIZONS[horizonIdx]
   const months = currentHorizon.months
+
+  // Мультипликативный расчёт: PAR_new = PAR_current × (1 + rate/100)^months
+  const compound = (base: number, ratePct: string) =>
+    base * Math.pow(1 + (parseFloat(ratePct) || 0) / 100, months)
+
   const budget = {
-    par: Math.max(0, Math.round((CP + (parseFloat(growPar30) || 0) * months) * 100) / 100),
-    cov: Math.min(100, Math.max(0, Math.round((CC + (parseFloat(growCov) || 0) * months) * 10) / 10)),
+    par: Math.round(compound(CP, growPar30) * 100) / 100,
+    cov: Math.min(100, Math.round(compound(CC, growCov) * 10) / 10),
   }
-  // Справочные приросты за горизонт
-  const refDeltaPar7   = Math.round((parseFloat(growPar7)   || 0) * months * 100) / 100
-  const refDeltaPar90  = Math.round((parseFloat(growPar90)  || 0) * months * 100) / 100
-  const refDeltaPar180 = Math.round((parseFloat(growPar180) || 0) * months * 100) / 100
-  const pess = { par: Math.round(CP * currentHorizon.pessMultiplier * 10) / 10, cov: 80 }
-  const cat  = { par: Math.round(CP * currentHorizon.catMultiplier  * 10) / 10, cov: 80 }
+
+  // Справочный суммарный прирост за горизонт: (1 + rate/100)^months − 1 в %
+  const refGrowthPct = (rate: string) =>
+    Math.round(((Math.pow(1 + (parseFloat(rate) || 0) / 100, months) - 1) * 100) * 100) / 100
+  const refDeltaPar7   = refGrowthPct(growPar7)
+  const refDeltaPar90  = refGrowthPct(growPar90)
+  const refDeltaPar180 = refGrowthPct(growPar180)
+
+  const pess = { par: Math.round(budget.par * 1.5 * 100) / 100, cov: 80 }
+  const cat  = { par: Math.round(budget.par * 2.0 * 100) / 100, cov: 80 }
 
   // Ближайшие строки PAR_ROWS для подсветки в Модели 2
   const nearestPessPar = PAR_ROWS.reduce((a, b) => Math.abs(b - pess.par) < Math.abs(a - pess.par) ? b : a)
@@ -274,7 +283,7 @@ export default function CreditStressTest() {
             ))}
           </div>
           <p className="text-xs text-gray-400 mt-1.5">
-            Пессимистичный: PAR×{currentHorizon.pessMultiplier.toFixed(2)} · Катастрофический: PAR×{currentHorizon.catMultiplier.toFixed(2)} за {currentHorizon.label}
+            Пессимистичный = Бюджетный PAR30 × 1.50 · Катастрофический = Бюджетный PAR30 × 2.00
           </p>
         </div>
         {/* Формула */}
