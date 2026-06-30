@@ -71,6 +71,10 @@ export default function TasksPage() {
   const [filterYear,     setFilterYear]     = useState(new Date().getFullYear())
   const [filterStratYear,setFilterStratYear]= useState(new Date().getFullYear())
   const [expanded,       setExpanded]       = useState<Set<string>>(new Set())
+  const [searchQuery,    setSearchQuery]    = useState('')
+  const [filterAssignee, setFilterAssignee] = useState('')
+  const [filterPriority, setFilterPriority] = useState('')
+  const [filterStatus,   setFilterStatus]   = useState('')
   // Inline add state per column
   const [addingIn,    setAddingIn]    = useState<string|null>(null)
   const addRef        = useRef<HTMLInputElement>(null)
@@ -151,6 +155,13 @@ export default function TasksPage() {
       return (!t.week_number || t.week_number === filterWeek) && (!t.task_year || t.task_year === filterYear)
     if (STRATEGIC_CATS.some(c => c.id === cat))
       return !t.task_year || t.task_year === filterStratYear
+    return true
+  }).filter(t => {
+    if (searchQuery && !t.title.toLowerCase().includes(searchQuery.toLowerCase()) &&
+        !(t.description || '').toLowerCase().includes(searchQuery.toLowerCase())) return false
+    if (filterAssignee && t.assignee !== filterAssignee) return false
+    if (filterPriority && t.priority !== filterPriority) return false
+    if (filterStatus && t.status !== filterStatus) return false
     return true
   })
 
@@ -342,14 +353,53 @@ export default function TasksPage() {
     )
   }
 
+  // ─── Duplicate Task ───────────────────────────────────────────────────────
+  async function duplicateTask(task: Task) {
+    await supabase.from('tasks').insert({
+      title: task.title + ' (копия)',
+      description: task.description,
+      category: task.category,
+      status: 'Новая',
+      priority: task.priority,
+      assignee: task.assignee,
+      deadline: task.deadline,
+      parent_id: task.parent_id,
+      week_number: task.week_number,
+      task_year: task.task_year,
+      strategic_task_id: task.strategic_task_id,
+    })
+    fetch_()
+  }
+
   // ─── Side Panel ───────────────────────────────────────────────────────────
   const SidePanel = ({ task }: { task: Task }) => {
-    const [newSubtitle, setNewSubtitle] = useState('')
-    const [addingSub,   setAddingSub]   = useState(false)
-    const [localTitle,  setLocalTitle]  = useState(task.title)
-    const [localDesc,   setLocalDesc]   = useState(task.description || '')
+    const [newSubtitle,  setNewSubtitle]  = useState('')
+    const [addingSub,    setAddingSub]    = useState(false)
+    const [localTitle,   setLocalTitle]   = useState(task.title)
+    const [localDesc,    setLocalDesc]    = useState(task.description || '')
+    const [comments,     setComments]     = useState<{id:string;author:string;body:string;created_at:string}[]>([])
+    const [newComment,   setNewComment]   = useState('')
+    const [commentAuthor,setCommentAuthor]= useState(ASSIGNEES[0])
     const subs = subTasks(task.id)
     const cat  = STRATEGIC_CATS.find(c => c.id === task.category)
+
+    useEffect(() => {
+      supabase.from('task_comments').select('*').eq('task_id', task.id).order('created_at')
+        .then(({ data }) => setComments(data || []))
+    }, [task.id])
+
+    async function postComment() {
+      if (!newComment.trim()) return
+      await supabase.from('task_comments').insert({ task_id: task.id, author: commentAuthor, body: newComment.trim() })
+      setNewComment('')
+      const { data } = await supabase.from('task_comments').select('*').eq('task_id', task.id).order('created_at')
+      setComments(data || [])
+    }
+
+    async function deleteComment(id: string) {
+      await supabase.from('task_comments').delete().eq('id', id)
+      setComments(prev => prev.filter(c => c.id !== id))
+    }
 
     return (
       <div className="w-96 flex-shrink-0 bg-white border-l border-gray-200 flex flex-col h-full overflow-hidden">
@@ -360,6 +410,10 @@ export default function TasksPage() {
             <span className="text-xs text-gray-400 font-medium">{task.category}</span>
           </div>
           <div className="flex items-center gap-1">
+            <button onClick={() => duplicateTask(task)} title="Дублировать задачу"
+              className="p-1.5 text-gray-400 hover:text-blue-500 hover:bg-blue-50 rounded-lg">
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><rect x="9" y="9" width="13" height="13" rx="2" strokeWidth="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1" strokeWidth="2"/></svg>
+            </button>
             <button onClick={() => deleteTask(task.id)}
               className="p-1.5 text-gray-400 hover:text-red-500 hover:bg-red-50 rounded-lg">
               <Trash2 className="w-4 h-4" />
@@ -386,7 +440,6 @@ export default function TasksPage() {
 
           {/* Properties */}
           <div className="px-5 space-y-1 pb-4">
-            {/* Status */}
             <div className="flex items-center gap-3 py-1.5 hover:bg-gray-50 rounded-lg px-2 -mx-2">
               <span className="text-xs text-gray-400 w-24 flex-shrink-0">Статус</span>
               <select value={task.status} onChange={e => updateTask(task.id, { status: e.target.value as Status })}
@@ -394,7 +447,6 @@ export default function TasksPage() {
                 {STATUSES.map(s => <option key={s}>{s}</option>)}
               </select>
             </div>
-            {/* Priority */}
             <div className="flex items-center gap-3 py-1.5 hover:bg-gray-50 rounded-lg px-2 -mx-2">
               <span className="text-xs text-gray-400 w-24 flex-shrink-0">Приоритет</span>
               <select value={task.priority} onChange={e => updateTask(task.id, { priority: e.target.value as Priority })}
@@ -402,7 +454,6 @@ export default function TasksPage() {
                 {PRIORITIES.map(p => <option key={p}>{p}</option>)}
               </select>
             </div>
-            {/* Assignee */}
             <div className="flex items-center gap-3 py-1.5 hover:bg-gray-50 rounded-lg px-2 -mx-2">
               <span className="text-xs text-gray-400 w-24 flex-shrink-0">Исполнитель</span>
               <select value={task.assignee || ''} onChange={e => updateTask(task.id, { assignee: e.target.value || null })}
@@ -411,14 +462,12 @@ export default function TasksPage() {
                 {ASSIGNEES.map(a => <option key={a} value={a}>{a.split('.')[0]}</option>)}
               </select>
             </div>
-            {/* Deadline */}
             <div className="flex items-center gap-3 py-1.5 hover:bg-gray-50 rounded-lg px-2 -mx-2">
               <span className="text-xs text-gray-400 w-24 flex-shrink-0">Дедлайн</span>
               <input type="date" value={task.deadline || ''}
                 onChange={e => updateTask(task.id, { deadline: e.target.value || null })}
                 className="text-xs text-gray-700 bg-transparent border-0 focus:outline-none cursor-pointer" />
             </div>
-            {/* Strategic link for weekly */}
             {(task.category === 'Еженедельные' || task.category === 'Бэклог') && !task.parent_id && (
               <div className="flex items-center gap-3 py-1.5 hover:bg-gray-50 rounded-lg px-2 -mx-2">
                 <span className="text-xs text-gray-400 w-24 flex-shrink-0 flex items-center gap-1"><Link2 className="w-3 h-3"/>Стратегия</span>
@@ -493,6 +542,61 @@ export default function TasksPage() {
               </button>
             )}
           </div>
+
+          <div className="border-t border-gray-100 mx-5" />
+
+          {/* Comments */}
+          <div className="px-5 py-4">
+            <p className="text-xs font-medium text-gray-400 uppercase tracking-wide mb-3">
+              Комментарии {comments.length > 0 && `(${comments.length})`}
+            </p>
+            <div className="space-y-3 mb-3">
+              {comments.map(c => (
+                <div key={c.id} className="group/comment flex gap-2.5">
+                  <div className="w-6 h-6 rounded-full bg-[#1B8A4C] flex items-center justify-center text-white text-[9px] font-bold flex-shrink-0 mt-0.5">
+                    {c.author.split('.')[0][0].toUpperCase()}
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center justify-between gap-2">
+                      <span className="text-xs font-medium text-gray-700">{c.author.split('.')[0]}</span>
+                      <div className="flex items-center gap-1">
+                        <span className="text-[10px] text-gray-400">
+                          {new Date(c.created_at).toLocaleDateString('ru-RU', { day:'2-digit', month:'short', hour:'2-digit', minute:'2-digit' })}
+                        </span>
+                        <button onClick={() => deleteComment(c.id)}
+                          className="opacity-0 group-hover/comment:opacity-100 text-gray-300 hover:text-red-400 transition-opacity">
+                          <X className="w-3 h-3"/>
+                        </button>
+                      </div>
+                    </div>
+                    <p className="text-sm text-gray-700 mt-0.5 leading-relaxed">{c.body}</p>
+                  </div>
+                </div>
+              ))}
+            </div>
+            {/* New comment input */}
+            <div className="border border-gray-200 rounded-lg overflow-hidden focus-within:border-[#1B8A4C] focus-within:ring-1 focus-within:ring-[#1B8A4C]">
+              <select value={commentAuthor} onChange={e => setCommentAuthor(e.target.value)}
+                className="w-full px-3 py-1.5 text-xs text-gray-500 border-b border-gray-100 bg-gray-50 focus:outline-none">
+                {ASSIGNEES.map(a => <option key={a} value={a}>{a.split('.')[0]}</option>)}
+              </select>
+              <textarea
+                value={newComment}
+                onChange={e => setNewComment(e.target.value)}
+                onKeyDown={e => { if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) postComment() }}
+                placeholder="Написать комментарий... (Ctrl+Enter)"
+                rows={2}
+                className="w-full px-3 py-2 text-sm text-gray-700 resize-none outline-none placeholder-gray-300"
+              />
+              <div className="px-3 py-1.5 bg-gray-50 border-t border-gray-100 flex justify-end">
+                <button onClick={postComment}
+                  className="px-3 py-1 bg-[#1B8A4C] text-white text-xs font-medium rounded-md hover:bg-[#177040] disabled:opacity-40"
+                  disabled={!newComment.trim()}>
+                  Отправить
+                </button>
+              </div>
+            </div>
+          </div>
         </div>
       </div>
     )
@@ -526,14 +630,54 @@ export default function TasksPage() {
         </div>
 
         {/* Tabs */}
-        <div className="flex gap-1 bg-gray-100 rounded-xl p-1 mb-5 flex-shrink-0">
+        <div className="flex gap-1 bg-gray-100 rounded-xl p-1 mb-4 flex-shrink-0">
           {(['Стратегические','Еженедельные','Бэклог'] as const).map(s => (
-            <button key={s} onClick={() => { setSection(s); if(s==='Стратегические') setStratCat(null) }}
+            <button key={s} onClick={() => {
+              setSection(s)
+              if (s === 'Стратегические') setStratCat(null)
+              setSearchQuery(''); setFilterAssignee(''); setFilterPriority(''); setFilterStatus('')
+            }}
               className={`flex-1 px-3 py-2 rounded-lg text-sm font-medium transition-all ${section===s?'bg-white shadow-sm text-gray-900':'text-gray-500 hover:text-gray-700'}`}>
               {s==='Стратегические'?'🎯':s==='Еженедельные'?'📅':'📦'} {s}
             </button>
           ))}
         </div>
+
+        {/* Search + Filters */}
+        {(section !== 'Стратегические' || stratCat) && (
+          <div className="flex items-center gap-2 mb-4 flex-shrink-0 flex-wrap">
+            <div className="relative flex-1 min-w-40">
+              <input
+                value={searchQuery}
+                onChange={e => setSearchQuery(e.target.value)}
+                placeholder="Поиск по задачам..."
+                className="w-full pl-8 pr-3 py-1.5 border border-gray-200 rounded-lg text-sm bg-white focus:outline-none focus:ring-2 focus:ring-[#1B8A4C] text-gray-900 placeholder-gray-400"
+              />
+              <svg className="absolute left-2.5 top-2 w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-4.35-4.35M17 11A6 6 0 1 1 5 11a6 6 0 0 1 12 0z"/></svg>
+            </div>
+            <select value={filterStatus} onChange={e => setFilterStatus(e.target.value)}
+              className="px-3 py-1.5 border border-gray-200 rounded-lg text-sm bg-white focus:outline-none focus:ring-2 focus:ring-[#1B8A4C] text-gray-700">
+              <option value="">Все статусы</option>
+              {STATUSES.map(s => <option key={s} value={s}>{s}</option>)}
+            </select>
+            <select value={filterPriority} onChange={e => setFilterPriority(e.target.value)}
+              className="px-3 py-1.5 border border-gray-200 rounded-lg text-sm bg-white focus:outline-none focus:ring-2 focus:ring-[#1B8A4C] text-gray-700">
+              <option value="">Все приоритеты</option>
+              {PRIORITIES.map(p => <option key={p} value={p}>{p}</option>)}
+            </select>
+            <select value={filterAssignee} onChange={e => setFilterAssignee(e.target.value)}
+              className="px-3 py-1.5 border border-gray-200 rounded-lg text-sm bg-white focus:outline-none focus:ring-2 focus:ring-[#1B8A4C] text-gray-700">
+              <option value="">Все исполнители</option>
+              {ASSIGNEES.map(a => <option key={a} value={a}>{a.split('.')[0]}</option>)}
+            </select>
+            {(searchQuery || filterAssignee || filterPriority || filterStatus) && (
+              <button onClick={() => { setSearchQuery(''); setFilterAssignee(''); setFilterPriority(''); setFilterStatus('') }}
+                className="px-3 py-1.5 text-xs text-red-500 hover:text-red-700 border border-red-200 rounded-lg bg-red-50 hover:bg-red-100 transition-colors">
+                Сбросить
+              </button>
+            )}
+          </div>
+        )}
 
         {/* Strategic category cards */}
         {section === 'Стратегические' && !stratCat && (
