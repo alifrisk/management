@@ -47,6 +47,11 @@ export async function POST(req: Request) {
     const sources: { priority: number; source: string; status: string; currency: string; amount: string; cost: string; term: string }[] =
       d.financing_sources || []
 
+    // Sanitize source names — strip any bank identifiers before sending to AI
+    const BANK_PATTERN = /алиф|alif|бонк|банк\s+алиф|alif\s+bank/gi
+    const sanitizeSource = (name: string) =>
+      name.replace(BANK_PATTERN, '[Банк]').trim()
+
     const totalAvail   = sources.filter(s => s.status === 'available').reduce((sum, s) => sum + (Number(s.amount) || 0), 0)
     const totalCond    = sources.filter(s => s.status === 'conditional').reduce((sum, s) => sum + (Number(s.amount) || 0), 0)
     const totalSources = totalAvail + totalCond
@@ -55,7 +60,7 @@ export async function POST(req: Request) {
       ? ['  Источники не указаны']
       : sources.map(s => {
           const stLabel = s.status === 'available' ? 'Доступен' : s.status === 'conditional' ? 'Условный' : 'Недоступен'
-          return `  ${s.priority}. ${s.source} | ${s.currency} ${s.amount} млн | ${stLabel} | Стоимость: ${s.cost} | Срок: ${s.term}`
+          return `  ${s.priority}. ${sanitizeSource(s.source)} | ${s.currency} ${s.amount} млн | ${stLabel} | Стоимость: ${s.cost} | Срок: ${s.term}`
         })
 
     // ── Stress amounts ────────────────────────────────────────────────────────
