@@ -7,8 +7,7 @@ const fmt  = (n: number) => n ? new Intl.NumberFormat('ru-RU').format(Math.round
 const fmtN = (v: string) => { const n = v.replace(/\D/g,''); return n ? new Intl.NumberFormat('ru-RU').format(Number(n)) : '' }
 const parseN = (v: string) => Number(v.replace(/\D/g,'')) || 0
 
-// PAR30 строки и Coverage столбцы для матрицы
-const PAR_ROWS = [2.2, 2.5, 2.9, 3.0, 3.1, 3.2, 3.3, 3.4, 3.5, 3.6, 3.7, 3.9, 4.0, 5.0, 7.0, 8.0, 9.0, 10.0]
+// Coverage столбцы для матрицы
 const COV_COLS = [50, 55, 60, 65, 70, 75, 80, 85, 90, 95, 100]
 
 const CREDIT_HORIZONS = [
@@ -25,6 +24,10 @@ export default function CreditStressTest() {
   const [currentCov, setCurrentCov] = useState('')
   const [baseProfit, setBaseProfit] = useState('')
 
+  // Бюджетный сценарий — текущие значения PAR (справочно)
+  const [currentPar7,   setCurrentPar7]   = useState('')
+  const [currentPar90,  setCurrentPar90]  = useState('')
+  const [currentPar180, setCurrentPar180] = useState('')
   // Бюджетный сценарий — ежемесячные приросты
   const [growPar7,   setGrowPar7]   = useState('')
   const [growPar30,  setGrowPar30]  = useState('')
@@ -72,19 +75,32 @@ export default function CreditStressTest() {
     cov: Math.min(100, Math.round(compound(CC, growCov) * 10) / 10),
   }
 
-  // Справочный суммарный прирост за горизонт: (1 + rate/100)^months − 1 в %
-  const refGrowthPct = (rate: string) =>
-    Math.round(((Math.pow(1 + (parseFloat(rate) || 0) / 100, months) - 1) * 100) * 100) / 100
-  const refDeltaPar7   = refGrowthPct(growPar7)
-  const refDeltaPar90  = refGrowthPct(growPar90)
-  const refDeltaPar180 = refGrowthPct(growPar180)
+  // Прогнозные значения PAR7/90/180 — та же мультипликативная логика что и PAR30
+  const CP7   = parseFloat(currentPar7)   || 0
+  const CP90  = parseFloat(currentPar90)  || 0
+  const CP180 = parseFloat(currentPar180) || 0
+  const refPar7   = Math.round(compound(CP7,   growPar7)   * 100) / 100
+  const refPar90  = Math.round(compound(CP90,  growPar90)  * 100) / 100
+  const refPar180 = Math.round(compound(CP180, growPar180) * 100) / 100
 
   const pess = { par: Math.round(budget.par * 1.5 * 100) / 100, cov: 80 }
   const cat  = { par: Math.round(budget.par * 2.0 * 100) / 100, cov: 80 }
 
-  // Ближайшие строки PAR_ROWS для подсветки в Модели 2
-  const nearestPessPar = PAR_ROWS.reduce((a, b) => Math.abs(b - pess.par) < Math.abs(a - pess.par) ? b : a)
-  const nearestCatPar  = PAR_ROWS.reduce((a, b) => Math.abs(b - cat.par)  < Math.abs(a - cat.par)  ? b : a)
+  // Динамические строки матрицы: шаг 0.5% от CP до CP+10%, плюс точные pess/cat
+  const parRows: number[] = (() => {
+    if (CP <= 0) return []
+    const step  = 0.5
+    const start = Math.floor(CP / step) * step
+    const end   = Math.round((CP + 10) * 10) / 10
+    const base: number[] = []
+    for (let v = start; v <= end + 0.001; v = Math.round((v + step) * 1000) / 1000) {
+      base.push(Math.round(v * 100) / 100)
+    }
+    const all = new Set(base)
+    if (pess.par > 0) all.add(pess.par)
+    if (cat.par  > 0) all.add(cat.par)
+    return Array.from(all).sort((a, b) => a - b)
+  })()
 
   // ── Сохранить в реестр ───────────────────────────
   async function saveToRegistry() {
@@ -103,7 +119,7 @@ export default function CreditStressTest() {
 
     // Модель 2 — ключевые точки What-If матрицы
     const model2 = P > 0 ? {
-      par_rows: PAR_ROWS,
+      par_rows: parRows,
       cov_cols: COV_COLS,
       base_profit: BP,
       pess_point: { par: pess.par, cov: pess.cov, reserve: Math.round(Math.max(0, addReserve(pess.par, pess.cov))), adj_profit: BP > 0 ? Math.round(adjProfit(pess.par, pess.cov)) : null },
@@ -159,7 +175,7 @@ export default function CreditStressTest() {
     rows.push([])
     rows.push(['МОДЕЛЬ 2 — WHAT-IF МАТРИЦА'])
     rows.push(['PAR30% / Coverage →', ...COV_COLS.map(c => `${c}%`)])
-    PAR_ROWS.forEach(par => {
+    parRows.forEach(par => {
       rows.push([`${par}%`, ...COV_COLS.map(cov => BP > 0 ? String(Math.round(adjProfit(par, cov))) : String(-Math.round(Math.max(0, addReserve(par, cov)))))])
     })
     const csv = rows.map(r => r.map(c => `"${String(c).replace(/"/g,'""')}"`).join(',')).join('\n')
@@ -315,33 +331,59 @@ export default function CreditStressTest() {
               <p className="text-xs font-bold text-green-700">📈 Бюджетный сценарий — средний ежемесячный прирост</p>
               <span className="text-[11px] bg-gray-100 text-gray-500 px-2 py-0.5 rounded-full">✍️ ручной ввод</span>
             </div>
+
+            {/* Текущие значения PAR для справочных категорий */}
+            <p className="text-[11px] text-gray-500 font-medium mb-1.5">Текущие значения (для справочных категорий):</p>
+            <div className="grid grid-cols-3 gap-3 mb-3">
+              <div>
+                <label className={lbl}>PAR&gt;7 текущий (%)</label>
+                <input type="text" inputMode="decimal" value={currentPar7}
+                  onChange={e => setCurrentPar7(e.target.value)}
+                  placeholder="4.50" className={inp} />
+              </div>
+              <div>
+                <label className={lbl}>PAR&gt;90 текущий (%)</label>
+                <input type="text" inputMode="decimal" value={currentPar90}
+                  onChange={e => setCurrentPar90(e.target.value)}
+                  placeholder="1.20" className={inp} />
+              </div>
+              <div>
+                <label className={lbl}>PAR&gt;180 текущий (%)</label>
+                <input type="text" inputMode="decimal" value={currentPar180}
+                  onChange={e => setCurrentPar180(e.target.value)}
+                  placeholder="0.80" className={inp} />
+              </div>
+            </div>
+
+            {/* Ежемесячные приросты */}
+            <p className="text-[11px] text-gray-500 font-medium mb-1.5">Ежемесячный прирост (%):</p>
             <div className="grid grid-cols-2 lg:grid-cols-5 gap-3">
               <div>
-                <label className={lbl}>Прирост PAR&gt;7 (%/мес)</label>
+                <label className={lbl}>PAR&gt;7 (%/мес)</label>
                 <input type="text" inputMode="decimal" value={growPar7}
                   onChange={e => setGrowPar7(e.target.value)}
                   placeholder="0.05" className={inp} />
               </div>
               <div>
-                <label className={lbl}>Прирост PAR&gt;30 (%/мес)</label>
+                <label className={lbl}>PAR&gt;30 (%/мес)</label>
                 <input type="text" inputMode="decimal" value={growPar30}
                   onChange={e => setGrowPar30(e.target.value)}
                   placeholder="0.05" className={inp} />
               </div>
               <div>
-                <label className={lbl}>Прирост PAR&gt;90 (%/мес)</label>
+                <label className={lbl}>PAR&gt;90 (%/мес)</label>
                 <input type="text" inputMode="decimal" value={growPar90}
                   onChange={e => setGrowPar90(e.target.value)}
                   placeholder="0.03" className={inp} />
               </div>
               <div>
-                <label className={lbl}>Прирост PAR&gt;180 (%/мес)</label>
+                <label className={lbl}>PAR&gt;180 (%/мес)</label>
                 <input type="text" inputMode="decimal" value={growPar180}
                   onChange={e => setGrowPar180(e.target.value)}
                   placeholder="0.02" className={inp} />
               </div>
               <div>
-                <label className={lbl}>Прирост Coverage (%/мес)</label>
+                <label className={lbl}>Coverage (%/мес)</label>
                 <input type="text" inputMode="decimal" value={growCov}
                   onChange={e => setGrowCov(e.target.value)}
                   placeholder="0.5" className={inp} />
@@ -357,9 +399,9 @@ export default function CreditStressTest() {
                 <div className="bg-gray-50 rounded-lg p-2 text-center">
                   <p className="text-gray-400 mb-0.5">PAR&gt;7</p>
                   <p className="font-semibold text-gray-700">
-                    {growPar7 ? `+${refDeltaPar7.toFixed(2)}%` : '—'}
+                    {(growPar7 && currentPar7) ? `${refPar7.toFixed(2)}%` : '—'}
                   </p>
-                  <p className="text-[10px] text-gray-400">прирост</p>
+                  <p className="text-[10px] text-gray-400">прогноз</p>
                 </div>
                 <div className="bg-green-50 border border-green-200 rounded-lg p-2 text-center">
                   <p className="text-gray-400 mb-0.5">PAR&gt;30</p>
@@ -369,16 +411,16 @@ export default function CreditStressTest() {
                 <div className="bg-gray-50 rounded-lg p-2 text-center">
                   <p className="text-gray-400 mb-0.5">PAR&gt;90</p>
                   <p className="font-semibold text-gray-700">
-                    {growPar90 ? `+${refDeltaPar90.toFixed(2)}%` : '—'}
+                    {(growPar90 && currentPar90) ? `${refPar90.toFixed(2)}%` : '—'}
                   </p>
-                  <p className="text-[10px] text-gray-400">прирост</p>
+                  <p className="text-[10px] text-gray-400">прогноз</p>
                 </div>
                 <div className="bg-gray-50 rounded-lg p-2 text-center">
                   <p className="text-gray-400 mb-0.5">PAR&gt;180</p>
                   <p className="font-semibold text-gray-700">
-                    {growPar180 ? `+${refDeltaPar180.toFixed(2)}%` : '—'}
+                    {(growPar180 && currentPar180) ? `${refPar180.toFixed(2)}%` : '—'}
                   </p>
-                  <p className="text-[10px] text-gray-400">прирост</p>
+                  <p className="text-[10px] text-gray-400">прогноз</p>
                 </div>
                 <div className="bg-green-50 border border-green-200 rounded-lg p-2 text-center">
                   <p className="text-gray-400 mb-0.5">Coverage</p>
@@ -512,14 +554,14 @@ export default function CreditStressTest() {
                     </tr>
                   </thead>
                   <tbody>
-                    {PAR_ROWS.map((par, pi) => {
-                      const isCat  = par === nearestCatPar
-                      const isPess = par === nearestPessPar && !isCat
+                    {parRows.map((par, pi) => {
+                      const isCat  = par === cat.par
+                      const isPess = par === pess.par && !isCat
                       const rowBg  = isCat ? 'bg-red-50' : isPess ? 'bg-yellow-50' : pi%2===0 ? 'bg-white' : 'bg-gray-50'
                       return (
                         <tr key={par} className={rowBg}>
                           <td className="px-3 py-1.5 font-semibold text-gray-700 whitespace-nowrap border-r border-gray-200 sticky left-0 bg-inherit">
-                            {par.toFixed(1)}%
+                            {par.toFixed(2)}%
                             {isCat  && <span className="ml-1 text-[10px] text-red-500">⚠️</span>}
                             {isPess && <span className="ml-1 text-[10px] text-yellow-500">📧</span>}
                           </td>
@@ -547,7 +589,7 @@ export default function CreditStressTest() {
                 <span className="flex items-center gap-1"><span className="w-3 h-3 bg-yellow-100 rounded inline-block"/> 0–90% базовой</span>
                 <span className="flex items-center gap-1"><span className="w-3 h-3 bg-red-100 rounded inline-block"/> Убыток</span>
                 <span className="flex items-center gap-1"><span className="w-3 h-3 bg-[#1B8A4C]/20 rounded inline-block"/> Coverage 80% (текущий норматив)</span>
-                <span>📧 Пессимистичный · ⚠️ Катастрофический (ближайшая строка к PAR из Модели 1)</span>
+                <span>📧 Пессимистичный · ⚠️ Катастрофический (точное значение PAR из Модели 1)</span>
               </div>
             </>
           )}
