@@ -87,6 +87,10 @@ export default function CreditStressTest() {
 
   // ── Загрузка исторических данных из Excel ─────────
   async function handleExcelUpload(file: File) {
+    if (file.size > 5 * 1024 * 1024) {
+      setExcelWarning('Файл слишком большой (максимум 5 МБ)')
+      return
+    }
     try {
       const buffer = await file.arrayBuffer()
       const wb = read(buffer, { cellDates: true })
