@@ -440,9 +440,9 @@ export default function CfpPage() {
               <Plus className="w-3.5 h-3.5" /> Добавить строку
             </button>
           </div>
-          <div className="flex items-start gap-2 mb-2 px-3 py-2 bg-amber-50 border border-amber-200 rounded-lg">
-            <svg className="w-3.5 h-3.5 text-amber-500 flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/></svg>
-            <p className="text-[11px] text-amber-700">Не указывайте название банка в названиях источников — эти данные уходят в ИИ. Пишите: «МБК», «НБТ», «Кредитная линия» и т.д.</p>
+          <div className="flex items-start gap-2 mb-2 px-3 py-2 bg-blue-50 border border-blue-100 rounded-lg">
+            <svg className="w-3.5 h-3.5 text-blue-400 flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+            <p className="text-[11px] text-blue-600">Пожалуйста, используйте сокращённые названия источников: «МБК», «НБТ», «Кредитная линия», «Депозит» и т.д.</p>
           </div>
           <div className="overflow-x-auto">
             <table className="w-full text-xs border-collapse">
@@ -462,7 +462,7 @@ export default function CfpPage() {
                         placeholder="Название источника"
                         className={`w-full min-w-[150px] px-2 py-1.5 border rounded text-xs focus:outline-none focus:ring-1 bg-white ${/алиф|alif|бонк/i.test(s.source) ? 'border-amber-400 ring-1 ring-amber-300 bg-amber-50' : 'border-gray-200 focus:ring-[#1B8A4C]'}`} />
                       {/алиф|alif|бонк/i.test(s.source) && (
-                        <p className="text-[10px] text-amber-600 mt-0.5">Уберите название банка</p>
+                        <p className="text-[10px] text-blue-500 mt-0.5">Используйте сокращение</p>
                       )}
                     </td>
                     <td className="px-1 py-1 border border-gray-200 bg-white">
