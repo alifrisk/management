@@ -120,7 +120,9 @@ export default function CfpPage() {
 
   // generation
   const [generating,   setGenerating]   = useState(false)
-  const [generatedDoc, setGeneratedDoc] = useState<string | null>(null)
+  const [generatedDoc, setGeneratedDoc] = useState<string | null>(() => {
+    try { return localStorage.getItem('cfp_draft') } catch { return null }
+  })
   const [error,        setError]        = useState<string | null>(null)
   const [saving,       setSaving]       = useState(false)
 
@@ -217,6 +219,7 @@ export default function CfpPage() {
       const data = await res.json()
       if (data.error) throw new Error(data.error)
       setGeneratedDoc(data.sections)
+      try { localStorage.setItem('cfp_draft', data.sections) } catch { /* ignore */ }
     } catch (err: unknown) {
       setError('Ошибка: ' + (err instanceof Error ? err.message : String(err)))
     } finally {
@@ -248,6 +251,7 @@ export default function CfpPage() {
       const { error: dbErr } = await supabase.from('cfp_reports').insert(payload)
       if (dbErr) throw new Error(dbErr.message)
       // reset form
+      try { localStorage.removeItem('cfp_draft') } catch { /* ignore */ }
       setGeneratedDoc(null); setPlanPeriod(''); setPlanDate('')
       setCar11(''); setCar12(''); setCar13(''); setK21('')
       setGapMatrix(EMPTY_GAP())
