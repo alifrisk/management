@@ -73,7 +73,7 @@ export async function GET() {
           if (!title) continue
           if (filtered && !matchesFinance(title)) continue
           const iso = item.isoDate || item.pubDate || ''
-          const rawDesc: string = (item as Record<string, unknown>).rawDesc as string || ''
+          const rawDesc: string = (item as unknown as Record<string, unknown>).rawDesc as string || ''
           const summary = rawDesc
             ? rawDesc.replace(/<[^>]+>/g, '').trim().slice(0, 220)
             : (item.contentSnippet || '').slice(0, 220)
