@@ -113,6 +113,12 @@ const EMPTY: Record<string, string> = {
   p2_cf_shares: '', p2_cf_bonds: '', p2_cf_founders: '', p2_cf_loans_in: '', p2_cf_other_fin_in: '', p2_cf_dividends: '', p2_cf_loans_out: '', p2_cf_buyback: '', p2_cf_other_fin_out: '',
   p1_cf_fx: '', p1_cf_cash_begin: '',
   p2_cf_fx: '', p2_cf_cash_begin: '',
+  // Концентрация
+  sme_sector_portfolio: '',
+  bank_total_portfolio: '',
+  current_par30_pct: '',
+  ra_conc_limit: '',
+  ra_par30_limit: '',
   additional_info: '',
 }
 
@@ -322,6 +328,19 @@ export default function CreditRiskPage() {
   const existing_balance = n('existing_loan_balance')
   const collateral_coverage_pct = existing_balance > 0 ? (collateral_total / existing_balance) * 100 : 0
 
+  // Концентрация
+  const smePf      = n('sme_sector_portfolio')
+  const bankPf     = n('bank_total_portfolio')
+  const curPar30Pct = parseFloat(form.current_par30_pct) || 0
+  const raConc     = parseFloat(form.ra_conc_limit)  || 0
+  const raPar30    = parseFloat(form.ra_par30_limit) || 0
+  const concSme    = smePf   > 0 && loanAmt > 0 ? (loanAmt / smePf)   * 100 : 0
+  const concBank   = bankPf  > 0 && loanAmt > 0 ? (loanAmt / bankPf)  * 100 : 0
+  const par30Delta = bankPf  > 0 && loanAmt > 0 ? (loanAmt / bankPf)  * 100 : 0
+  const par30After = curPar30Pct + par30Delta
+  const concViolates  = raConc  > 0 && concSme    > raConc
+  const par30Violates = raPar30 > 0 && par30After > raPar30
+
   function handleEdit(c: CreditConclusion) {
     // 0 → '' so empty inputs look blank, not "0"
     const s = (v: number | null | undefined) => (v != null && v !== 0) ? String(Math.round(v)) : ''
@@ -467,6 +486,15 @@ export default function CreditRiskPage() {
         p1_cf_cash_end: p1_cash_end, p2_cf_cash_end: p2_cash_end,
         monthly_payment: monthlyPayment,
         collateral_total, collateral_coverage_pct,
+        // Концентрация
+        concentration_sme_pct:      concSme    > 0 ? Math.round(concSme    * 100) / 100 : null,
+        concentration_bank_pct:     concBank   > 0 ? Math.round(concBank   * 100) / 100 : null,
+        par30_delta_pct:            par30Delta > 0 ? Math.round(par30Delta * 100) / 100 : null,
+        par30_after_pct:            curPar30Pct > 0 && par30Delta > 0 ? Math.round(par30After * 100) / 100 : null,
+        risk_appetite_conc_pct:     raConc  || null,
+        risk_appetite_par30_pct:    raPar30 || null,
+        concentration_violates:     concViolates,
+        par30_violates:             par30Violates,
       }
       const res = await apiFetch('/api/credit-risk/generate', {
         method: 'POST',
@@ -836,7 +864,7 @@ export default function CreditRiskPage() {
             {/* Tabs — only in manual mode */}
             {inputMode === 'manual' && (
             <div className="flex border-b border-gray-100 px-2">
-              {[{n:1,t:'Заёмщик'},{n:2,t:'Баланс'},{n:3,t:'ОПУ'},{n:4,t:'КешФлоу'},{n:5,t:'Залог'},{n:6,t:'Дополнение'}].map(({n:tn,t}) => (
+              {[{n:1,t:'Заёмщик'},{n:2,t:'Баланс'},{n:3,t:'ОПУ'},{n:4,t:'КешФлоу'},{n:5,t:'Залог'},{n:6,t:'Концентрация'},{n:7,t:'Дополнение'}].map(({n:tn,t}) => (
                 <button key={tn} onClick={() => setTab(tn)}
                   className={`px-3 py-3 text-xs font-semibold border-b-2 whitespace-nowrap transition-colors flex-shrink-0 ${tab === tn ? 'border-[#1B8A4C] text-[#1B8A4C]' : 'border-transparent text-gray-500 hover:text-gray-700'}`}>
                   {t}
@@ -1152,8 +1180,121 @@ export default function CreditRiskPage() {
                 </div>
               )}
 
-              {/* Tab 6: Дополнение */}
+              {/* Tab 6: Концентрация */}
               {tab === 6 && (
+                <div className="space-y-5">
+                  <div className="p-3 bg-blue-50 border border-blue-100 rounded-lg">
+                    <p className="text-xs text-blue-700 font-medium">Анализ концентрации кредитного риска</p>
+                    <p className="text-xs text-blue-500 mt-0.5">Аналитик вводит данные вручную. Расчёт показывает концентрацию после выдачи кредита и влияние на PAR30 портфеля при дефолте заёмщика.</p>
+                  </div>
+
+                  <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+                    <div>
+                      <label className={lbl}>Общий портфель сектора SME (TJS)</label>
+                      <input type="text" inputMode="numeric"
+                        value={form.sme_sector_portfolio ? new Intl.NumberFormat('ru-RU').format(Number(form.sme_sector_portfolio)) : ''}
+                        onChange={e => setF('sme_sector_portfolio', e.target.value.replace(/[^0-9]/g,''))}
+                        placeholder="0" className={inp} />
+                      <p className="text-xs text-gray-400 mt-1">Текущий портфель сектора МСБ банка до выдачи</p>
+                    </div>
+                    <div>
+                      <label className={lbl}>Общий кредитный портфель банка (TJS)</label>
+                      <input type="text" inputMode="numeric"
+                        value={form.bank_total_portfolio ? new Intl.NumberFormat('ru-RU').format(Number(form.bank_total_portfolio)) : ''}
+                        onChange={e => setF('bank_total_portfolio', e.target.value.replace(/[^0-9]/g,''))}
+                        placeholder="0" className={inp} />
+                    </div>
+                    <div>
+                      <label className={lbl}>Текущий PAR30 портфеля (%)</label>
+                      <input type="text" inputMode="decimal"
+                        value={form.current_par30_pct}
+                        onChange={e => setF('current_par30_pct', e.target.value.replace(/[^0-9.]/g,''))}
+                        placeholder="2.50" className={inp} />
+                      <p className="text-xs text-gray-400 mt-1">Текущий PAR30 по всему кредитному портфелю банка</p>
+                    </div>
+                    <div>
+                      <label className={lbl}>Лимит риск-аппетита — концентрация сектора (%)</label>
+                      <input type="text" inputMode="decimal"
+                        value={form.ra_conc_limit}
+                        onChange={e => setF('ra_conc_limit', e.target.value.replace(/[^0-9.]/g,''))}
+                        placeholder="10.00" className={inp} />
+                      <p className="text-xs text-gray-400 mt-1">Максимально допустимая доля одного заёмщика в секторе SME</p>
+                    </div>
+                    <div>
+                      <label className={lbl}>Лимит риск-аппетита — PAR30 (%)</label>
+                      <input type="text" inputMode="decimal"
+                        value={form.ra_par30_limit}
+                        onChange={e => setF('ra_par30_limit', e.target.value.replace(/[^0-9.]/g,''))}
+                        placeholder="5.00" className={inp} />
+                      <p className="text-xs text-gray-400 mt-1">Максимально допустимый уровень PAR30 портфеля</p>
+                    </div>
+                  </div>
+
+                  {(smePf > 0 || bankPf > 0) && loanAmt > 0 && (
+                    <div className="space-y-3">
+                      <p className="text-xs font-bold text-gray-500 uppercase tracking-wide">Результаты расчёта</p>
+
+                      <div className="grid grid-cols-1 lg:grid-cols-2 gap-3">
+                        {smePf > 0 && (
+                          <div className={`p-4 rounded-xl border-2 ${concViolates ? 'bg-red-50 border-red-300' : 'bg-green-50 border-green-300'}`}>
+                            <p className="text-xs text-gray-500 mb-1">Концентрация в секторе SME (после выдачи)</p>
+                            <p className={`text-2xl font-bold ${concViolates ? 'text-red-700' : 'text-green-700'}`}>
+                              {concSme.toFixed(2)}%
+                            </p>
+                            <p className="text-xs text-gray-400 mt-1">
+                              {fmt(loanAmt)} / {fmt(smePf)} TJS{raConc > 0 ? ` · лимит: ${raConc}%` : ''}
+                            </p>
+                            <div className={`mt-2 inline-flex items-center gap-1 px-2 py-1 rounded-lg text-xs font-bold ${concViolates ? 'bg-red-100 text-red-700' : 'bg-green-100 text-green-700'}`}>
+                              {concViolates ? '❌ Нарушает риск-аппетит' : '✅ Не нарушает риск-аппетит'}
+                            </div>
+                          </div>
+                        )}
+                        {bankPf > 0 && (
+                          <div className="p-4 rounded-xl border-2 bg-blue-50 border-blue-200">
+                            <p className="text-xs text-gray-500 mb-1">Концентрация от всего портфеля банка</p>
+                            <p className="text-2xl font-bold text-blue-700">{concBank.toFixed(2)}%</p>
+                            <p className="text-xs text-gray-400 mt-1">{fmt(loanAmt)} / {fmt(bankPf)} TJS</p>
+                          </div>
+                        )}
+                      </div>
+
+                      {bankPf > 0 && (
+                        <div className={`p-4 rounded-xl border-2 ${par30Violates ? 'bg-red-50 border-red-300' : 'bg-green-50 border-green-300'}`}>
+                          <p className="text-xs font-semibold text-gray-600 uppercase tracking-wide mb-3">
+                            Влияние на PAR30 при уходе заёмщика в просрочку
+                          </p>
+                          <div className="grid grid-cols-3 gap-3 text-xs">
+                            <div className="bg-white rounded-lg p-3 text-center">
+                              <p className="text-gray-400 mb-1">PAR30 сейчас</p>
+                              <p className="text-xl font-bold text-gray-900">{curPar30Pct > 0 ? `${curPar30Pct.toFixed(2)}%` : '—'}</p>
+                            </div>
+                            <div className="bg-white rounded-lg p-3 text-center">
+                              <p className="text-gray-400 mb-1">Прирост PAR30</p>
+                              <p className="text-xl font-bold text-orange-600">+{par30Delta.toFixed(2)}%</p>
+                            </div>
+                            <div className={`rounded-lg p-3 text-center ${par30Violates ? 'bg-red-100' : 'bg-green-100'}`}>
+                              <p className="text-gray-400 mb-1">PAR30 после</p>
+                              <p className={`text-xl font-bold ${par30Violates ? 'text-red-700' : 'text-green-700'}`}>
+                                {curPar30Pct > 0 ? `${par30After.toFixed(2)}%` : `+${par30Delta.toFixed(2)}%`}
+                              </p>
+                            </div>
+                          </div>
+                          {raPar30 > 0 && (
+                            <div className={`mt-3 inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold ${par30Violates ? 'bg-red-100 text-red-700' : 'bg-green-100 text-green-700'}`}>
+                              {par30Violates
+                                ? `❌ Нарушает риск-аппетит (лимит PAR30: ${raPar30}%)`
+                                : `✅ Не нарушает риск-аппетит (лимит PAR30: ${raPar30}%)`}
+                            </div>
+                          )}
+                        </div>
+                      )}
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {/* Tab 7: Дополнение */}
+              {tab === 7 && (
                 <div className="space-y-4">
                   <div className="p-3 bg-blue-50 border border-blue-100 rounded-lg">
                     <p className="text-xs text-blue-700 font-medium">Дополнительная информация о заёмщике</p>
@@ -1296,7 +1437,7 @@ export default function CreditRiskPage() {
                   <div className="flex gap-2">
                     <button onClick={() => { setShowModal(false); setForm(EMPTY); setInputMode('manual'); setImageFiles([]); setExtractMsg(null) }}
                       className="px-4 py-2 border border-gray-200 rounded-lg text-sm text-gray-600 hover:bg-gray-50">Отмена</button>
-                    {tab < 6
+                    {tab < 7
                       ? <button onClick={() => setTab(tab+1)} className="px-4 py-2 bg-[#1B8A4C] text-white rounded-lg text-sm font-medium hover:bg-[#177040]">Далее →</button>
                       : <button onClick={handleGenerate} disabled={generating} className="flex items-center gap-2 px-4 py-2 bg-[#1B8A4C] text-white rounded-lg text-sm font-medium hover:bg-[#177040] disabled:opacity-70">
                           {generating ? <><Loader2 className="w-4 h-4 animate-spin" /> AI анализирует...</> : <><CheckCircle2 className="w-4 h-4" /> {editingId ? 'Перегенерировать' : 'Сгенерировать'}</>}
