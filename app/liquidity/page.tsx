@@ -27,6 +27,13 @@ interface StressTest {
   outflow_t30: number; drawdown_t30: number; need_t30: number
   coverage_cash_t30: number; coverage_only_t30: number; risk_t30: string
   created_at: string
+  results?: {
+    exchange_rate: number
+    scenario: string
+    tjs: { inputs: Record<string, number>; rates: Record<string, HRate>; t1: HData; t7: HData; t30: HData }
+    fx:  { inputs: Record<string, number>; rates: Record<string, HRate>; t1: HData; t7: HData; t30: HData }
+    cons: { t1: HData; t7: HData; t30: HData }
+  }
 }
 
 type HRate = { t1: number; t7: number; t30: number }
@@ -249,6 +256,27 @@ export default function LiquidityPage() {
     if (!form.test_name.trim()) { setError('Введите название теста'); return }
     setSaving(true); setError(null)
     try {
+      const fxComputed   = calcStress(fxInputs, scenario, customRatesFX)
+      const consComputed = calcConsolidated(inputs, fxInputs, scenario, customRatesTJS, customRatesFX, exRate)
+
+      const resultsPayload = {
+        exchange_rate: exRate,
+        scenario,
+        tjs: {
+          inputs: { ...inputs },
+          rates: customRatesTJS[scenario],
+          t1: computed.t1, t7: computed.t7, t30: computed.t30,
+        },
+        fx: {
+          inputs: { ...fxInputs },
+          rates: customRatesFX[scenario],
+          t1: fxComputed.t1, t7: fxComputed.t7, t30: fxComputed.t30,
+        },
+        cons: {
+          t1: consComputed.t1, t7: consComputed.t7, t30: consComputed.t30,
+        },
+      }
+
       const { error: dbErr } = await supabase.from('liquidity_stress_tests').insert({
         test_name: form.test_name, analyst_name: form.analyst_name,
         scenario,
@@ -258,27 +286,31 @@ export default function LiquidityPage() {
         borrowings: n('borrowings'), other_liabilities: n('other_liabilities'),
         credit_line_salom: n('credit_line_salom'), credit_line_sme: n('credit_line_sme'),
         cash_equivalents: n('cash_equivalents'), cash_only: n('cash_only'),
-        outflow_t1: computed.t1.liab, drawdown_t1: computed.t1.draw, need_t1: computed.t1.need,
-        coverage_cash_t1: computed.t1.cov_cash, coverage_only_t1: computed.t1.cov_only, risk_t1: computed.t1.risk,
-        outflow_t7: computed.t7.liab, drawdown_t7: computed.t7.draw, need_t7: computed.t7.need,
-        coverage_cash_t7: computed.t7.cov_cash, coverage_only_t7: computed.t7.cov_only, risk_t7: computed.t7.risk,
-        outflow_t30: computed.t30.liab, drawdown_t30: computed.t30.draw, need_t30: computed.t30.need,
-        coverage_cash_t30: computed.t30.cov_cash, coverage_only_t30: computed.t30.cov_only, risk_t30: computed.t30.risk,
+        // Flat columns → consolidated (main result shown in list)
+        outflow_t1: consComputed.t1.liab, drawdown_t1: consComputed.t1.draw, need_t1: consComputed.t1.need,
+        coverage_cash_t1: consComputed.t1.cov_cash, coverage_only_t1: consComputed.t1.cov_only, risk_t1: consComputed.t1.risk,
+        outflow_t7: consComputed.t7.liab, drawdown_t7: consComputed.t7.draw, need_t7: consComputed.t7.need,
+        coverage_cash_t7: consComputed.t7.cov_cash, coverage_only_t7: consComputed.t7.cov_only, risk_t7: consComputed.t7.risk,
+        outflow_t30: consComputed.t30.liab, drawdown_t30: consComputed.t30.draw, need_t30: consComputed.t30.need,
+        coverage_cash_t30: consComputed.t30.cov_cash, coverage_only_t30: consComputed.t30.cov_only, risk_t30: consComputed.t30.risk,
+        results: resultsPayload,
       })
       if (dbErr) throw new Error(dbErr.message)
 
+      const cons30 = consComputed.t30
       const conclusion = [
-        `Сценарий: ${scenario}.`,
-        `T+1 — потребность: ${fmt(computed.t1.need)} TJS, покрытие: ${(computed.t1.cov_cash*100).toFixed(0)}%, риск: ${riskLabel(computed.t1.risk)}.`,
-        `T+7 — потребность: ${fmt(computed.t7.need)} TJS, покрытие: ${(computed.t7.cov_cash*100).toFixed(0)}%, риск: ${riskLabel(computed.t7.risk)}.`,
-        `T+30 — потребность: ${fmt(computed.t30.need)} TJS, покрытие: ${(computed.t30.cov_cash*100).toFixed(0)}%, риск: ${riskLabel(computed.t30.risk)}.`,
+        `Сценарий: ${scenario}. Курс НБТ: ${exRate} TJS/USD.`,
+        `T+1 (конс.) — потребность: ${fmt(consComputed.t1.need)} TJS, покрытие: ${(consComputed.t1.cov_cash*100).toFixed(0)}%, риск: ${riskLabel(consComputed.t1.risk)}.`,
+        `T+7 (конс.) — потребность: ${fmt(consComputed.t7.need)} TJS, покрытие: ${(consComputed.t7.cov_cash*100).toFixed(0)}%, риск: ${riskLabel(consComputed.t7.risk)}.`,
+        `T+30 (конс.) — потребность: ${fmt(cons30.need)} TJS, покрытие: ${(cons30.cov_cash*100).toFixed(0)}%, риск: ${riskLabel(cons30.risk)}.`,
+        `TJS T+30: покрытие ${(computed.t30.cov_cash*100).toFixed(0)}%. FX T+30: покрытие ${(fxComputed.t30.cov_cash*100).toFixed(0)}%.`,
       ].join(' ')
       await supabase.from('stress_test_registry').insert({
         risk_type: 'Риск ликвидности',
         analyst_name: form.analyst_name,
         period: form.test_name,
-        inputs: { ...inputs, scenario },
-        results: { scenario, t1: computed.t1, t7: computed.t7, t30: computed.t30 },
+        inputs: { tjs: inputs, fx: fxInputs, exchange_rate: exRate, scenario },
+        results: resultsPayload,
         conclusion,
         status: 'Проведён',
       })
@@ -536,74 +568,182 @@ export default function LiquidityPage() {
               <button onClick={() => setViewing(null)}><X className="w-5 h-5 text-gray-400" /></button>
             </div>
             <div className="flex-1 overflow-y-auto p-6 space-y-5">
-              <div className="grid grid-cols-3 gap-2">
-                {(Object.keys(ALL_SCENARIOS) as ScenarioName[]).map(sc => {
-                  const style = SCENARIO_STYLES[sc]
-                  const active = viewScenario === sc
-                  const isSaved = (viewing.scenario || 'Пессимистичный') === sc
-                  return (
-                    <button key={sc} onClick={() => setViewScenario(sc)}
-                      className={`px-3 py-2.5 rounded-xl border-2 text-xs font-semibold transition-all ${active ? `${style.bg} ${style.border} ${style.text}` : 'bg-white border-gray-200 text-gray-500 hover:border-gray-300'}`}>
-                      {sc === 'Оптимистичный' ? '📈' : sc === 'Пессимистичный' ? '📉' : '⚠️'} {sc}
-                      {isSaved && <span className="ml-1 text-[10px] opacity-70">(сохранён)</span>}
-                    </button>
-                  )
-                })}
-              </div>
-              {(() => {
-                const vi = {
-                  due_to_banks: viewing.due_to_banks, current_accounts: viewing.current_accounts,
-                  electronic_wallet: viewing.electronic_wallet, savings: viewing.savings,
-                  term_deposits: viewing.term_deposits, borrowings: viewing.borrowings,
-                  other_liabilities: viewing.other_liabilities,
-                  credit_line_salom: viewing.credit_line_salom, credit_line_sme: viewing.credit_line_sme,
-                  cash_equivalents: viewing.cash_equivalents, cash_only: viewing.cash_only,
-                }
-                const res = calcStress(vi, viewScenario)
-                return (
-                  <div className="grid grid-cols-3 gap-3">
-                    <HorizonCard h="T+1 (1 день)" data={res.t1} />
-                    <HorizonCard h="T+7 (7 дней)" data={res.t7} />
-                    <HorizonCard h="T+30 (30 дней)" data={res.t30} />
-                  </div>
-                )
-              })()}
-              <div className="bg-gray-50 rounded-xl p-4">
-                <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-3">
-                  Входные данные · <span className="text-[#1B8A4C]">% отток: {viewScenario}</span>
-                </p>
-                <div className="grid grid-cols-1 gap-1.5 text-xs">
-                  {([
-                    { label: 'Межбанковские обязательства', val: viewing.due_to_banks,      key: 'due_to_banks' },
-                    { label: 'Текущие счета',               val: viewing.current_accounts,   key: 'current_accounts' },
-                    { label: 'Электронный кошелёк',         val: viewing.electronic_wallet,  key: 'electronic_wallet' },
-                    { label: 'Накопительные счета',         val: viewing.savings,            key: 'savings' },
-                    { label: 'Срочные депозиты',            val: viewing.term_deposits,      key: 'term_deposits' },
-                    { label: 'Заимствования',               val: viewing.borrowings,         key: 'borrowings' },
-                    { label: 'Прочие обязательства',        val: viewing.other_liabilities,  key: 'other_liabilities' },
-                    { label: 'Кредитная линия Salom',       val: viewing.credit_line_salom,  key: 'credit_line_salom' },
-                    { label: 'Кредитная линия SME',         val: viewing.credit_line_sme,    key: 'credit_line_sme' },
-                  ] as { label: string; val: number; key: string }[]).map(item => {
-                    const r = ALL_SCENARIOS[viewScenario][item.key] as HRate | undefined
-                    const rateStr = r ? `${(r.t1*100).toFixed(0)}% / ${(r.t7*100).toFixed(0)}% / ${(r.t30*100).toFixed(0)}%` : null
+              {/* Scenario switcher — only for legacy (no results jsonb) */}
+              {!viewing.results && (
+                <div className="grid grid-cols-3 gap-2">
+                  {(Object.keys(ALL_SCENARIOS) as ScenarioName[]).map(sc => {
+                    const style = SCENARIO_STYLES[sc]
+                    const active = viewScenario === sc
+                    const isSaved = (viewing.scenario || 'Пессимистичный') === sc
                     return (
-                      <div key={item.label} className="flex items-center justify-between p-1.5 bg-white rounded gap-2">
-                        <span className="text-gray-500 flex-1">{item.label}</span>
-                        {rateStr && <span className="text-[#1B8A4C] font-medium text-[10px] whitespace-nowrap">{rateStr}</span>}
-                        <span className="font-medium text-gray-900 whitespace-nowrap">{fmt(item.val)} TJS</span>
-                      </div>
+                      <button key={sc} onClick={() => setViewScenario(sc)}
+                        className={`px-3 py-2.5 rounded-xl border-2 text-xs font-semibold transition-all ${active ? `${style.bg} ${style.border} ${style.text}` : 'bg-white border-gray-200 text-gray-500 hover:border-gray-300'}`}>
+                        {sc === 'Оптимистичный' ? '📈' : sc === 'Пессимистичный' ? '📉' : '⚠️'} {sc}
+                        {isSaved && <span className="ml-1 text-[10px] opacity-70">(сохранён)</span>}
+                      </button>
                     )
                   })}
-                  <div className="border-t border-gray-200 mt-1 pt-1.5">
-                    {[{ label: 'Буфер: Cash & Equivalents', val: viewing.cash_equivalents }, { label: 'Буфер: Cash Only', val: viewing.cash_only }].map(item => (
-                      <div key={item.label} className="flex justify-between p-1.5 bg-white rounded mt-1">
-                        <span className="text-gray-500">{item.label}</span>
-                        <span className="font-bold text-gray-900">{fmt(item.val)} TJS</span>
-                      </div>
-                    ))}
-                  </div>
                 </div>
-              </div>
+              )}
+
+              {viewing.results ? (
+                /* New format: consolidated + TJS/FX breakdown */
+                <>
+                  {/* Header info */}
+                  <div className="flex items-center gap-3 flex-wrap">
+                    <span className={`text-xs font-semibold px-3 py-1 rounded-full ${SCENARIO_STYLES[viewing.results.scenario as ScenarioName]?.badge || 'bg-gray-100 text-gray-600'}`}>
+                      {viewing.results.scenario}
+                    </span>
+                    <span className="text-xs text-gray-500 bg-blue-50 px-3 py-1 rounded-full">
+                      💱 Курс НБТ: <strong>{viewing.results.exchange_rate}</strong> TJS/USD
+                    </span>
+                  </div>
+
+                  {/* Consolidated cards */}
+                  <div>
+                    <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">🔗 Консолидировано (TJS + FX × {viewing.results.exchange_rate})</p>
+                    <div className="grid grid-cols-3 gap-3">
+                      <HorizonCard h="T+1 (1 день)" data={viewing.results.cons.t1} />
+                      <HorizonCard h="T+7 (7 дней)" data={viewing.results.cons.t7} />
+                      <HorizonCard h="T+30 (30 дней)" data={viewing.results.cons.t30} />
+                    </div>
+                  </div>
+
+                  {/* TJS breakdown */}
+                  <div className="bg-gray-50 rounded-xl p-4">
+                    <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-3">🇹🇯 Сомони (TJS)</p>
+                    <div className="grid grid-cols-3 gap-3 mb-3">
+                      <HorizonCard h="T+1" data={viewing.results.tjs.t1} />
+                      <HorizonCard h="T+7" data={viewing.results.tjs.t7} />
+                      <HorizonCard h="T+30" data={viewing.results.tjs.t30} />
+                    </div>
+                    <div className="grid grid-cols-1 gap-1.5 text-xs">
+                      {([
+                        { label: 'Межбанковские обязательства', key: 'due_to_banks' },
+                        { label: 'Текущие счета',               key: 'current_accounts' },
+                        { label: 'Электронный кошелёк',         key: 'electronic_wallet' },
+                        { label: 'Накопительные счета',         key: 'savings' },
+                        { label: 'Срочные депозиты',            key: 'term_deposits' },
+                        { label: 'Заимствования',               key: 'borrowings' },
+                        { label: 'Прочие обязательства',        key: 'other_liabilities' },
+                        { label: 'Кредитная линия Salom',       key: 'credit_line_salom' },
+                        { label: 'Кредитная линия SME',         key: 'credit_line_sme' },
+                      ]).map(item => {
+                        const val = viewing.results!.tjs.inputs[item.key] || 0
+                        const r = viewing.results!.tjs.rates[item.key] as HRate | undefined
+                        const rateStr = r ? `${(r.t1*100).toFixed(0)}% / ${(r.t7*100).toFixed(0)}% / ${(r.t30*100).toFixed(0)}%` : null
+                        return (
+                          <div key={item.key} className="flex items-center justify-between p-1.5 bg-white rounded gap-2">
+                            <span className="text-gray-500 flex-1">{item.label}</span>
+                            {rateStr && <span className="text-[#1B8A4C] font-medium text-[10px] whitespace-nowrap">{rateStr}</span>}
+                            <span className="font-medium text-gray-900 whitespace-nowrap">{fmt(val)} TJS</span>
+                          </div>
+                        )
+                      })}
+                      <div className="border-t border-gray-200 mt-1 pt-1.5 space-y-1">
+                        <div className="flex justify-between p-1.5 bg-white rounded"><span className="text-gray-500">Буфер: Cash & Equivalents</span><span className="font-bold">{fmt(viewing.results.tjs.inputs.cash_equivalents || 0)} TJS</span></div>
+                        <div className="flex justify-between p-1.5 bg-white rounded"><span className="text-gray-500">Буфер: Cash Only</span><span className="font-bold">{fmt(viewing.results.tjs.inputs.cash_only || 0)} TJS</span></div>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* FX breakdown */}
+                  <div className="bg-blue-50 rounded-xl p-4">
+                    <p className="text-xs font-semibold text-blue-700 uppercase tracking-wide mb-3">💵 Иностранная валюта (USD экв.)</p>
+                    <div className="grid grid-cols-3 gap-3 mb-3">
+                      <HorizonCard h="T+1" data={viewing.results.fx.t1} unit="USD" />
+                      <HorizonCard h="T+7" data={viewing.results.fx.t7} unit="USD" />
+                      <HorizonCard h="T+30" data={viewing.results.fx.t30} unit="USD" />
+                    </div>
+                    <div className="grid grid-cols-1 gap-1.5 text-xs">
+                      {([
+                        { label: 'Межбанковские обязательства', key: 'due_to_banks' },
+                        { label: 'Текущие счета',               key: 'current_accounts' },
+                        { label: 'Электронный кошелёк',         key: 'electronic_wallet' },
+                        { label: 'Накопительные счета',         key: 'savings' },
+                        { label: 'Срочные депозиты',            key: 'term_deposits' },
+                        { label: 'Заимствования',               key: 'borrowings' },
+                        { label: 'Прочие обязательства',        key: 'other_liabilities' },
+                        { label: 'Кредитная линия Salom',       key: 'credit_line_salom' },
+                        { label: 'Кредитная линия SME',         key: 'credit_line_sme' },
+                      ]).map(item => {
+                        const val = viewing.results!.fx.inputs[item.key] || 0
+                        const r = viewing.results!.fx.rates[item.key] as HRate | undefined
+                        const rateStr = r ? `${(r.t1*100).toFixed(0)}% / ${(r.t7*100).toFixed(0)}% / ${(r.t30*100).toFixed(0)}%` : null
+                        return val > 0 ? (
+                          <div key={item.key} className="flex items-center justify-between p-1.5 bg-white rounded gap-2">
+                            <span className="text-gray-500 flex-1">{item.label}</span>
+                            {rateStr && <span className="text-blue-500 font-medium text-[10px] whitespace-nowrap">{rateStr}</span>}
+                            <span className="font-medium text-gray-900 whitespace-nowrap">{fmt(val)} USD</span>
+                          </div>
+                        ) : null
+                      })}
+                      <div className="border-t border-blue-200 mt-1 pt-1.5 space-y-1">
+                        <div className="flex justify-between p-1.5 bg-white rounded"><span className="text-gray-500">FX Cash + Ностро USD/EUR</span><span className="font-bold">{fmt(viewing.results.fx.inputs.cash_equivalents || 0)} USD</span></div>
+                        <div className="flex justify-between p-1.5 bg-white rounded"><span className="text-gray-500">FX Cash Only</span><span className="font-bold">{fmt(viewing.results.fx.inputs.cash_only || 0)} USD</span></div>
+                      </div>
+                    </div>
+                  </div>
+                </>
+              ) : (
+                /* Legacy format: TJS only */
+                <>
+                  {(() => {
+                    const vi = {
+                      due_to_banks: viewing.due_to_banks, current_accounts: viewing.current_accounts,
+                      electronic_wallet: viewing.electronic_wallet, savings: viewing.savings,
+                      term_deposits: viewing.term_deposits, borrowings: viewing.borrowings,
+                      other_liabilities: viewing.other_liabilities,
+                      credit_line_salom: viewing.credit_line_salom, credit_line_sme: viewing.credit_line_sme,
+                      cash_equivalents: viewing.cash_equivalents, cash_only: viewing.cash_only,
+                    }
+                    const res = calcStress(vi, viewScenario)
+                    return (
+                      <div className="grid grid-cols-3 gap-3">
+                        <HorizonCard h="T+1 (1 день)" data={res.t1} />
+                        <HorizonCard h="T+7 (7 дней)" data={res.t7} />
+                        <HorizonCard h="T+30 (30 дней)" data={res.t30} />
+                      </div>
+                    )
+                  })()}
+                  <div className="bg-gray-50 rounded-xl p-4">
+                    <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-3">
+                      Входные данные · <span className="text-[#1B8A4C]">% отток: {viewScenario}</span>
+                    </p>
+                    <div className="grid grid-cols-1 gap-1.5 text-xs">
+                      {([
+                        { label: 'Межбанковские обязательства', val: viewing.due_to_banks,      key: 'due_to_banks' },
+                        { label: 'Текущие счета',               val: viewing.current_accounts,   key: 'current_accounts' },
+                        { label: 'Электронный кошелёк',         val: viewing.electronic_wallet,  key: 'electronic_wallet' },
+                        { label: 'Накопительные счета',         val: viewing.savings,            key: 'savings' },
+                        { label: 'Срочные депозиты',            val: viewing.term_deposits,      key: 'term_deposits' },
+                        { label: 'Заимствования',               val: viewing.borrowings,         key: 'borrowings' },
+                        { label: 'Прочие обязательства',        val: viewing.other_liabilities,  key: 'other_liabilities' },
+                        { label: 'Кредитная линия Salom',       val: viewing.credit_line_salom,  key: 'credit_line_salom' },
+                        { label: 'Кредитная линия SME',         val: viewing.credit_line_sme,    key: 'credit_line_sme' },
+                      ] as { label: string; val: number; key: string }[]).map(item => {
+                        const r = ALL_SCENARIOS[viewScenario][item.key] as HRate | undefined
+                        const rateStr = r ? `${(r.t1*100).toFixed(0)}% / ${(r.t7*100).toFixed(0)}% / ${(r.t30*100).toFixed(0)}%` : null
+                        return (
+                          <div key={item.label} className="flex items-center justify-between p-1.5 bg-white rounded gap-2">
+                            <span className="text-gray-500 flex-1">{item.label}</span>
+                            {rateStr && <span className="text-[#1B8A4C] font-medium text-[10px] whitespace-nowrap">{rateStr}</span>}
+                            <span className="font-medium text-gray-900 whitespace-nowrap">{fmt(item.val)} TJS</span>
+                          </div>
+                        )
+                      })}
+                      <div className="border-t border-gray-200 mt-1 pt-1.5">
+                        {[{ label: 'Буфер: Cash & Equivalents', val: viewing.cash_equivalents }, { label: 'Буфер: Cash Only', val: viewing.cash_only }].map(item => (
+                          <div key={item.label} className="flex justify-between p-1.5 bg-white rounded mt-1">
+                            <span className="text-gray-500">{item.label}</span>
+                            <span className="font-bold text-gray-900">{fmt(item.val)} TJS</span>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  </div>
+                </>
+              )}
             </div>
             <div className="flex justify-end gap-3 p-6 border-t border-gray-100">
               <button onClick={() => downloadWord(viewing)} className="flex items-center gap-2 px-4 py-2 bg-[#1B8A4C] text-white rounded-lg text-sm font-medium hover:bg-[#177040]"><Download className="w-4 h-4" /> Word</button>
