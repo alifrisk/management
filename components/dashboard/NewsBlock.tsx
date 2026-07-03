@@ -45,12 +45,19 @@ function srcBadge(source: string) {
 const PAGE_SIZE = 8
 
 export default function NewsBlock() {
-  const [all, setAll]           = useState<NewsItem[]>([])
-  const [loading, setLoading]   = useState(true)
-  const [error, setError]       = useState(false)
-  const [tab, setTab]           = useState<FilterTab>('all')
-  const [visible, setVisible]   = useState(PAGE_SIZE)
+  const [all, setAll]             = useState<NewsItem[]>([])
+  const [loading, setLoading]     = useState(true)
+  const [error, setError]         = useState(false)
+  const [tab, setTab]             = useState<FilterTab>('all')
+  const [visible, setVisible]     = useState(PAGE_SIZE)
   const [refreshed, setRefreshed] = useState<Date | null>(null)
+  const [scrolled, setScrolled]   = useState(false)
+
+  useEffect(() => {
+    const onScroll = () => setScrolled(window.scrollY > 40)
+    window.addEventListener('scroll', onScroll, { passive: true })
+    return () => window.removeEventListener('scroll', onScroll)
+  }, [])
 
   async function load() {
     setLoading(true); setError(false)
@@ -76,9 +83,15 @@ export default function NewsBlock() {
   const hasMore  = visible < filtered.length
 
   return (
-    <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
-      {/* Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 px-5 py-4 border-b border-gray-100">
+    // No overflow-hidden here — required for sticky header to work
+    <div className="bg-white rounded-2xl border border-gray-100 shadow-sm">
+
+      {/* Sticky header */}
+      <div
+        className={`sticky top-0 z-20 bg-white rounded-t-2xl flex flex-col sm:flex-row sm:items-center justify-between gap-3 px-5 py-4 border-b border-gray-100 transition-shadow duration-200 ${
+          scrolled ? 'shadow-md' : ''
+        }`}
+      >
         <div className="flex items-center gap-3">
           <div className="w-8 h-8 bg-[#1B8A4C]/10 rounded-lg flex items-center justify-center">
             <Newspaper className="w-4 h-4 text-[#1B8A4C]" />
@@ -212,7 +225,7 @@ export default function NewsBlock() {
 
       {/* Footer */}
       {all.length > 0 && (
-        <div className="px-5 py-2.5 border-t border-gray-50 bg-gray-50/50">
+        <div className="px-5 py-2.5 border-t border-gray-50 bg-gray-50/50 rounded-b-2xl">
           <p className="text-[10px] text-gray-400">
             Источники: Sputnik TJ · Asia-Plus · Avesta.tj · ТАСС · Коммерсантъ · Интерфакс · OilPrice.com · Mining.com · Financial Post · MarketWatch
           </p>
