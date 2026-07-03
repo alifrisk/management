@@ -11,10 +11,10 @@ const parseN = (v: string) => Number(v.replace(/\D/g,'')) || 0
 const COV_COLS = [50, 55, 60, 65, 70, 75, 80, 85, 90, 95, 100]
 
 const CREDIT_HORIZONS = [
-  { months: 1,  label: '1 месяц',   pessMultiplier: 1 + 0.4/12, catMultiplier: 1 + 1.0/12 },
-  { months: 3,  label: '3 месяца',  pessMultiplier: 1 + 0.4/4,  catMultiplier: 1 + 1.0/4  },
-  { months: 6,  label: '6 месяцев', pessMultiplier: 1 + 0.4/2,  catMultiplier: 1 + 1.0/2  },
-  { months: 12, label: '1 год',     pessMultiplier: 1.4,         catMultiplier: 2.0         },
+  { months: 1,  label: '1 месяц'   },
+  { months: 3,  label: '3 месяца'  },
+  { months: 6,  label: '6 месяцев' },
+  { months: 12, label: '1 год'     },
 ]
 
 export default function CreditStressTest() {
@@ -24,16 +24,14 @@ export default function CreditStressTest() {
   const [currentCov, setCurrentCov] = useState('')
   const [baseProfit, setBaseProfit] = useState('')
 
-  // Бюджетный сценарий — текущие значения PAR (справочно)
-  const [currentPar7,   setCurrentPar7]   = useState('')
-  const [currentPar90,  setCurrentPar90]  = useState('')
-  const [currentPar180, setCurrentPar180] = useState('')
-  // Бюджетный сценарий — ежемесячные приросты
-  const [growPar7,   setGrowPar7]   = useState('')
-  const [growPar30,  setGrowPar30]  = useState('')
-  const [growPar90,  setGrowPar90]  = useState('')
-  const [growPar180, setGrowPar180] = useState('')
-  const [growCov,    setGrowCov]    = useState('')
+  // Текущие значения PAR7/90/180 для справочного прогноза
+  const [curPar7,   setCurPar7]   = useState('')
+  const [curPar90,  setCurPar90]  = useState('')
+  const [curPar180, setCurPar180] = useState('')
+  // Таблица приростов [строка: PAR7/30/90/180/Coverage][колонка: мин/сред/макс]
+  const [growTable, setGrowTable] = useState<string[][]>(
+    Array(5).fill(null).map(() => ['', '', ''])
+  )
 
   const [reportDate, setReportDate] = useState(() => new Date().toISOString().split('T')[0])
   const [tab, setTab]         = useState<1|2>(1)
@@ -62,29 +60,34 @@ export default function CreditStressTest() {
   const effect     = (newPar: number, cov: number) => -Math.max(0, addReserve(newPar, cov))
   const adjProfit  = (newPar: number, cov: number) => BP + effect(newPar, cov)
 
-  // Сценарии
   const currentHorizon = CREDIT_HORIZONS[horizonIdx]
   const months = currentHorizon.months
 
-  // Мультипликативный расчёт: PAR_new = PAR_current × (1 + rate/100)^months
+  // PAR_new = PAR_current × (1 + rate/100)^months
   const compound = (base: number, ratePct: string) =>
     base * Math.pow(1 + (parseFloat(ratePct) || 0) / 100, months)
 
-  const budget = {
-    par: Math.round(compound(CP, growPar30) * 100) / 100,
-    cov: Math.min(100, Math.round(compound(CC, growCov) * 10) / 10),
+  const setGrow = (row: number, col: number, val: string) =>
+    setGrowTable(prev => prev.map((r, ri) => ri === row ? r.map((c, ci) => ci === col ? val : c) : r))
+
+  // Три сценария: Оптимистичный (мин), Пессимистичный (средний), Катастрофический (макс)
+  const optim = {
+    par: Math.round(compound(CP, growTable[1][0]) * 100) / 100,
+    cov: Math.min(100, Math.round(compound(CC, growTable[4][0]) * 10) / 10),
+  }
+  const pess = {
+    par: Math.round(compound(CP, growTable[1][1]) * 100) / 100,
+    cov: Math.min(100, Math.round(compound(CC, growTable[4][1]) * 10) / 10),
+  }
+  const cat = {
+    par: Math.round(compound(CP, growTable[1][2]) * 100) / 100,
+    cov: Math.min(100, Math.round(compound(CC, growTable[4][2]) * 10) / 10),
   }
 
-  // Прогнозные значения PAR7/90/180 — та же мультипликативная логика что и PAR30
-  const CP7   = parseFloat(currentPar7)   || 0
-  const CP90  = parseFloat(currentPar90)  || 0
-  const CP180 = parseFloat(currentPar180) || 0
-  const refPar7   = Math.round(compound(CP7,   growPar7)   * 100) / 100
-  const refPar90  = Math.round(compound(CP90,  growPar90)  * 100) / 100
-  const refPar180 = Math.round(compound(CP180, growPar180) * 100) / 100
-
-  const pess = { par: Math.round(budget.par * 1.5 * 100) / 100, cov: 80 }
-  const cat  = { par: Math.round(budget.par * 2.0 * 100) / 100, cov: 80 }
+  // Текущие значения PAR7/90/180 для справочного прогноза
+  const CP7   = parseFloat(curPar7)   || 0
+  const CP90  = parseFloat(curPar90)  || 0
+  const CP180 = parseFloat(curPar180) || 0
 
   // Динамические строки матрицы: шаг 0.5% от CP до CP+10%, плюс точные pess/cat
   const parRows: number[] = (() => {
@@ -106,9 +109,9 @@ export default function CreditStressTest() {
   async function saveToRegistry() {
     setSaving(true)
     const scenarios = [
-      { name: 'Бюджетный',        par: budget.par, cov: budget.cov },
-      { name: 'Пессимистичный',   par: pess.par,   cov: pess.cov   },
-      { name: 'Катастрофический', par: cat.par,     cov: cat.cov    },
+      { name: 'Оптимистичный',    par: optim.par, cov: optim.cov },
+      { name: 'Пессимистичный',   par: pess.par,  cov: pess.cov  },
+      { name: 'Катастрофический', par: cat.par,   cov: cat.cov   },
     ].map(sc => ({
       ...sc,
       reserve:    Math.round(Math.max(0, addReserve(sc.par, sc.cov))),
@@ -129,7 +132,7 @@ export default function CreditStressTest() {
     const conclusion = [
       `Дата отчётности: ${new Date(reportDate).toLocaleDateString('ru-RU')}. Горизонт: ${currentHorizon.label}.`,
       P > 0 ? `Портфель: ${fmt(P)} TJS. Текущий PAR30: ${CP}%, Coverage: ${CC}%.` : null,
-      `Модель 1 — Бюджетный: PAR=${budget.par.toFixed(1)}%, доп. резерв ${fmt(scenarios[0].reserve)} TJS.`,
+      `Модель 1 — Оптимистичный: PAR=${optim.par.toFixed(1)}%, доп. резерв ${fmt(scenarios[0].reserve)} TJS.`,
       `Пессимистичный: PAR=${pess.par.toFixed(1)}%, доп. резерв ${fmt(scenarios[1].reserve)} TJS.`,
       `Катастрофический: PAR=${cat.par.toFixed(1)}%, доп. резерв ${fmt(catSc.reserve)} TJS${BP > 0 && catSc.adj_profit !== null ? `, скорр. прибыль ${fmt(catSc.adj_profit)} TJS` : ''}.`,
       model2?.cat_point?.adj_profit != null ? `Модель 2 — What-If: при катастрофе скорр. прибыль ${fmt(model2.cat_point.adj_profit)} TJS.` : null,
@@ -139,7 +142,7 @@ export default function CreditStressTest() {
       risk_type: 'Кредитный риск',
       analyst_name: analystName,
       period: new Date(reportDate).toLocaleDateString('ru-RU'),
-      inputs: { report_date: reportDate, portfolio: P, current_par: CP, current_cov: CC, base_profit: BP, budget_par: budget.par || null, budget_cov: budget.cov || null, grow_par30: growPar30 || null, grow_cov: growCov || null, horizon: currentHorizon.label },
+      inputs: { report_date: reportDate, portfolio: P, current_par: CP, current_cov: CC, base_profit: BP, optim_par: optim.par || null, optim_cov: optim.cov || null, pess_par: pess.par || null, cat_par: cat.par || null, grow_table: growTable, horizon: currentHorizon.label },
       results: {
         model1: { scenarios },
         model2,
@@ -164,9 +167,9 @@ export default function CreditStressTest() {
     rows.push(['МОДЕЛЬ 1 — СЦЕНАРИИ'])
     rows.push(['Сценарий','PAR30 (%)','Coverage (%)','Доп. резерв (TJS)','Эффект на П&У (TJS)','Скорр. прибыль (TJS)'])
     ;[
-      { name: 'Бюджетный',       ...budget },
-      { name: 'Пессимистичный',  ...pess   },
-      { name: 'Катастрофический',...cat    },
+      { name: 'Оптимистичный',   ...optim },
+      { name: 'Пессимистичный',  ...pess  },
+      { name: 'Катастрофический',...cat   },
     ].forEach(sc => {
       const res = Math.max(0, addReserve(sc.par, sc.cov))
       const eff = -res
@@ -299,7 +302,7 @@ export default function CreditStressTest() {
             ))}
           </div>
           <p className="text-xs text-gray-400 mt-1.5">
-            Пессимистичный = Бюджетный PAR30 × 1.50 · Катастрофический = Бюджетный PAR30 × 2.00
+            Оптимистичный = мин. прирост · Пессимистичный = средний прирост · Катастрофический = макс. прирост
           </p>
         </div>
         {/* Формула */}
@@ -325,117 +328,126 @@ export default function CreditStressTest() {
       {/* ═══ МОДЕЛЬ 1 ═══ */}
       {tab === 1 && (
         <div className="space-y-5">
-          {/* Бюджетный ввод — ежемесячные приросты */}
-          <div className="p-4 border-2 border-green-200 bg-green-50 rounded-xl print:hidden">
+          {/* Таблица ввода приростов по сценариям */}
+          <div className="p-4 border-2 border-gray-200 bg-gray-50 rounded-xl print:hidden">
             <div className="flex items-center justify-between mb-3">
-              <p className="text-xs font-bold text-green-700">📈 Бюджетный сценарий — средний ежемесячный прирост</p>
+              <p className="text-xs font-bold text-gray-700">📊 Ежемесячные приросты по историческим данным за 12 мес. (%/мес)</p>
               <span className="text-[11px] bg-gray-100 text-gray-500 px-2 py-0.5 rounded-full">✍️ ручной ввод</span>
             </div>
-
-            {/* Текущие значения PAR для справочных категорий */}
-            <p className="text-[11px] text-gray-500 font-medium mb-1.5">Текущие значения (для справочных категорий):</p>
-            <div className="grid grid-cols-3 gap-3 mb-3">
-              <div>
-                <label className={lbl}>PAR&gt;7 текущий (%)</label>
-                <input type="text" inputMode="decimal" value={currentPar7}
-                  onChange={e => setCurrentPar7(e.target.value)}
-                  placeholder="4.50" className={inp} />
-              </div>
-              <div>
-                <label className={lbl}>PAR&gt;90 текущий (%)</label>
-                <input type="text" inputMode="decimal" value={currentPar90}
-                  onChange={e => setCurrentPar90(e.target.value)}
-                  placeholder="1.20" className={inp} />
-              </div>
-              <div>
-                <label className={lbl}>PAR&gt;180 текущий (%)</label>
-                <input type="text" inputMode="decimal" value={currentPar180}
-                  onChange={e => setCurrentPar180(e.target.value)}
-                  placeholder="0.80" className={inp} />
-              </div>
+            <div className="overflow-x-auto">
+              <table className="w-full text-xs">
+                <thead>
+                  <tr className="border-b-2 border-gray-200">
+                    <th className="text-left pb-2 pr-4 text-gray-500 font-medium">Показатель</th>
+                    <th className="text-center pb-2 px-3 text-gray-500 font-medium">Текущий %</th>
+                    <th className="text-center pb-2 px-3 font-bold text-green-700">
+                      Мин. прирост/мес<br/><span className="font-normal text-[10px] text-green-500">Оптимистичный</span>
+                    </th>
+                    <th className="text-center pb-2 px-3 font-bold text-yellow-700">
+                      Средний прирост/мес<br/><span className="font-normal text-[10px] text-yellow-500">Пессимистичный</span>
+                    </th>
+                    <th className="text-center pb-2 px-3 font-bold text-red-700">
+                      Макс. прирост/мес<br/><span className="font-normal text-[10px] text-red-500">Катастрофический</span>
+                    </th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-gray-100">
+                  <tr>
+                    <td className="py-2 pr-4 text-gray-600 font-medium whitespace-nowrap">PAR&gt;7 (%)</td>
+                    <td className="px-2 py-2">
+                      <input type="text" inputMode="decimal" value={curPar7} onChange={e => setCurPar7(e.target.value)} placeholder="4.50" className={`${inp} text-xs py-1.5`} />
+                    </td>
+                    <td className="px-2 py-2"><input type="text" inputMode="decimal" value={growTable[0][0]} onChange={e => setGrow(0,0,e.target.value)} placeholder="0.05" className={`${inp} text-xs py-1.5`} /></td>
+                    <td className="px-2 py-2"><input type="text" inputMode="decimal" value={growTable[0][1]} onChange={e => setGrow(0,1,e.target.value)} placeholder="0.10" className={`${inp} text-xs py-1.5`} /></td>
+                    <td className="px-2 py-2"><input type="text" inputMode="decimal" value={growTable[0][2]} onChange={e => setGrow(0,2,e.target.value)} placeholder="0.20" className={`${inp} text-xs py-1.5`} /></td>
+                  </tr>
+                  <tr className="bg-green-50/50">
+                    <td className="py-2 pr-4 font-bold text-gray-700 whitespace-nowrap">
+                      PAR&gt;30 (%)<br/><span className="font-normal text-[10px] text-green-600">основной для резерва</span>
+                    </td>
+                    <td className="px-2 py-2 text-center font-semibold text-gray-700 text-xs">{CP > 0 ? `${CP}%` : '—'}</td>
+                    <td className="px-2 py-2"><input type="text" inputMode="decimal" value={growTable[1][0]} onChange={e => setGrow(1,0,e.target.value)} placeholder="0.05" className={`${inp} text-xs py-1.5 border-green-300`} /></td>
+                    <td className="px-2 py-2"><input type="text" inputMode="decimal" value={growTable[1][1]} onChange={e => setGrow(1,1,e.target.value)} placeholder="0.10" className={`${inp} text-xs py-1.5 border-green-300`} /></td>
+                    <td className="px-2 py-2"><input type="text" inputMode="decimal" value={growTable[1][2]} onChange={e => setGrow(1,2,e.target.value)} placeholder="0.20" className={`${inp} text-xs py-1.5 border-green-300`} /></td>
+                  </tr>
+                  <tr>
+                    <td className="py-2 pr-4 text-gray-600 font-medium whitespace-nowrap">PAR&gt;90 (%)</td>
+                    <td className="px-2 py-2">
+                      <input type="text" inputMode="decimal" value={curPar90} onChange={e => setCurPar90(e.target.value)} placeholder="1.20" className={`${inp} text-xs py-1.5`} />
+                    </td>
+                    <td className="px-2 py-2"><input type="text" inputMode="decimal" value={growTable[2][0]} onChange={e => setGrow(2,0,e.target.value)} placeholder="0.03" className={`${inp} text-xs py-1.5`} /></td>
+                    <td className="px-2 py-2"><input type="text" inputMode="decimal" value={growTable[2][1]} onChange={e => setGrow(2,1,e.target.value)} placeholder="0.05" className={`${inp} text-xs py-1.5`} /></td>
+                    <td className="px-2 py-2"><input type="text" inputMode="decimal" value={growTable[2][2]} onChange={e => setGrow(2,2,e.target.value)} placeholder="0.10" className={`${inp} text-xs py-1.5`} /></td>
+                  </tr>
+                  <tr>
+                    <td className="py-2 pr-4 text-gray-600 font-medium whitespace-nowrap">PAR&gt;180 (%)</td>
+                    <td className="px-2 py-2">
+                      <input type="text" inputMode="decimal" value={curPar180} onChange={e => setCurPar180(e.target.value)} placeholder="0.80" className={`${inp} text-xs py-1.5`} />
+                    </td>
+                    <td className="px-2 py-2"><input type="text" inputMode="decimal" value={growTable[3][0]} onChange={e => setGrow(3,0,e.target.value)} placeholder="0.02" className={`${inp} text-xs py-1.5`} /></td>
+                    <td className="px-2 py-2"><input type="text" inputMode="decimal" value={growTable[3][1]} onChange={e => setGrow(3,1,e.target.value)} placeholder="0.04" className={`${inp} text-xs py-1.5`} /></td>
+                    <td className="px-2 py-2"><input type="text" inputMode="decimal" value={growTable[3][2]} onChange={e => setGrow(3,2,e.target.value)} placeholder="0.08" className={`${inp} text-xs py-1.5`} /></td>
+                  </tr>
+                  <tr className="bg-green-50/50">
+                    <td className="py-2 pr-4 font-bold text-gray-700 whitespace-nowrap">
+                      Coverage (%)<br/><span className="font-normal text-[10px] text-green-600">основной для резерва</span>
+                    </td>
+                    <td className="px-2 py-2 text-center font-semibold text-gray-700 text-xs">{CC > 0 ? `${CC}%` : '—'}</td>
+                    <td className="px-2 py-2"><input type="text" inputMode="decimal" value={growTable[4][0]} onChange={e => setGrow(4,0,e.target.value)} placeholder="0.5" className={`${inp} text-xs py-1.5 border-green-300`} /></td>
+                    <td className="px-2 py-2"><input type="text" inputMode="decimal" value={growTable[4][1]} onChange={e => setGrow(4,1,e.target.value)} placeholder="0.3" className={`${inp} text-xs py-1.5 border-green-300`} /></td>
+                    <td className="px-2 py-2"><input type="text" inputMode="decimal" value={growTable[4][2]} onChange={e => setGrow(4,2,e.target.value)} placeholder="-0.5" className={`${inp} text-xs py-1.5 border-green-300`} /></td>
+                  </tr>
+                </tbody>
+              </table>
             </div>
 
-            {/* Ежемесячные приросты */}
-            <p className="text-[11px] text-gray-500 font-medium mb-1.5">Ежемесячный прирост (%):</p>
-            <div className="grid grid-cols-2 lg:grid-cols-5 gap-3">
-              <div>
-                <label className={lbl}>PAR&gt;7 (%/мес)</label>
-                <input type="text" inputMode="decimal" value={growPar7}
-                  onChange={e => setGrowPar7(e.target.value)}
-                  placeholder="0.05" className={inp} />
-              </div>
-              <div>
-                <label className={lbl}>PAR&gt;30 (%/мес)</label>
-                <input type="text" inputMode="decimal" value={growPar30}
-                  onChange={e => setGrowPar30(e.target.value)}
-                  placeholder="0.05" className={inp} />
-              </div>
-              <div>
-                <label className={lbl}>PAR&gt;90 (%/мес)</label>
-                <input type="text" inputMode="decimal" value={growPar90}
-                  onChange={e => setGrowPar90(e.target.value)}
-                  placeholder="0.03" className={inp} />
-              </div>
-              <div>
-                <label className={lbl}>PAR&gt;180 (%/мес)</label>
-                <input type="text" inputMode="decimal" value={growPar180}
-                  onChange={e => setGrowPar180(e.target.value)}
-                  placeholder="0.02" className={inp} />
-              </div>
-              <div>
-                <label className={lbl}>Coverage (%/мес)</label>
-                <input type="text" inputMode="decimal" value={growCov}
-                  onChange={e => setGrowCov(e.target.value)}
-                  placeholder="0.5" className={inp} />
-              </div>
-            </div>
-
-            {/* Справочный прогноз за горизонт */}
-            <div className="mt-3 p-3 bg-white border border-green-100 rounded-lg">
-              <p className="text-[11px] font-semibold text-gray-500 uppercase tracking-wide mb-2">
-                Прогноз за {currentHorizon.label} (справочно)
-              </p>
-              <div className="grid grid-cols-2 lg:grid-cols-5 gap-2 text-xs">
-                <div className="bg-gray-50 rounded-lg p-2 text-center">
-                  <p className="text-gray-400 mb-0.5">PAR&gt;7</p>
-                  <p className="font-semibold text-gray-700">
-                    {(growPar7 && currentPar7) ? `${refPar7.toFixed(2)}%` : '—'}
-                  </p>
-                  <p className="text-[10px] text-gray-400">прогноз</p>
-                </div>
-                <div className="bg-green-50 border border-green-200 rounded-lg p-2 text-center">
-                  <p className="text-gray-400 mb-0.5">PAR&gt;30</p>
-                  <p className="font-bold text-green-700">{budget.par.toFixed(2)}%</p>
-                  <p className="text-[10px] text-green-600">используется</p>
-                </div>
-                <div className="bg-gray-50 rounded-lg p-2 text-center">
-                  <p className="text-gray-400 mb-0.5">PAR&gt;90</p>
-                  <p className="font-semibold text-gray-700">
-                    {(growPar90 && currentPar90) ? `${refPar90.toFixed(2)}%` : '—'}
-                  </p>
-                  <p className="text-[10px] text-gray-400">прогноз</p>
-                </div>
-                <div className="bg-gray-50 rounded-lg p-2 text-center">
-                  <p className="text-gray-400 mb-0.5">PAR&gt;180</p>
-                  <p className="font-semibold text-gray-700">
-                    {(growPar180 && currentPar180) ? `${refPar180.toFixed(2)}%` : '—'}
-                  </p>
-                  <p className="text-[10px] text-gray-400">прогноз</p>
-                </div>
-                <div className="bg-green-50 border border-green-200 rounded-lg p-2 text-center">
-                  <p className="text-gray-400 mb-0.5">Coverage</p>
-                  <p className="font-bold text-green-700">{budget.cov.toFixed(1)}%</p>
-                  <p className="text-[10px] text-green-600">используется</p>
+            {/* Прогноз за горизонт */}
+            {(CP > 0 || CC > 0) && (
+              <div className="mt-3 p-3 bg-white border border-gray-100 rounded-lg">
+                <p className="text-[11px] font-semibold text-gray-500 uppercase tracking-wide mb-2">
+                  Прогноз за {currentHorizon.label}
+                </p>
+                <div className="grid grid-cols-3 gap-2 text-xs">
+                  <div className="bg-green-50 border border-green-200 rounded-lg p-2.5">
+                    <p className="text-green-700 font-bold text-[11px] mb-1.5">📈 Оптимистичный</p>
+                    <div className="space-y-1">
+                      <div className="flex justify-between"><span className="text-gray-400">PAR&gt;7:</span><span className="font-semibold">{(CP7 > 0 && growTable[0][0]) ? `${Math.round(compound(CP7, growTable[0][0])*100)/100}%` : '—'}</span></div>
+                      <div className="flex justify-between"><span className="text-gray-400">PAR&gt;30:</span><span className="font-bold text-green-700">{optim.par > 0 ? `${optim.par.toFixed(2)}%` : '—'}</span></div>
+                      <div className="flex justify-between"><span className="text-gray-400">PAR&gt;90:</span><span className="font-semibold">{(CP90 > 0 && growTable[2][0]) ? `${Math.round(compound(CP90, growTable[2][0])*100)/100}%` : '—'}</span></div>
+                      <div className="flex justify-between"><span className="text-gray-400">PAR&gt;180:</span><span className="font-semibold">{(CP180 > 0 && growTable[3][0]) ? `${Math.round(compound(CP180, growTable[3][0])*100)/100}%` : '—'}</span></div>
+                      <div className="flex justify-between border-t border-green-100 pt-1"><span className="text-gray-400">Coverage:</span><span className="font-bold text-green-700">{optim.cov > 0 ? `${optim.cov.toFixed(1)}%` : '—'}</span></div>
+                    </div>
+                  </div>
+                  <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-2.5">
+                    <p className="text-yellow-700 font-bold text-[11px] mb-1.5">📉 Пессимистичный</p>
+                    <div className="space-y-1">
+                      <div className="flex justify-between"><span className="text-gray-400">PAR&gt;7:</span><span className="font-semibold">{(CP7 > 0 && growTable[0][1]) ? `${Math.round(compound(CP7, growTable[0][1])*100)/100}%` : '—'}</span></div>
+                      <div className="flex justify-between"><span className="text-gray-400">PAR&gt;30:</span><span className="font-bold text-yellow-700">{pess.par > 0 ? `${pess.par.toFixed(2)}%` : '—'}</span></div>
+                      <div className="flex justify-between"><span className="text-gray-400">PAR&gt;90:</span><span className="font-semibold">{(CP90 > 0 && growTable[2][1]) ? `${Math.round(compound(CP90, growTable[2][1])*100)/100}%` : '—'}</span></div>
+                      <div className="flex justify-between"><span className="text-gray-400">PAR&gt;180:</span><span className="font-semibold">{(CP180 > 0 && growTable[3][1]) ? `${Math.round(compound(CP180, growTable[3][1])*100)/100}%` : '—'}</span></div>
+                      <div className="flex justify-between border-t border-yellow-100 pt-1"><span className="text-gray-400">Coverage:</span><span className="font-bold text-yellow-700">{pess.cov > 0 ? `${pess.cov.toFixed(1)}%` : '—'}</span></div>
+                    </div>
+                  </div>
+                  <div className="bg-red-50 border border-red-200 rounded-lg p-2.5">
+                    <p className="text-red-700 font-bold text-[11px] mb-1.5">⚠️ Катастрофический</p>
+                    <div className="space-y-1">
+                      <div className="flex justify-between"><span className="text-gray-400">PAR&gt;7:</span><span className="font-semibold">{(CP7 > 0 && growTable[0][2]) ? `${Math.round(compound(CP7, growTable[0][2])*100)/100}%` : '—'}</span></div>
+                      <div className="flex justify-between"><span className="text-gray-400">PAR&gt;30:</span><span className="font-bold text-red-700">{cat.par > 0 ? `${cat.par.toFixed(2)}%` : '—'}</span></div>
+                      <div className="flex justify-between"><span className="text-gray-400">PAR&gt;90:</span><span className="font-semibold">{(CP90 > 0 && growTable[2][2]) ? `${Math.round(compound(CP90, growTable[2][2])*100)/100}%` : '—'}</span></div>
+                      <div className="flex justify-between"><span className="text-gray-400">PAR&gt;180:</span><span className="font-semibold">{(CP180 > 0 && growTable[3][2]) ? `${Math.round(compound(CP180, growTable[3][2])*100)/100}%` : '—'}</span></div>
+                      <div className="flex justify-between border-t border-red-100 pt-1"><span className="text-gray-400">Coverage:</span><span className="font-bold text-red-700">{cat.cov > 0 ? `${cat.cov.toFixed(1)}%` : '—'}</span></div>
+                    </div>
+                  </div>
                 </div>
               </div>
-            </div>
+            )}
           </div>
 
           {/* 3 карточки */}
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
-            <ScenCard title="Бюджетный" icon="📈"
+            <ScenCard title="Оптимистичный" icon="📈"
               color="text-green-700" bg="bg-green-50" border="border-green-200"
-              par={budget.par} cov={budget.cov} />
+              par={optim.par} cov={optim.cov} />
             <ScenCard title="Пессимистичный" icon="📉"
               color="text-yellow-700" bg="bg-yellow-50" border="border-yellow-200"
               par={pess.par} cov={pess.cov} />
@@ -462,9 +474,9 @@ export default function CreditStressTest() {
                   </thead>
                   <tbody>
                     {[
-                      { name: 'Бюджетный',        icon: '📈', par: budget.par, cov: budget.cov, bg: 'bg-green-50' },
-                      { name: 'Пессимистичный',   icon: '📉', par: pess.par,   cov: pess.cov,   bg: 'bg-yellow-50' },
-                      { name: 'Катастрофический', icon: '⚠️', par: cat.par,    cov: cat.cov,    bg: 'bg-red-50' },
+                      { name: 'Оптимистичный',    icon: '📈', par: optim.par, cov: optim.cov, bg: 'bg-green-50' },
+                      { name: 'Пессимистичный',   icon: '📉', par: pess.par,  cov: pess.cov,  bg: 'bg-yellow-50' },
+                      { name: 'Катастрофический', icon: '⚠️', par: cat.par,   cov: cat.cov,   bg: 'bg-red-50' },
                     ].map(sc => {
                       const res = Math.max(0, addReserve(sc.par, sc.cov))
                       const eff = -res

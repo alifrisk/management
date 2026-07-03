@@ -127,7 +127,7 @@ export default function RegistryPage() {
 
   // ── Alert state ─────────────────────────────────────────────────────────────
   const [nbtReported, setNbtReported] = useState<Record<string, boolean>>({})
-  const [qDismissed,  setQDismissed]  = useState<Record<string, boolean>>({})
+  const [qSent,       setQSent]       = useState<Record<string, boolean>>({})
   const [nowMs,       setNowMs]       = useState(Date.now())
 
   const fetchIncidents = useCallback(async () => {
@@ -157,7 +157,7 @@ export default function RegistryPage() {
   useEffect(() => {
     try {
       const r = localStorage.getItem('or_nbt_reported'); if (r) setNbtReported(JSON.parse(r))
-      const q = localStorage.getItem('or_q_dismissed');  if (q) setQDismissed(JSON.parse(q))
+      const q = localStorage.getItem('or_q_sent');       if (q) setQSent(JSON.parse(q))
     } catch {}
   }, [])
 
@@ -172,9 +172,9 @@ export default function RegistryPage() {
     const u = { ...nbtReported, [incidentId]: true }
     setNbtReported(u); localStorage.setItem('or_nbt_reported', JSON.stringify(u))
   }
-  function dismissQuarter(key: string) {
-    const u = { ...qDismissed, [key]: true }
-    setQDismissed(u); localStorage.setItem('or_q_dismissed', JSON.stringify(u))
+  function markQuarterSent(key: string) {
+    const u = { ...qSent, [key]: true }
+    setQSent(u); localStorage.setItem('or_q_sent', JSON.stringify(u))
   }
   function fmtCountdown(ms: number): string {
     if (ms <= 0) return 'ПРОСРОЧЕНО'
@@ -183,15 +183,25 @@ export default function RegistryPage() {
     const s = Math.floor((ms % 60_000) / 1_000)
     return `${String(h).padStart(2,'0')}:${String(m).padStart(2,'0')}:${String(s).padStart(2,'0')}`
   }
-  function getQuarterInfo(ts: number) {
-    const d = new Date(ts)
-    const month = d.getMonth()
-    const endMonth = ([2, 5, 8, 11] as const).find(m => month <= m) ?? 11
-    const qNum = Math.floor(endMonth / 3) + 1
-    const endDate = new Date(d.getFullYear(), endMonth + 1, 0, 23, 59, 59)
-    const msLeft = endDate.getTime() - ts
-    const daysLeft = Math.ceil(msLeft / 86_400_000)
-    return { qNum, year: d.getFullYear(), daysLeft, key: `Q${qNum}-${d.getFullYear()}`, show: daysLeft >= 0 && daysLeft <= 21 }
+  function getQuarterReportAlert(nowMs: number) {
+    const year = new Date(nowMs).getFullYear()
+    // Fixed reporting dates: Jan 1, Apr 1, Jul 1, Oct 1
+    for (const y of [year - 1, year, year + 1]) {
+      for (const month of [0, 3, 6, 9] as const) {
+        const reportDate = new Date(y, month, 1)
+        const diffDays = Math.floor((nowMs - reportDate.getTime()) / 86_400_000)
+        if (diffDays < -1 || diffDays > 3) continue
+        const quarterNum = month === 0 ? 4 : month / 3
+        const reportYear  = month === 0 ? y - 1 : y
+        const key      = `nbt-${y}-${month}`
+        const label    = `Q${quarterNum} ${reportYear}`
+        const dateStr  = reportDate.toLocaleDateString('ru-RU', { day: 'numeric', month: 'long', year: 'numeric' })
+        if (diffDays === -1) return { type: 'before'  as const, key, label, dateStr }
+        if (diffDays === 0)  return { type: 'today'   as const, key, label, dateStr }
+        if (diffDays >= 1)   return { type: 'overdue' as const, key, label, dateStr, daysAfter: diffDays }
+      }
+    }
+    return null
   }
 
   function handleChange(field: string, value: unknown) {
@@ -298,7 +308,7 @@ export default function RegistryPage() {
     !nbtReported[i.id] &&
     (nowMs - new Date(i.created_at).getTime()) < 7 * 86_400_000
   )
-  const qInfo = getQuarterInfo(nowMs)
+  const qAlert = getQuarterReportAlert(nowMs)
 
   // Change browser tab title when alerts are active (annoying on purpose)
   // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -491,47 +501,51 @@ export default function RegistryPage() {
         )
       })}
 
-      {/* ── Quarterly Alert ─────────────────────────────────────────────────── */}
-      {qInfo.show && !qDismissed[qInfo.key] && (
+      {/* ── Quarterly Report Alert ──────────────────────────────────────────── */}
+      {qAlert && !qSent[qAlert.key] && (
         <div className={`rounded-xl border-2 p-4 ${
-          qInfo.daysLeft <= 3  ? 'bg-red-50 border-red-500' :
-          qInfo.daysLeft <= 7  ? 'bg-orange-50 border-orange-400' :
-          qInfo.daysLeft <= 14 ? 'bg-yellow-50 border-yellow-300' :
-                                  'bg-blue-50 border-blue-200'
+          qAlert.type === 'overdue' ? 'bg-red-50 border-red-500 animate-pulse' :
+          qAlert.type === 'today'   ? 'bg-orange-50 border-orange-500' :
+                                      'bg-yellow-50 border-yellow-400'
         }`}>
-          <div className="flex items-center justify-between gap-4">
-            <div className="flex items-center gap-3">
-              <BellRing className={`w-6 h-6 flex-shrink-0 ${
-                qInfo.daysLeft <= 3  ? 'text-red-600 animate-bounce' :
-                qInfo.daysLeft <= 7  ? 'text-orange-600 animate-bounce' :
-                qInfo.daysLeft <= 14 ? 'text-yellow-600' : 'text-blue-600'
+          <div className="flex items-start justify-between gap-4">
+            <div className="flex items-start gap-3">
+              <BellRing className={`w-6 h-6 flex-shrink-0 mt-0.5 ${
+                qAlert.type === 'overdue' ? 'text-red-600 animate-bounce' :
+                qAlert.type === 'today'   ? 'text-orange-600 animate-pulse' :
+                                            'text-yellow-600'
               }`} />
               <div>
                 <p className={`font-bold text-sm ${
-                  qInfo.daysLeft <= 3  ? 'text-red-700' :
-                  qInfo.daysLeft <= 7  ? 'text-orange-700' :
-                  qInfo.daysLeft <= 14 ? 'text-yellow-700' : 'text-blue-700'
+                  qAlert.type === 'overdue' ? 'text-red-700' :
+                  qAlert.type === 'today'   ? 'text-orange-700' :
+                                              'text-yellow-700'
                 }`}>
-                  📊 КВАРТАЛЬНЫЙ ОТЧЁТ НБТ РТ · Q{qInfo.qNum} {qInfo.year}
+                  {qAlert.type === 'overdue'
+                    ? `🚨 ПРОСРОЧЕНО — Квартальный отчёт НБТ РТ · ${qAlert.label} не отправлен`
+                    : qAlert.type === 'today'
+                    ? `🔴 СЕГОДНЯ — Срок подачи квартального отчёта НБТ РТ · ${qAlert.label}`
+                    : `⚠️ ЗАВТРА — Квартальный отчёт НБТ РТ · ${qAlert.label}`
+                  }
                 </p>
                 <p className="text-xs text-gray-600 mt-0.5">
-                  {qInfo.daysLeft <= 0
-                    ? '🚨 Срок подачи квартального отчёта истёк! Немедленно отправьте в НБТ РТ!'
-                    : qInfo.daysLeft === 1
-                    ? '🚨 ПОСЛЕДНИЙ ДЕНЬ! Квартальный отчёт по операционным рискам нужно сдать СЕГОДНЯ!'
-                    : qInfo.daysLeft <= 3
-                    ? `🔴 Осталось ${qInfo.daysLeft} дня до конца квартала — подготовьте и отправьте отчёт в НБТ РТ!`
-                    : qInfo.daysLeft <= 7
-                    ? `До конца Q${qInfo.qNum} осталось ${qInfo.daysLeft} дней — не забудьте квартальный отчёт НБТ РТ по операционным рискам.`
-                    : `До конца Q${qInfo.qNum} ${qInfo.year} осталось ${qInfo.daysLeft} дней. Начните подготовку квартального отчёта НБТ РТ.`
+                  {qAlert.type === 'overdue'
+                    ? `Отчётная дата ${qAlert.dateStr} прошла ${qAlert.daysAfter} дн. назад. Немедленно отправьте отчёт по операционным рискам в НБТ РТ!`
+                    : qAlert.type === 'today'
+                    ? `Срок подачи отчёта по операционным рискам за ${qAlert.label} истекает СЕГОДНЯ (${qAlert.dateStr}). Отправьте в НБТ РТ незамедлительно!`
+                    : `Отчётная дата: ${qAlert.dateStr}. Подготовьте и отправьте квартальный отчёт по операционным рискам в НБТ РТ.`
                   }
                 </p>
               </div>
             </div>
             <button
-              onClick={() => dismissQuarter(qInfo.key)}
-              className="flex items-center gap-1.5 px-3 py-2 border border-gray-300 rounded-lg text-xs font-medium text-gray-600 bg-white hover:bg-gray-50 whitespace-nowrap flex-shrink-0">
-              <CheckCircle2 className="w-3.5 h-3.5 text-green-600" /> Понял, не забуду
+              onClick={() => markQuarterSent(qAlert.key)}
+              className={`flex items-center gap-1.5 px-3 py-2 rounded-lg text-xs font-semibold text-white whitespace-nowrap flex-shrink-0 ${
+                qAlert.type === 'overdue' ? 'bg-red-600 hover:bg-red-700' :
+                qAlert.type === 'today'   ? 'bg-orange-600 hover:bg-orange-700' :
+                                            'bg-[#1B8A4C] hover:bg-[#177040]'
+              }`}>
+              <CheckCircle2 className="w-3.5 h-3.5" /> Отчёт отправлен в НБТ
             </button>
           </div>
         </div>
