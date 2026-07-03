@@ -1,87 +1,100 @@
 import { NextResponse } from 'next/server'
 import Parser from 'rss-parser'
 
+export type NewsCategory = 'tj' | 'cis' | 'world'
+
 export interface NewsItem {
   title: string
   link: string
   source: string
   pubDate: string
   isoDate: string
+  category: NewsCategory
+  summary?: string
 }
 
-const FEEDS = [
+const FEEDS: { url: string; source: string; category: NewsCategory; filtered?: boolean }[] = [
+  // Tajikistan — all news
+  { url: 'https://tj.sputniknews.ru/export/rss2/archive/index.xml', source: 'Sputnik TJ', category: 'tj' },
+  { url: 'https://asiaplustj.info/ru/rss', source: 'Asia-Plus', category: 'tj' },
+  { url: 'https://avesta.tj/feed', source: 'Avesta.tj', category: 'tj' },
   {
-    url: 'https://feeds.marketwatch.com/marketwatch/topstories/',
-    source: 'MarketWatch',
+    url: 'https://news.google.com/rss/search?q=%D0%A2%D0%B0%D0%B4%D0%B6%D0%B8%D0%BA%D0%B8%D1%81%D1%82%D0%B0%D0%BD+%D1%8D%D0%BA%D0%BE%D0%BD%D0%BE%D0%BC%D0%B8%D0%BA%D0%B0+%D0%B1%D0%B0%D0%BD%D0%BA&hl=ru&gl=TJ&ceid=TJ:ru',
+    source: 'Google TJ',
+    category: 'tj',
   },
-  {
-    url: 'https://www.investing.com/rss/news_14.rss',
-    source: 'Investing.com',
-  },
-  {
-    url: 'https://news.google.com/rss/search?q=banking+liquidity+risk+management+finance&hl=en&gl=US&ceid=US:en',
-    source: 'Google News',
-  },
-  {
-    url: 'https://news.google.com/rss/search?q=inflation+central+bank+interest+rates+gold+oil&hl=en&gl=US&ceid=US:en',
-    source: 'Google News',
-  },
-  {
-    url: 'https://news.google.com/rss/search?q=%D0%B1%D0%B0%D0%BD%D0%BA+%D1%80%D0%B8%D1%81%D0%BA+%D0%BB%D0%B8%D0%BA%D0%B2%D0%B8%D0%B4%D0%BD%D0%BE%D1%81%D1%82%D1%8C+%D1%81%D1%82%D0%B0%D0%B2%D0%BA%D0%B0+%D0%B8%D0%BD%D1%84%D0%BB%D1%8F%D1%86%D0%B8%D1%8F&hl=ru&gl=RU&ceid=RU:ru',
-    source: 'Google Новости',
-  },
+  // CIS / Russia — finance-filtered
+  { url: 'https://tass.ru/rss/v2.xml', source: 'ТАСС', category: 'cis', filtered: true },
+  { url: 'https://www.kommersant.ru/RSS/news.xml', source: 'Коммерсантъ', category: 'cis', filtered: true },
+  { url: 'https://www.interfax.ru/rss.asp', source: 'Интерфакс', category: 'cis', filtered: true },
+  // World
+  { url: 'https://oilprice.com/rss/main', source: 'OilPrice.com', category: 'world' },
+  { url: 'https://www.mining.com/feed/', source: 'Mining.com', category: 'world' },
+  { url: 'https://financialpost.com/feed', source: 'Financial Post', category: 'world', filtered: true },
+  { url: 'https://feeds.marketwatch.com/marketwatch/topstories/', source: 'MarketWatch', category: 'world', filtered: true },
 ]
 
-const KEYWORDS = [
-  'банк', 'риск', 'ликвидность', 'ставка', 'инфляция', 'нефть', 'золото',
-  'биткоин', 'курс', 'цб', 'нбт', 'капитал', 'кредит', 'валют', 'рубл',
-  'bank', 'risk', 'liquidity', 'rate', 'inflation', 'oil', 'gold', 'bitcoin',
-  'fed', 'ecb', 'credit', 'market', 'finance', 'debt', 'bond', 'yield',
-  'central', 'monetary', 'gdp', 'recession', 'economy', 'financial',
+const FINANCE_KW = [
+  'банк', 'риск', 'ликвидность', 'ставка', 'инфляция', 'нефть', 'золото', 'валют', 'рубл',
+  'капитал', 'кредит', 'экономик', 'бюджет', 'ввп', 'санкц', 'нбт', 'цб', 'мвф', 'минфин',
+  'процент', 'долг', 'доход', 'актив', 'рынок', 'торгов',
+  'bank', 'risk', 'rate', 'inflation', 'oil', 'gold', 'credit', 'finance', 'debt', 'bond',
+  'yield', 'fed', 'ecb', 'imf', 'market', 'economy', 'monetary', 'gdp', 'recession', 'trade',
+  'investment', 'stock', 'mining', 'commodity', 'energy', 'currency', 'exchange', 'capital',
+  'interest', 'deposit', 'asset', 'fund', 'profit', 'revenue', 'earnings',
 ]
 
-function matchesKeyword(title: string): boolean {
+function matchesFinance(title: string): boolean {
   const lower = title.toLowerCase()
-  return KEYWORDS.some(kw => lower.includes(kw))
+  return FINANCE_KW.some(kw => lower.includes(kw))
 }
 
-// In-memory cache
 let cache: { items: NewsItem[]; ts: number } | null = null
-const CACHE_TTL = 60 * 60 * 1000 // 1 hour
+const CACHE_TTL = 60 * 60 * 1000
 
 export async function GET() {
-  // Return cached if fresh
   if (cache && Date.now() - cache.ts < CACHE_TTL) {
     return NextResponse.json(cache.items)
   }
 
-  const parser = new Parser({ timeout: 8000, headers: { 'User-Agent': 'Mozilla/5.0 (compatible; RSSReader/1.0)' } })
+  const parser = new Parser({
+    timeout: 8000,
+    headers: { 'User-Agent': 'Mozilla/5.0 (compatible; RSSReader/1.0)' },
+    customFields: { item: [['description', 'rawDesc']] },
+  })
   const all: NewsItem[] = []
 
   await Promise.allSettled(
-    FEEDS.map(async ({ url, source }) => {
+    FEEDS.map(async ({ url, source, category, filtered }) => {
       try {
         const feed = await parser.parseURL(url)
         for (const item of feed.items || []) {
           const title = item.title?.trim() || ''
           if (!title) continue
-          if (!matchesKeyword(title)) continue
+          if (filtered && !matchesFinance(title)) continue
           const iso = item.isoDate || item.pubDate || ''
+          const rawDesc: string = (item as Record<string, unknown>).rawDesc as string || ''
+          const summary = rawDesc
+            ? rawDesc.replace(/<[^>]+>/g, '').trim().slice(0, 220)
+            : (item.contentSnippet || '').slice(0, 220)
           all.push({
             title,
             link: item.link || url,
-            source: feed.title ? `${feed.title}` : source,
-            pubDate: iso ? new Date(iso).toLocaleDateString('ru-RU', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' }) : '',
+            source,
+            pubDate: iso
+              ? new Date(iso).toLocaleDateString('ru-RU', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })
+              : '',
             isoDate: iso,
+            category,
+            summary: summary || undefined,
           })
         }
       } catch {
-        // skip silently
+        // skip failed feeds silently
       }
     })
   )
 
-  // Deduplicate by title similarity, sort by date desc, take top 10
   const seen = new Set<string>()
   const deduped = all.filter(item => {
     const key = item.title.slice(0, 60).toLowerCase()
@@ -96,7 +109,7 @@ export async function GET() {
     return tb - ta
   })
 
-  const items = deduped.slice(0, 10)
+  const items = deduped.slice(0, 40)
   cache = { items, ts: Date.now() }
 
   return NextResponse.json(items)
