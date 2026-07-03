@@ -5,7 +5,7 @@ import { supabase } from '@/supabase/client'
 import { apiFetch } from '@/lib/api-fetch'
 import { Plus, FileText, Download, Eye, Trash2, X, Loader2, CheckCircle2, AlertCircle, Filter, Upload, Edit2 } from 'lucide-react'
 
-interface Collateral { type: string; description: string; value: number }
+interface Collateral { type: string; description: string; address?: string; value: number }
 
 interface CreditConclusion {
   id: string
@@ -65,6 +65,11 @@ interface CreditConclusion {
   additional_info?: string
   collaterals: Collateral[]
   guarantors?: { name: string; inn: string; relation: string }[]
+  sme_sector_portfolio?: number
+  bank_total_portfolio?: number
+  current_par30_pct?: number
+  ra_conc_limit?: number
+  ra_par30_limit?: number
   ai_conclusion: string; recommendation: string; risk_level: string; created_at: string
 }
 
@@ -145,70 +150,6 @@ const TYPE_SHORT: Record<string, string> = {
   'Смена залога': 'Смена залога',
 }
 
-// ─── Sub-components OUTSIDE main component (prevent focus loss on re-render) ───
-
-interface FRProps {
-  label: string; f1?: string; f2?: string
-  bold?: boolean; auto?: boolean; v1?: number; v2?: number
-  formData: Record<string, string>; setF: (k: string, v: string) => void
-}
-
-function FR({ label, f1, f2, bold, auto, v1, v2, formData, setF }: FRProps) {
-  const fmt = (n: number) => new Intl.NumberFormat('ru-RU').format(Math.round(n || 0))
-  const cls = "w-full px-2 py-2 border border-gray-200 rounded text-sm focus:outline-none focus:ring-2 focus:ring-[#1B8A4C] text-right bg-white"
-
-  const fmtInput = (raw: string) => {
-    if (!raw) return ''
-    const isNeg = raw.startsWith('-')
-    const digits = raw.replace(/[^0-9]/g, '')
-    if (!digits) return isNeg ? '-' : ''
-    return (isNeg ? '-' : '') + new Intl.NumberFormat('ru-RU').format(Number(digits))
-  }
-  const parseInput = (val: string) => val.replace(/[^0-9-]/g, '')
-
-  return (
-    <tr className={bold ? 'bg-gray-50' : 'hover:bg-blue-50/20'}>
-      <td className={`px-3 py-2 text-xs ${bold ? 'font-semibold text-gray-800' : 'text-gray-600'}`}>{label}</td>
-      <td className="px-2 py-1">
-        {auto
-          ? <div className={`text-sm font-bold text-right pr-2 ${(v1||0) < 0 ? 'text-red-600' : bold ? 'text-[#1B8A4C]' : 'text-gray-900'}`}>{fmt(v1||0)}</div>
-          : <input type="text" inputMode="numeric"
-              value={f1 ? fmtInput(formData[f1] || '') : ''}
-              onChange={e => f1 && setF(f1, parseInput(e.target.value))}
-              className={cls} placeholder="0" />}
-      </td>
-      <td className="px-2 py-1">
-        {auto
-          ? <div className={`text-sm font-bold text-right pr-2 ${(v2||0) < 0 ? 'text-red-600' : bold ? 'text-[#1B8A4C]' : 'text-gray-900'}`}>{fmt(v2||0)}</div>
-          : <input type="text" inputMode="numeric"
-              value={f2 ? fmtInput(formData[f2] || '') : ''}
-              onChange={e => f2 && setF(f2, parseInput(e.target.value))}
-              className={cls} placeholder="0" />}
-      </td>
-    </tr>
-  )
-}
-
-interface FTProps { title: string; p1: string; p2: string; children: React.ReactNode }
-
-function FT({ title, p1, p2, children }: FTProps) {
-  return (
-    <div className="mb-5">
-      <h3 className="text-xs font-bold text-gray-500 uppercase tracking-wide mb-2">{title}</h3>
-      <table className="w-full border border-gray-200 rounded-lg overflow-hidden">
-        <thead>
-          <tr className="bg-[#1B8A4C] text-white">
-            <th className="text-left px-3 py-2 text-xs font-medium w-1/2">Показатель</th>
-            <th className="text-center px-3 py-2 text-xs font-medium w-1/4">{p1 || 'Период 1'}</th>
-            <th className="text-center px-3 py-2 text-xs font-medium w-1/4">{p2 || 'Период 2'}</th>
-          </tr>
-        </thead>
-        <tbody className="divide-y divide-gray-100">{children}</tbody>
-      </table>
-    </div>
-  )
-}
-
 // ─── Main component ───
 
 export default function CreditRiskPage() {
@@ -216,7 +157,7 @@ export default function CreditRiskPage() {
   const [loading, setLoading] = useState(true)
   const [showModal, setShowModal] = useState(false)
   const [form, setForm] = useState<Record<string, string>>(EMPTY)
-  const [collaterals, setCollaterals] = useState<Collateral[]>([{ type: 'Недвижимость', description: '', value: 0 }])
+  const [collaterals, setCollaterals] = useState<Collateral[]>([{ type: 'Недвижимость', description: '', address: '', value: 0 }])
   const [guarantors, setGuarantors] = useState<{name: string; inn: string; relation: string}[]>([])
   const [generating, setGenerating] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -341,6 +282,21 @@ export default function CreditRiskPage() {
   const concViolates  = raConc  > 0 && concSme    > raConc
   const par30Violates = raPar30 > 0 && par30After > raPar30
 
+  // ── Financial ratios (for Tab 2 — populated via image extraction) ──
+  const rv = (v: number) => isFinite(v) && !isNaN(v) ? v.toFixed(2) : '—'
+  const pv = (v: number) => isFinite(v) && !isNaN(v) ? v.toFixed(1) + '%' : '—'
+  const p1_curr_ratio = p1_total_cl > 0 ? p1_total_ca / p1_total_cl : NaN
+  const p2_curr_ratio = p2_total_cl > 0 ? p2_total_ca / p2_total_cl : NaN
+  const p1_quick_ratio = p1_total_cl > 0 ? (p1_total_ca - n('p1_inventory')) / p1_total_cl : NaN
+  const p2_quick_ratio = p2_total_cl > 0 ? (p2_total_ca - n('p2_inventory')) / p2_total_cl : NaN
+  const p1_leverage = p1_total_liab > 0 ? p1_total_equity / p1_total_liab : NaN
+  const p2_leverage = p2_total_liab > 0 ? p2_total_equity / p2_total_liab : NaN
+  const p1_roa = p1_total_assets > 0 ? (p1_net / p1_total_assets) * 100 : NaN
+  const p2_roa = p2_total_assets > 0 ? (p2_net / p2_total_assets) * 100 : NaN
+  const p1_roe = p1_total_equity > 0 ? (p1_net / p1_total_equity) * 100 : NaN
+  const p2_roe = p2_total_equity > 0 ? (p2_net / p2_total_equity) * 100 : NaN
+  const hasFinData = p1_total_assets > 0 || n('p1_net_rev') > 0
+
   function handleEdit(c: CreditConclusion) {
     // 0 → '' so empty inputs look blank, not "0"
     const s = (v: number | null | undefined) => (v != null && v !== 0) ? String(Math.round(v)) : ''
@@ -432,9 +388,14 @@ export default function CreditRiskPage() {
       p2_cf_dividends: s(c.p2_cf_dividends), p2_cf_loans_out: s(c.p2_cf_loans_out) || s(c.p2_fin_outflow),
       p2_cf_buyback: s(c.p2_cf_buyback), p2_cf_other_fin_out: s(c.p2_cf_other_fin_out),
       p2_cf_fx: s(c.p2_cf_fx), p2_cf_cash_begin: s(c.p2_cf_cash_begin) || s(c.p2_cash_begin),
+      sme_sector_portfolio: c.sme_sector_portfolio ? String(Math.round(c.sme_sector_portfolio)) : '',
+      bank_total_portfolio: c.bank_total_portfolio ? String(Math.round(c.bank_total_portfolio)) : '',
+      current_par30_pct: c.current_par30_pct ? String(c.current_par30_pct) : '',
+      ra_conc_limit: c.ra_conc_limit ? String(c.ra_conc_limit) : '',
+      ra_par30_limit: c.ra_par30_limit ? String(c.ra_par30_limit) : '',
       additional_info: c.additional_info || '',
     })
-    setCollaterals(c.collaterals?.length ? c.collaterals : [{ type: 'Недвижимость', description: '', value: 0 }])
+    setCollaterals(c.collaterals?.length ? c.collaterals.map(col => ({ ...col, address: col.address || '' })) : [{ type: 'Недвижимость', description: '', address: '', value: 0 }])
     setGuarantors(c.guarantors || [])
     setEditingId(c.id)
     setEditingNumber(c.conclusion_number || null)
@@ -449,7 +410,7 @@ export default function CreditRiskPage() {
   function closeModal() {
     setShowModal(false)
     setForm(EMPTY)
-    setCollaterals([{ type: 'Недвижимость', description: '', value: 0 }])
+    setCollaterals([{ type: 'Недвижимость', description: '', address: '', value: 0 }])
     setGuarantors([])
     setEditingId(null)
     setEditingNumber(null)
@@ -580,6 +541,11 @@ export default function CreditRiskPage() {
         p2_cf_other_fin_out: n('p2_cf_other_fin_out'), p2_cf_fx: n('p2_cf_fx'), p2_cf_cash_begin: n('p2_cf_cash_begin'),
         p2_cash_end,
         collaterals, guarantors,
+        sme_sector_portfolio: n('sme_sector_portfolio') || null,
+        bank_total_portfolio: n('bank_total_portfolio') || null,
+        current_par30_pct: parseFloat(form.current_par30_pct) || null,
+        ra_conc_limit: raConc || null,
+        ra_par30_limit: raPar30 || null,
         additional_info: form.additional_info || null,
         ai_conclusion: data.conclusion,
         recommendation: data.recommendation, risk_level: data.risk_level,
@@ -789,39 +755,174 @@ export default function CreditRiskPage() {
               </div>
               <button onClick={() => setViewing(null)}><X className="w-5 h-5 text-gray-400" /></button>
             </div>
-            <div className="flex-1 overflow-y-auto p-6 space-y-4">
-              <div className="grid grid-cols-2 gap-3">
-                {[
-                  ['Заёмщик', viewing.borrower_name],
-                  viewing.conclusion_type === 'Увеличение кредитной линии' && viewing.existing_loan_balance
-                    ? ['Действующий лимит', `${fmt(viewing.existing_loan_balance)} ${viewing.loan_currency}`]
-                    : null,
-                  viewing.conclusion_type === 'Увеличение кредитной линии' && viewing.loan_amount
-                    ? ['Желаемый лимит', `${fmt(viewing.loan_amount)} ${viewing.loan_currency}`]
-                    : viewing.conclusion_type === 'Смена залога'
-                    ? (viewing.existing_loan_balance ? ['Остаток кредита', `${fmt(viewing.existing_loan_balance)} ${viewing.loan_currency}`] : null)
-                    : (viewing.loan_amount ? ['Сумма линии', `${fmt(viewing.loan_amount)} ${viewing.loan_currency}`] : null),
-                  ['Срок линии', viewing.loan_term || '—'],
-                  ['Ставка', viewing.interest_rate ? `${viewing.interest_rate}%` : '—'],
-                  ['Бизнес', viewing.business_type || '—'],
-                  ['Лет', String(viewing.years_in_business || '—')],
-                  ['Выручка П1', `${fmt(viewing.p1_net_rev ?? viewing.p1_revenue ?? 0)} TJS`],
-                  ['Выручка П2', `${fmt(viewing.p2_net_rev ?? viewing.p2_revenue ?? 0)} TJS`],
-                  ['Прибыль П1', `${fmt(viewing.p1_net_profit ?? 0)} TJS`],
-                  ['Прибыль П2', `${fmt(viewing.p2_net_profit ?? 0)} TJS`],
-                  ['Уровень риска', viewing.risk_level || '—'],
-                  ['Аналитик', viewing.analyst_name || '—'],
-                ].filter((x): x is string[] => x !== null).map(([l, v]) => <div key={String(l)}><p className="text-xs text-gray-500">{l}</p><p className="text-sm font-medium text-gray-900 mt-0.5">{v}</p></div>)}
+            <div className="flex-1 overflow-y-auto p-6 space-y-5">
+
+              {/* 1. Общая информация */}
+              <div>
+                <p className="text-xs font-bold text-gray-500 uppercase tracking-wide border-b border-gray-100 pb-1 mb-3">1. Общая информация</p>
+                <div className="grid grid-cols-2 gap-3">
+                  {[
+                    ['Заёмщик', viewing.borrower_name],
+                    ['Кредитная история', viewing.credit_history || '—'],
+                    ['Сектор бизнеса', viewing.sector || '—'],
+                    ['Вид деятельности', viewing.business_type || '—'],
+                    viewing.conclusion_type === 'Увеличение кредитной линии'
+                      ? ['Действ. / Желаемый лимит', `${fmt(viewing.existing_loan_balance)} / ${fmt(viewing.loan_amount)} ${viewing.loan_currency}`]
+                      : viewing.conclusion_type === 'Смена залога'
+                      ? ['Остаток кредита', `${fmt(viewing.existing_loan_balance)} ${viewing.loan_currency}`]
+                      : ['Сумма линии', `${fmt(viewing.loan_amount)} ${viewing.loan_currency}`],
+                    ['Тип операции', viewing.conclusion_type || '—'],
+                    ['Цель', viewing.loan_purpose || '—'],
+                    ['Менеджер', viewing.analyst_name || '—'],
+                  ].filter((x): x is string[] => x !== null).map(([l, v]) => (
+                    <div key={String(l)}><p className="text-xs text-gray-500">{l}</p><p className="text-sm font-medium text-gray-900 mt-0.5">{v}</p></div>
+                  ))}
+                </div>
               </div>
-              <div><p className="text-xs font-semibold text-gray-700 uppercase tracking-wide mb-2">AI Заключение</p>
+
+              {/* 2. Залог */}
+              <div>
+                <p className="text-xs font-bold text-gray-500 uppercase tracking-wide border-b border-gray-100 pb-1 mb-3">2. Залог</p>
+                {(viewing.collaterals || []).length === 0
+                  ? <p className="text-xs text-gray-400">Залог не указан</p>
+                  : <div className="space-y-2">
+                    {(viewing.collaterals || []).map((col, i) => (
+                      <div key={i} className="flex items-start gap-3 p-3 bg-gray-50 rounded-lg">
+                        <span className="text-xs font-bold text-gray-400 mt-0.5">#{i+1}</span>
+                        <div className="flex-1 grid grid-cols-2 gap-x-4 gap-y-1">
+                          <div><p className="text-[10px] text-gray-400">Тип</p><p className="text-xs font-medium">{col.type}</p></div>
+                          <div><p className="text-[10px] text-gray-400">Стоимость</p><p className="text-xs font-medium">{fmt(col.value)} TJS</p></div>
+                          {col.description && <div><p className="text-[10px] text-gray-400">Описание</p><p className="text-xs">{col.description}</p></div>}
+                          {col.address && <div><p className="text-[10px] text-gray-400">Адрес</p><p className="text-xs">{col.address}</p></div>}
+                        </div>
+                      </div>
+                    ))}
+                    <div className="flex justify-between text-xs px-1 pt-1">
+                      <span className="text-gray-500">Итого залог:</span>
+                      <span className="font-bold text-gray-900">{fmt((viewing.collaterals || []).reduce((s, c) => s + (c.value || 0), 0))} TJS</span>
+                    </div>
+                  </div>
+                }
+              </div>
+
+              {/* 3. Финансовые коэффициенты */}
+              {(() => {
+                const vca = (viewing.p1_cash_desk||0)+(viewing.p1_cash_bank||0)+(viewing.p1_st_invest||0)+(viewing.p1_trade_rec||0)+(viewing.p1_other_rec||0)+(viewing.p1_founder_rec||0)+(viewing.p1_inventory||0)+(viewing.p1_prepaid||0)+(viewing.p1_nca_sale||0) || (viewing.p1_cash||0)+(viewing.p1_receivables||0)+(viewing.p1_inventory||0)
+                const v2ca = (viewing.p2_cash_desk||0)+(viewing.p2_cash_bank||0)+(viewing.p2_st_invest||0)+(viewing.p2_trade_rec||0)+(viewing.p2_other_rec||0)+(viewing.p2_founder_rec||0)+(viewing.p2_inventory||0)+(viewing.p2_prepaid||0)+(viewing.p2_nca_sale||0) || (viewing.p2_cash||0)+(viewing.p2_receivables||0)+(viewing.p2_inventory||0)
+                const vnca = (viewing.p1_ppe||0)+(viewing.p1_nat_res||0)+(viewing.p1_intangibles||0)+(viewing.p1_bio_assets||0)+(viewing.p1_invest_prop||0)+(viewing.p1_lt_invest||0)+(viewing.p1_def_tax_asset||0)+(viewing.p1_lt_rec||0) || (viewing.p1_fixed_assets||0)+(viewing.p1_other_assets||0)
+                const v2nca = (viewing.p2_ppe||0)+(viewing.p2_nat_res||0)+(viewing.p2_intangibles||0)+(viewing.p2_bio_assets||0)+(viewing.p2_invest_prop||0)+(viewing.p2_lt_invest||0)+(viewing.p2_def_tax_asset||0)+(viewing.p2_lt_rec||0) || (viewing.p2_fixed_assets||0)+(viewing.p2_other_assets||0)
+                const va = vca + vnca; const v2a = v2ca + v2nca
+                const vcl = (viewing.p1_trade_pay||0)+(viewing.p1_st_debt||0)+(viewing.p1_accrued||0)+(viewing.p1_taxes_pay||0)+(viewing.p1_exp_reserves||0)+(viewing.p1_other_st_liab||0) || (viewing.p1_supplier_debt||0)+(viewing.p1_bank_debt||0)
+                const v2cl = (viewing.p2_trade_pay||0)+(viewing.p2_st_debt||0)+(viewing.p2_accrued||0)+(viewing.p2_taxes_pay||0)+(viewing.p2_exp_reserves||0)+(viewing.p2_other_st_liab||0) || (viewing.p2_supplier_debt||0)+(viewing.p2_bank_debt||0)
+                const ve = (viewing.p1_charter_cap||0)+(viewing.p1_add_cap||0)+(viewing.p1_retained||0)+(viewing.p1_reserve_cap||0)+(viewing.p1_minority||0) || (viewing.p1_equity_capital||0)+(viewing.p1_reserves||0)+(viewing.p1_retained_earnings||0)
+                const v2e = (viewing.p2_charter_cap||0)+(viewing.p2_add_cap||0)+(viewing.p2_retained||0)+(viewing.p2_reserve_cap||0)+(viewing.p2_minority||0) || (viewing.p2_equity_capital||0)+(viewing.p2_reserves||0)+(viewing.p2_retained_earnings||0)
+                const vrev = (viewing.p1_net_rev||0)||(viewing.p1_revenue||0); const v2rev = (viewing.p2_net_rev||0)||(viewing.p2_revenue||0)
+                const vnet = (viewing.p1_net_profit||0); const v2net = (viewing.p2_net_profit||0)
+                const vr = (v: number) => isFinite(v) && !isNaN(v) && v !== 0 ? v.toFixed(2) : '—'
+                const vp = (v: number) => isFinite(v) && !isNaN(v) && v !== 0 ? v.toFixed(1)+'%' : '—'
+                if (va === 0 && vrev === 0) return null
+                const ctl1 = vcl > 0 ? vca/vcl : NaN; const ctl2 = v2cl > 0 ? v2ca/v2cl : NaN
+                const roa2 = v2a > 0 ? (v2net/v2a)*100 : NaN
+                const roe2 = v2e > 0 ? (v2net/v2e)*100 : NaN
+                return (
+                  <div>
+                    <p className="text-xs font-bold text-gray-500 uppercase tracking-wide border-b border-gray-100 pb-1 mb-3">3. Финансовые коэффициенты</p>
+                    <div className="overflow-hidden rounded-lg border border-gray-200">
+                      <table className="w-full text-xs">
+                        <thead><tr className="bg-gray-50 text-gray-500"><th className="text-left px-3 py-1.5 font-medium">Показатель</th><th className="text-center px-2 py-1.5">П1</th><th className="text-center px-2 py-1.5">П2</th><th className="text-center px-2 py-1.5">Норма</th></tr></thead>
+                        <tbody className="divide-y divide-gray-100">
+                          {vrev > 0 && <tr><td className="px-3 py-1.5 text-gray-600">Чистая выручка</td><td className="text-center px-2 py-1.5">{fmt(vrev)}</td><td className="text-center px-2 py-1.5 font-medium">{fmt(v2rev)}</td><td className="text-center px-2 py-1.5 text-gray-400">—</td></tr>}
+                          {(vnet !== 0 || v2net !== 0) && <tr><td className="px-3 py-1.5 text-gray-600">Чистая прибыль</td><td className="text-center px-2 py-1.5">{fmt(vnet)}</td><td className="text-center px-2 py-1.5 font-medium">{fmt(v2net)}</td><td className="text-center px-2 py-1.5 text-gray-400">&gt;0</td></tr>}
+                          {vcl > 0 && <tr><td className="px-3 py-1.5 text-gray-600">Ктл (ликвидность)</td><td className="text-center px-2 py-1.5">{vr(ctl1)}</td><td className="text-center px-2 py-1.5 font-medium">{vr(ctl2)}</td><td className="text-center px-2 py-1.5 text-gray-400">&gt;2.0</td></tr>}
+                          {v2a > 0 && <tr><td className="px-3 py-1.5 text-gray-600">ROA</td><td className="text-center px-2 py-1.5">—</td><td className="text-center px-2 py-1.5 font-medium">{vp(roa2)}</td><td className="text-center px-2 py-1.5 text-gray-400">&gt;6%</td></tr>}
+                          {v2e > 0 && <tr><td className="px-3 py-1.5 text-gray-600">ROE</td><td className="text-center px-2 py-1.5">—</td><td className="text-center px-2 py-1.5 font-medium">{vp(roe2)}</td><td className="text-center px-2 py-1.5 text-gray-400">&gt;20%</td></tr>}
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+                )
+              })()}
+
+              {/* 4. Концентрация */}
+              {(viewing.sme_sector_portfolio || viewing.bank_total_portfolio) && (
+                <div>
+                  <p className="text-xs font-bold text-gray-500 uppercase tracking-wide border-b border-gray-100 pb-1 mb-3">4. Концентрация</p>
+                  <div className="grid grid-cols-2 gap-3">
+                    {viewing.sme_sector_portfolio && viewing.loan_amount ? (
+                      <div className={`p-3 rounded-xl border-2 ${viewing.ra_conc_limit && (viewing.loan_amount/viewing.sme_sector_portfolio*100) > viewing.ra_conc_limit ? 'bg-red-50 border-red-300' : 'bg-green-50 border-green-300'}`}>
+                        <p className="text-xs text-gray-500 mb-1">Доля в портфеле SME</p>
+                        <p className="text-xl font-bold text-gray-900">{(viewing.loan_amount/viewing.sme_sector_portfolio*100).toFixed(2)}%</p>
+                        {viewing.ra_conc_limit && <p className="text-[10px] text-gray-400 mt-0.5">Лимит: {viewing.ra_conc_limit}%</p>}
+                      </div>
+                    ) : null}
+                    {viewing.bank_total_portfolio && viewing.loan_amount ? (
+                      <div className="p-3 rounded-xl border-2 bg-blue-50 border-blue-200">
+                        <p className="text-xs text-gray-500 mb-1">Доля от портфеля банка</p>
+                        <p className="text-xl font-bold text-blue-700">{(viewing.loan_amount/viewing.bank_total_portfolio*100).toFixed(2)}%</p>
+                        <p className="text-[10px] text-gray-400 mt-0.5">Инфо</p>
+                      </div>
+                    ) : null}
+                  </div>
+                </div>
+              )}
+
+              {/* 5. Риск-аппетит */}
+              {viewing.current_par30_pct != null && viewing.bank_total_portfolio && viewing.loan_amount ? (
+                <div>
+                  <p className="text-xs font-bold text-gray-500 uppercase tracking-wide border-b border-gray-100 pb-1 mb-3">5. Риск-аппетит (PAR30)</p>
+                  {(() => {
+                    const delta = viewing.loan_amount / viewing.bank_total_portfolio * 100
+                    const after = (viewing.current_par30_pct || 0) + delta
+                    const violates = viewing.ra_par30_limit && after > viewing.ra_par30_limit
+                    return (
+                      <div className={`p-3 rounded-xl border-2 ${violates ? 'bg-red-50 border-red-300' : 'bg-green-50 border-green-300'}`}>
+                        <div className="grid grid-cols-3 gap-2 text-xs text-center">
+                          <div><p className="text-gray-400">PAR30 сейчас</p><p className="font-bold text-lg">{viewing.current_par30_pct?.toFixed(2)}%</p></div>
+                          <div><p className="text-gray-400">Прирост</p><p className="font-bold text-lg text-orange-600">+{delta.toFixed(2)}%</p></div>
+                          <div><p className="text-gray-400">PAR30 после</p><p className={`font-bold text-lg ${violates ? 'text-red-700' : 'text-green-700'}`}>{after.toFixed(2)}%</p></div>
+                        </div>
+                        {viewing.ra_par30_limit && (
+                          <p className={`text-xs font-bold mt-2 ${violates ? 'text-red-700' : 'text-green-700'}`}>
+                            {violates ? `❌ Нарушает лимит ${viewing.ra_par30_limit}%` : `✅ В пределах лимита ${viewing.ra_par30_limit}%`}
+                          </p>
+                        )}
+                      </div>
+                    )
+                  })()}
+                </div>
+              ) : null}
+
+              {/* 6. AI Заключение */}
+              <div>
+                <p className="text-xs font-bold text-gray-500 uppercase tracking-wide border-b border-gray-100 pb-1 mb-2">6. Заключение СУР</p>
                 <div className="bg-blue-50 border border-blue-100 rounded-lg p-4">
                   <p className="text-sm text-gray-800 whitespace-pre-wrap">{viewing.ai_conclusion}</p>
                 </div>
               </div>
+
+              {/* 7. Рекомендация */}
               <div className={`p-4 rounded-xl border-2 ${viewing.recommendation?.includes('Отклонить') ? 'bg-red-50 border-red-200' : viewing.recommendation?.includes('Условно') ? 'bg-yellow-50 border-yellow-200' : 'bg-green-50 border-green-200'}`}>
                 <p className="text-xs text-gray-500 mb-1">Рекомендация</p>
                 <p className={`text-xl font-bold ${recColor(viewing.recommendation)}`}>{viewing.recommendation}</p>
               </div>
+
+              {/* 8. Подписи */}
+              <div>
+                <p className="text-xs font-bold text-gray-500 uppercase tracking-wide border-b border-gray-100 pb-1 mb-3">8. Подписи</p>
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="p-3 bg-gray-50 rounded-lg">
+                    <p className="text-[10px] text-gray-400 uppercase tracking-wide">Руководитель СУР</p>
+                    <p className="text-sm font-semibold text-gray-900 mt-1">Сангинова Ф.</p>
+                    <p className="text-xs text-gray-400 mt-2 border-t border-dashed border-gray-300 pt-2">Подпись ________________</p>
+                  </div>
+                  <div className="p-3 bg-gray-50 rounded-lg">
+                    <p className="text-[10px] text-gray-400 uppercase tracking-wide">Менеджер</p>
+                    <p className="text-sm font-semibold text-gray-900 mt-1">{viewing.analyst_name || '—'}</p>
+                    <p className="text-xs text-gray-400 mt-2 border-t border-dashed border-gray-300 pt-2">Подпись ________________</p>
+                  </div>
+                </div>
+              </div>
+
             </div>
             <div className="flex justify-end gap-3 p-6 border-t border-gray-100">
               <button onClick={() => downloadWord(viewing)} className="flex items-center gap-2 px-4 py-2 bg-[#1B8A4C] text-white rounded-lg text-sm font-medium hover:bg-[#177040]"><Download className="w-4 h-4" /> Word</button>
@@ -864,7 +965,7 @@ export default function CreditRiskPage() {
             {/* Tabs — only in manual mode */}
             {inputMode === 'manual' && (
             <div className="flex border-b border-gray-100 px-2">
-              {[{n:1,t:'Заёмщик'},{n:2,t:'Баланс'},{n:3,t:'ОПУ'},{n:4,t:'КешФлоу'},{n:5,t:'Залог'},{n:6,t:'Концентрация'},{n:7,t:'Дополнение'}].map(({n:tn,t}) => (
+              {[{n:1,t:'Заёмщик'},{n:2,t:'Фин. коэф.'},{n:3,t:'Залог'},{n:4,t:'Концентрация'},{n:5,t:'Риск-аппетит'},{n:6,t:'Дополнение'}].map(({n:tn,t}) => (
                 <button key={tn} onClick={() => setTab(tn)}
                   className={`px-3 py-3 text-xs font-semibold border-b-2 whitespace-nowrap transition-colors flex-shrink-0 ${tab === tn ? 'border-[#1B8A4C] text-[#1B8A4C]' : 'border-transparent text-gray-500 hover:text-gray-700'}`}>
                   {t}
@@ -961,8 +1062,6 @@ export default function CreditRiskPage() {
                     </select>
                   </div>
                   <div><label className={lbl}>Вид деятельности (детально)</label><input type="text" value={form.business_type} onChange={e => setF('business_type', e.target.value)} placeholder="Торговля стройматериалами..." className={inp} /></div>
-                  <div><label className={lbl}>Лет в бизнесе</label><input type="text" inputMode="numeric" value={form.years_in_business} onChange={e => setF('years_in_business', e.target.value.replace(/\D/g,''))} className={inp} /></div>
-
                   {/* Поля суммы — зависят от типа заключения */}
                   {isCollateralChange ? (
                     <div>
@@ -1008,20 +1107,7 @@ export default function CreditRiskPage() {
 
                   <div><label className={lbl}>Валюта</label><select value={form.loan_currency} onChange={e => setF('loan_currency', e.target.value)} className={inp}>{CURRENCIES.map(c => <option key={c}>{c}</option>)}</select></div>
 
-                  {!isCollateralChange && <>
-                    <div><label className={lbl}>Срок линии (месяцев)</label><input type="text" inputMode="numeric" value={form.loan_term_months} onChange={e => setF('loan_term_months', e.target.value.replace(/\D/g,''))} placeholder="12" className={inp} /></div>
-                    <div><label className={lbl}>Процентная ставка (% годовых)</label><input type="text" inputMode="decimal" value={form.interest_rate} onChange={e => setF('interest_rate', e.target.value.replace(/[^0-9.]/g,''))} placeholder="24" className={inp} /></div>
-                    {form.loan_amount && form.loan_term_months && (
-                      <div className="lg:col-span-2 bg-blue-50 border border-blue-100 rounded-lg p-3 flex items-center justify-between">
-                        <p className="text-xs text-gray-600">Ежемесячное погашение (аннуитет):</p>
-                        <p className="text-base font-bold text-[#1B8A4C]">{new Intl.NumberFormat('ru-RU').format(monthlyPayment)} {form.loan_currency}/мес</p>
-                      </div>
-                    )}
-                  </>}
-
-                  <div><label className={lbl}>Аналитик</label><input type="text" value={form.analyst_name} onChange={e => setF('analyst_name', e.target.value)} placeholder="ФИО" className={inp} /></div>
-                  <div><label className={lbl}>Название периода 1 (напр. 31.12.2024)</label><input type="text" value={form.p1_label} onChange={e => setF('p1_label', e.target.value)} placeholder="31.12.2024" className={inp} /></div>
-                  <div><label className={lbl}>Название периода 2 (напр. 31.03.2025)</label><input type="text" value={form.p2_label} onChange={e => setF('p2_label', e.target.value)} placeholder="31.03.2025" className={inp} /></div>
+                  <div><label className={lbl}>Менеджер</label><input type="text" value={form.analyst_name} onChange={e => setF('analyst_name', e.target.value)} placeholder="ФИО" className={inp} /></div>
                   <div className="lg:col-span-2">
                     <label className={lbl}>
                       {isCollateralChange ? 'Причина смены залога *' : isIncrease ? 'Обоснование увеличения лимита *' : 'Цель кредитной линии *'}
@@ -1033,155 +1119,64 @@ export default function CreditRiskPage() {
                 </div>
               )}
 
-              {/* Tab 2: Баланс — Форма №1 (МФ РТ Приказ №42) */}
+              {/* Tab 2: Финансовые коэффициенты */}
               {tab === 2 && (
-                <div className="space-y-2">
-                  <FT title="РАЗДЕЛ 1. КРАТКОСРОЧНЫЕ АКТИВЫ" p1={p1} p2={p2}>
-                    <FR label="Денежные средства в кассе (10100)" f1="p1_cash_desk" f2="p2_cash_desk" formData={form} setF={setF} />
-                    <FR label="Денежные средства в банках (10200)" f1="p1_cash_bank" f2="p2_cash_bank" formData={form} setF={setF} />
-                    <FR label="Краткосрочные инвестиции (10300)" f1="p1_st_invest" f2="p2_st_invest" formData={form} setF={setF} />
-                    <FR label="Торговая дебиторская задолженность (10400)" f1="p1_trade_rec" f2="p2_trade_rec" formData={form} setF={setF} />
-                    <FR label="Прочая дебиторская задолженность (10500)" f1="p1_other_rec" f2="p2_other_rec" formData={form} setF={setF} />
-                    <FR label="Задолженность учредителей (10600)" f1="p1_founder_rec" f2="p2_founder_rec" formData={form} setF={setF} />
-                    <FR label="Товарно-материальные запасы (10700)" f1="p1_inventory" f2="p2_inventory" formData={form} setF={setF} />
-                    <FR label="Расходы будущих периодов (10800)" f1="p1_prepaid" f2="p2_prepaid" formData={form} setF={setF} />
-                    <FR label="Долгосрочные активы для продажи (10900)" f1="p1_nca_sale" f2="p2_nca_sale" formData={form} setF={setF} />
-                    <FR label="Итого краткосрочных активов" bold auto v1={p1_total_ca} v2={p2_total_ca} formData={form} setF={setF} />
-                  </FT>
-                  <FT title="РАЗДЕЛ 2. ДОЛГОСРОЧНЫЕ АКТИВЫ" p1={p1} p2={p2}>
-                    <FR label="Основные средства (11000)" f1="p1_ppe" f2="p2_ppe" formData={form} setF={setF} />
-                    <FR label="Природные ресурсы (11200)" f1="p1_nat_res" f2="p2_nat_res" formData={form} setF={setF} />
-                    <FR label="Нематериальные активы (11300)" f1="p1_intangibles" f2="p2_intangibles" formData={form} setF={setF} />
-                    <FR label="Биологические активы (11400)" f1="p1_bio_assets" f2="p2_bio_assets" formData={form} setF={setF} />
-                    <FR label="Инвестиционное имущество (11500)" f1="p1_invest_prop" f2="p2_invest_prop" formData={form} setF={setF} />
-                    <FR label="Долгосрочные инвестиции (11600)" f1="p1_lt_invest" f2="p2_lt_invest" formData={form} setF={setF} />
-                    <FR label="Отложенные налоговые активы (11700)" f1="p1_def_tax_asset" f2="p2_def_tax_asset" formData={form} setF={setF} />
-                    <FR label="Долгосрочная дебиторская задолженность (11800)" f1="p1_lt_rec" f2="p2_lt_rec" formData={form} setF={setF} />
-                    <FR label="Итого долгосрочных активов" bold auto v1={p1_total_nca} v2={p2_total_nca} formData={form} setF={setF} />
-                    <FR label="ИТОГО АКТИВЫ" bold auto v1={p1_total_assets} v2={p2_total_assets} formData={form} setF={setF} />
-                  </FT>
-                  <FT title="РАЗДЕЛ 3. КРАТКОСРОЧНЫЕ ОБЯЗАТЕЛЬСТВА" p1={p1} p2={p2}>
-                    <FR label="Торговая кредиторская задолженность (22000)" f1="p1_trade_pay" f2="p2_trade_pay" formData={form} setF={setF} />
-                    <FR label="Краткосрочные долговые обязательства (22100)" f1="p1_st_debt" f2="p2_st_debt" formData={form} setF={setF} />
-                    <FR label="Начисленные краткосрочные обязательства (22200)" f1="p1_accrued" f2="p2_accrued" formData={form} setF={setF} />
-                    <FR label="Налоговые обязательства (22300)" f1="p1_taxes_pay" f2="p2_taxes_pay" formData={form} setF={setF} />
-                    <FR label="Резервы на расходы (22400)" f1="p1_exp_reserves" f2="p2_exp_reserves" formData={form} setF={setF} />
-                    <FR label="Прочие краткосрочные обязательства (22500)" f1="p1_other_st_liab" f2="p2_other_st_liab" formData={form} setF={setF} />
-                    <FR label="Итого краткосрочных обязательств" bold auto v1={p1_total_cl} v2={p2_total_cl} formData={form} setF={setF} />
-                  </FT>
-                  <FT title="РАЗДЕЛ 4. ДОЛГОСРОЧНЫЕ ОБЯЗАТЕЛЬСТВА" p1={p1} p2={p2}>
-                    <FR label="Долгосрочные долговые обязательства (22600)" f1="p1_lt_debt" f2="p2_lt_debt" formData={form} setF={setF} />
-                    <FR label="Доходы будущих периодов (22700)" f1="p1_def_income" f2="p2_def_income" formData={form} setF={setF} />
-                    <FR label="Отложенные налоговые обязательства (22800)" f1="p1_def_tax_liab" f2="p2_def_tax_liab" formData={form} setF={setF} />
-                    <FR label="Итого долгосрочных обязательств" bold auto v1={p1_total_ll} v2={p2_total_ll} formData={form} setF={setF} />
-                    <FR label="ИТОГО ОБЯЗАТЕЛЬСТВА" bold auto v1={p1_total_liab} v2={p2_total_liab} formData={form} setF={setF} />
-                  </FT>
-                  <FT title="РАЗДЕЛ 5. СОБСТВЕННЫЙ КАПИТАЛ" p1={p1} p2={p2}>
-                    <FR label="Уставный капитал (33000)" f1="p1_charter_cap" f2="p2_charter_cap" formData={form} setF={setF} />
-                    <FR label="Дополнительный капитал (33100)" f1="p1_add_cap" f2="p2_add_cap" formData={form} setF={setF} />
-                    <FR label="Нераспределённая прибыль (33200)" f1="p1_retained" f2="p2_retained" formData={form} setF={setF} />
-                    <FR label="Резервный капитал (33300)" f1="p1_reserve_cap" f2="p2_reserve_cap" formData={form} setF={setF} />
-                    <FR label="Доля меньшинства (33400)" f1="p1_minority" f2="p2_minority" formData={form} setF={setF} />
-                    <FR label="Итого собственный капитал" bold auto v1={p1_total_equity} v2={p2_total_equity} formData={form} setF={setF} />
-                    <FR label="ИТОГО ПАССИВЫ" bold auto v1={p1_total_passiv} v2={p2_total_passiv} formData={form} setF={setF} />
-                  </FT>
-                  {(p1_total_assets > 0 || p2_total_assets > 0) && (
-                    <div className="grid grid-cols-2 gap-3">
-                      {[{period: p1, diff: p1_balance_diff, assets: p1_total_assets},{period: p2, diff: p2_balance_diff, assets: p2_total_assets}].map(({period, diff, assets}) => assets > 0 && (
-                        <div key={period} className={`p-3 rounded-lg border text-xs font-medium ${Math.abs(diff) < 1 ? 'bg-green-50 border-green-200 text-green-700' : 'bg-red-50 border-red-200 text-red-700'}`}>
-                          {period}: {Math.abs(diff) < 1 ? '✅ Баланс сходится' : `⚠️ Актив ≠ Пассив, разница: ${new Intl.NumberFormat('ru-RU').format(Math.round(Math.abs(diff)))}`}
-                        </div>
-                      ))}
+                <div className="space-y-4">
+                  <div className="p-3 bg-blue-50 border border-blue-100 rounded-lg flex items-start gap-3">
+                    <Upload className="w-4 h-4 text-blue-500 flex-shrink-0 mt-0.5" />
+                    <div>
+                      <p className="text-xs text-blue-700 font-medium">Финансовые коэффициенты из скриншота</p>
+                      <p className="text-xs text-blue-500 mt-0.5">Загрузите скриншот(ы) финансовой отчётности через вкладку «Загрузить скрин» — AI автоматически извлечёт данные и рассчитает коэффициенты ниже.</p>
+                    </div>
+                  </div>
+                  {!hasFinData ? (
+                    <div className="flex flex-col items-center justify-center py-10 text-center gap-3">
+                      <FileText className="w-10 h-10 text-gray-200" />
+                      <p className="text-sm text-gray-400">Нет финансовых данных</p>
+                      <p className="text-xs text-gray-300">Используйте «Загрузить скрин» для автозаполнения</p>
+                    </div>
+                  ) : (
+                    <div className="overflow-hidden rounded-xl border border-gray-200">
+                      <table className="w-full text-xs">
+                        <thead>
+                          <tr className="bg-[#1B8A4C] text-white">
+                            <th className="text-left px-3 py-2 font-medium">Показатель</th>
+                            <th className="text-center px-3 py-2 font-medium">{form.p1_label || 'П1'}</th>
+                            <th className="text-center px-3 py-2 font-medium">{form.p2_label || 'П2'}</th>
+                            <th className="text-center px-3 py-2 font-medium">Норма</th>
+                            <th className="text-center px-3 py-2 font-medium">Статус</th>
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y divide-gray-100">
+                          {[
+                            { label: 'Чистая выручка, TJS', v1: n('p1_net_rev') ? new Intl.NumberFormat('ru-RU').format(Math.round(n('p1_net_rev'))) : '—', v2: n('p2_net_rev') ? new Intl.NumberFormat('ru-RU').format(Math.round(n('p2_net_rev'))) : '—', norm: '—', ok: null },
+                            { label: 'Чистая прибыль, TJS', v1: new Intl.NumberFormat('ru-RU').format(Math.round(p1_net)), v2: new Intl.NumberFormat('ru-RU').format(Math.round(p2_net)), norm: '>0', ok: p2_net > 0 },
+                            { label: 'Ктл (текущая ликвидность)', v1: rv(p1_curr_ratio), v2: rv(p2_curr_ratio), norm: '>2.0', ok: isFinite(p2_curr_ratio) ? p2_curr_ratio > 2.0 : null },
+                            { label: 'Кбл (быстрая ликвидность)', v1: rv(p1_quick_ratio), v2: rv(p2_quick_ratio), norm: '>1.0', ok: isFinite(p2_quick_ratio) ? p2_quick_ratio > 1.0 : null },
+                            { label: 'ROA (рентабельность активов)', v1: pv(p1_roa), v2: pv(p2_roa), norm: '>6%', ok: isFinite(p2_roa) ? p2_roa > 6 : null },
+                            { label: 'ROE (рентабельность капитала)', v1: pv(p1_roe), v2: pv(p2_roe), norm: '>20%', ok: isFinite(p2_roe) ? p2_roe > 20 : null },
+                            { label: 'Кфин (леверидж Капитал/Долг)', v1: rv(p1_leverage), v2: rv(p2_leverage), norm: '≤0.5', ok: isFinite(p2_leverage) ? p2_leverage <= 0.5 : null },
+                            { label: 'Опер. ден. поток, TJS', v1: new Intl.NumberFormat('ru-RU').format(Math.round(p1_cf_net_op)), v2: new Intl.NumberFormat('ru-RU').format(Math.round(p2_cf_net_op)), norm: '>0', ok: p2_cf_net_op > 0 },
+                          ].map((row, i) => (
+                            <tr key={i} className="hover:bg-gray-50">
+                              <td className="px-3 py-2 text-gray-700 font-medium">{row.label}</td>
+                              <td className="px-3 py-2 text-center text-gray-600">{row.v1}</td>
+                              <td className="px-3 py-2 text-center text-gray-900 font-semibold">{row.v2}</td>
+                              <td className="px-3 py-2 text-center text-gray-400">{row.norm}</td>
+                              <td className="px-3 py-2 text-center">
+                                {row.ok === null ? <span className="text-gray-300">—</span> : row.ok ? <span className="text-green-600 font-bold">✓</span> : <span className="text-red-500 font-bold">✗</span>}
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
                     </div>
                   )}
                 </div>
               )}
 
-              {/* Tab 3: ОПУ — Форма №2 (МФ РТ Приказ №42) */}
-              {tab === 3 && (
-                <FT title="ОТЧЁТ О ПРИБЫЛЯХ И УБЫТКАХ — Форма №2" p1={p1} p2={p2}>
-                  <FR label="Чистый доход от продаж (010)" f1="p1_net_rev" f2="p2_net_rev" formData={form} setF={setF} />
-                  <FR label="Себестоимость продаж (020)" f1="p1_cogs" f2="p2_cogs" formData={form} setF={setF} />
-                  <FR label="▶ Валовая прибыль (030)" bold auto v1={p1_gross} v2={p2_gross} formData={form} setF={setF} />
-                  <FR label="Расходы на продажу (040)" f1="p1_sell_exp" f2="p2_sell_exp" formData={form} setF={setF} />
-                  <FR label="Административные расходы (050)" f1="p1_admin_exp" f2="p2_admin_exp" formData={form} setF={setF} />
-                  <FR label="▶ Итого операционные расходы (060)" bold auto v1={p1_total_op_exp} v2={p2_total_op_exp} formData={form} setF={setF} />
-                  <FR label="Прочие операционные доходы/(расходы) (070)" f1="p1_other_op" f2="p2_other_op" formData={form} setF={setF} />
-                  <FR label="▶ Операционная прибыль/(убыток) (080)" bold auto v1={p1_op_profit} v2={p2_op_profit} formData={form} setF={setF} />
-                  <FR label="Доходы/(расходы) по процентам (100)" f1="p1_interest_exp" f2="p2_interest_exp" formData={form} setF={setF} />
-                  <FR label="Доходы/(убыток) от инвестиций (110)" f1="p1_invest_inc" f2="p2_invest_inc" formData={form} setF={setF} />
-                  <FR label="Доходы/(убыток) от курсовых разниц (120)" f1="p1_fx_diff" f2="p2_fx_diff" formData={form} setF={setF} />
-                  <FR label="Доходы/(убыток) от обмена валюты (130)" f1="p1_currency_ex" f2="p2_currency_ex" formData={form} setF={setF} />
-                  <FR label="Доходы/(убыток) от выбытия активов (140)" f1="p1_asset_disp" f2="p2_asset_disp" formData={form} setF={setF} />
-                  <FR label="Убыток от обесценения (150)" f1="p1_impairment" f2="p2_impairment" formData={form} setF={setF} />
-                  <FR label="Прочие неоперационные доходы/(расходы) (160)" f1="p1_other_nonop" f2="p2_other_nonop" formData={form} setF={setF} />
-                  <FR label="▶ Итого неоперационных (170)" bold auto v1={p1_total_nonop} v2={p2_total_nonop} formData={form} setF={setF} />
-                  <FR label="Доля прибыли ассоц. компаний (180)" f1="p1_assoc_profit" f2="p2_assoc_profit" formData={form} setF={setF} />
-                  <FR label="▶ Прибыль до налогообложения (190)" bold auto v1={p1_ebt} v2={p2_ebt} formData={form} setF={setF} />
-                  <FR label="Налог на прибыль (200)" f1="p1_tax" f2="p2_tax" formData={form} setF={setF} />
-                  <FR label="▶ Прибыль от продолжаемой деятельности (210)" bold auto v1={p1_continuing} v2={p2_continuing} formData={form} setF={setF} />
-                  <FR label="Прибыль/(убыток) от прекращённой деятельности (220)" f1="p1_discont" f2="p2_discont" formData={form} setF={setF} />
-                  <FR label="▶ ЧИСТАЯ ПРИБЫЛЬ/(УБЫТОК) (230)" bold auto v1={p1_net} v2={p2_net} formData={form} setF={setF} />
-                </FT>
-              )}
-
-              {/* Tab 4: КешФлоу */}
+              {/* Tab 4: Концентрация */}
               {tab === 4 && (
-                <div className="space-y-2">
-                  <FT title="ОДДС — ОПЕРАЦИОННАЯ ДЕЯТЕЛЬНОСТЬ (Форма №5)" p1={p1} p2={p2}>
-                    <FR label="Поступления от продаж (010) [+]" f1="p1_cf_sales" f2="p2_cf_sales" formData={form} setF={setF} />
-                    <FR label="Прочие операционные поступления (020) [+]" f1="p1_cf_other_op_in" f2="p2_cf_other_op_in" formData={form} setF={setF} />
-                    <FR label="Итого поступлений (030)" bold auto v1={p1_cf_total_op_in} v2={p2_cf_total_op_in} formData={form} setF={setF} />
-                    <FR label="Оплата себестоимости продаж (050) [−]" f1="p1_cf_cogs_paid" f2="p2_cf_cogs_paid" formData={form} setF={setF} />
-                    <FR label="Оплата труда и отчисления (060) [−]" f1="p1_cf_salary" f2="p2_cf_salary" formData={form} setF={setF} />
-                    <FR label="Оплата прочих услуг (070) [−]" f1="p1_cf_services" f2="p2_cf_services" formData={form} setF={setF} />
-                    <FR label="Выплата процентов (080) [−]" f1="p1_cf_interest" f2="p2_cf_interest" formData={form} setF={setF} />
-                    <FR label="Уплата налога на прибыль (090) [−]" f1="p1_cf_income_tax" f2="p2_cf_income_tax" formData={form} setF={setF} />
-                    <FR label="Уплата прочих налогов (100) [−]" f1="p1_cf_other_taxes" f2="p2_cf_other_taxes" formData={form} setF={setF} />
-                    <FR label="Прочие операционные выплаты (110) [−]" f1="p1_cf_other_op_out" f2="p2_cf_other_op_out" formData={form} setF={setF} />
-                    <FR label="Итого выплат (190)" bold auto v1={p1_cf_total_op_out} v2={p2_cf_total_op_out} formData={form} setF={setF} />
-                    <FR label="▶ Чистый поток — операционная (200)" bold auto v1={p1_cf_net_op} v2={p2_cf_net_op} formData={form} setF={setF} />
-                  </FT>
-                  <FT title="ОДДС — ИНВЕСТИЦИОННАЯ ДЕЯТЕЛЬНОСТЬ" p1={p1} p2={p2}>
-                    <FR label="Продажа основных средств (210) [+]" f1="p1_cf_asset_sold" f2="p2_cf_asset_sold" formData={form} setF={setF} />
-                    <FR label="Продажа нематериальных активов (220) [+]" f1="p1_cf_intang_sold" f2="p2_cf_intang_sold" formData={form} setF={setF} />
-                    <FR label="Продажа ценных бумаг (230) [+]" f1="p1_cf_sec_sold" f2="p2_cf_sec_sold" formData={form} setF={setF} />
-                    <FR label="Возврат займов (240) [+]" f1="p1_cf_loan_ret" f2="p2_cf_loan_ret" formData={form} setF={setF} />
-                    <FR label="Прочие инвест. поступления (250) [+]" f1="p1_cf_other_inv_in" f2="p2_cf_other_inv_in" formData={form} setF={setF} />
-                    <FR label="Итого инвест. поступлений (260)" bold auto v1={p1_cf_total_inv_in} v2={p2_cf_total_inv_in} formData={form} setF={setF} />
-                    <FR label="Приобретение основных средств (270) [−]" f1="p1_cf_asset_buy" f2="p2_cf_asset_buy" formData={form} setF={setF} />
-                    <FR label="Приобретение нематериальных активов (280) [−]" f1="p1_cf_intang_buy" f2="p2_cf_intang_buy" formData={form} setF={setF} />
-                    <FR label="Приобретение ценных бумаг (290) [−]" f1="p1_cf_sec_buy" f2="p2_cf_sec_buy" formData={form} setF={setF} />
-                    <FR label="Предоставление займов (300) [−]" f1="p1_cf_loans_given" f2="p2_cf_loans_given" formData={form} setF={setF} />
-                    <FR label="Прочие инвест. выплаты (310) [−]" f1="p1_cf_other_inv_out" f2="p2_cf_other_inv_out" formData={form} setF={setF} />
-                    <FR label="Итого инвест. выплат (320)" bold auto v1={p1_cf_total_inv_out} v2={p2_cf_total_inv_out} formData={form} setF={setF} />
-                    <FR label="▶ Чистый поток — инвестиционная (330)" bold auto v1={p1_cf_net_inv} v2={p2_cf_net_inv} formData={form} setF={setF} />
-                  </FT>
-                  <FT title="ОДДС — ФИНАНСОВАЯ ДЕЯТЕЛЬНОСТЬ" p1={p1} p2={p2}>
-                    <FR label="Эмиссия акций (410) [+]" f1="p1_cf_shares" f2="p2_cf_shares" formData={form} setF={setF} />
-                    <FR label="Эмиссия облигаций (420) [+]" f1="p1_cf_bonds" f2="p2_cf_bonds" formData={form} setF={setF} />
-                    <FR label="Вклады учредителей (430) [+]" f1="p1_cf_founders" f2="p2_cf_founders" formData={form} setF={setF} />
-                    <FR label="Полученные займы и кредиты (440) [+]" f1="p1_cf_loans_in" f2="p2_cf_loans_in" formData={form} setF={setF} />
-                    <FR label="Прочие фин. поступления (450) [+]" f1="p1_cf_other_fin_in" f2="p2_cf_other_fin_in" formData={form} setF={setF} />
-                    <FR label="Итого фин. поступлений (460)" bold auto v1={p1_cf_total_fin_in} v2={p2_cf_total_fin_in} formData={form} setF={setF} />
-                    <FR label="Выплата дивидендов (470) [−]" f1="p1_cf_dividends" f2="p2_cf_dividends" formData={form} setF={setF} />
-                    <FR label="Погашение займов и кредитов (480) [−]" f1="p1_cf_loans_out" f2="p2_cf_loans_out" formData={form} setF={setF} />
-                    <FR label="Выкуп собственных акций (490) [−]" f1="p1_cf_buyback" f2="p2_cf_buyback" formData={form} setF={setF} />
-                    <FR label="Прочие фин. выплаты (500) [−]" f1="p1_cf_other_fin_out" f2="p2_cf_other_fin_out" formData={form} setF={setF} />
-                    <FR label="Итого фин. выплат (510)" bold auto v1={p1_cf_total_fin_out} v2={p2_cf_total_fin_out} formData={form} setF={setF} />
-                    <FR label="▶ Чистый поток — финансовая (520)" bold auto v1={p1_cf_net_fin} v2={p2_cf_net_fin} formData={form} setF={setF} />
-                  </FT>
-                  <FT title="ОДДС — ИТОГО" p1={p1} p2={p2}>
-                    <FR label="Влияние курсовых разниц (600)" f1="p1_cf_fx" f2="p2_cf_fx" formData={form} setF={setF} />
-                    <FR label="▶ Нетто изменение денежных средств" bold auto v1={p1_cf_net_change} v2={p2_cf_net_change} formData={form} setF={setF} />
-                    <FR label="Остаток на начало периода" bold f1="p1_cf_cash_begin" f2="p2_cf_cash_begin" formData={form} setF={setF} />
-                    <FR label="▶ Остаток на конец периода" bold auto v1={p1_cash_end} v2={p2_cash_end} formData={form} setF={setF} />
-                  </FT>
-                </div>
-              )}
-
-              {/* Tab 6: Концентрация */}
-              {tab === 6 && (
                 <div className="space-y-5">
                   <div className="p-3 bg-blue-50 border border-blue-100 rounded-lg">
                     <p className="text-xs text-blue-700 font-medium">Анализ концентрации кредитного риска</p>
@@ -1213,20 +1208,12 @@ export default function CreditRiskPage() {
                       <p className="text-xs text-gray-400 mt-1">Текущий PAR30 по всему кредитному портфелю банка</p>
                     </div>
                     <div>
-                      <label className={lbl}>Лимит риск-аппетита — концентрация сектора (%)</label>
+                      <label className={lbl}>Лимит концентрации в секторе SME (%)</label>
                       <input type="text" inputMode="decimal"
                         value={form.ra_conc_limit}
                         onChange={e => setF('ra_conc_limit', e.target.value.replace(/[^0-9.]/g,''))}
                         placeholder="10.00" className={inp} />
                       <p className="text-xs text-gray-400 mt-1">Максимально допустимая доля одного заёмщика в секторе SME</p>
-                    </div>
-                    <div>
-                      <label className={lbl}>Лимит риск-аппетита — PAR30 (%)</label>
-                      <input type="text" inputMode="decimal"
-                        value={form.ra_par30_limit}
-                        onChange={e => setF('ra_par30_limit', e.target.value.replace(/[^0-9.]/g,''))}
-                        placeholder="5.00" className={inp} />
-                      <p className="text-xs text-gray-400 mt-1">Максимально допустимый уровень PAR30 портфеля</p>
                     </div>
                   </div>
 
@@ -1258,43 +1245,74 @@ export default function CreditRiskPage() {
                         )}
                       </div>
 
-                      {bankPf > 0 && (
-                        <div className={`p-4 rounded-xl border-2 ${par30Violates ? 'bg-red-50 border-red-300' : 'bg-green-50 border-green-300'}`}>
-                          <p className="text-xs font-semibold text-gray-600 uppercase tracking-wide mb-3">
-                            Влияние на PAR30 при уходе заёмщика в просрочку
-                          </p>
-                          <div className="grid grid-cols-3 gap-3 text-xs">
-                            <div className="bg-white rounded-lg p-3 text-center">
-                              <p className="text-gray-400 mb-1">PAR30 сейчас</p>
-                              <p className="text-xl font-bold text-gray-900">{curPar30Pct > 0 ? `${curPar30Pct.toFixed(2)}%` : '—'}</p>
-                            </div>
-                            <div className="bg-white rounded-lg p-3 text-center">
-                              <p className="text-gray-400 mb-1">Прирост PAR30</p>
-                              <p className="text-xl font-bold text-orange-600">+{par30Delta.toFixed(2)}%</p>
-                            </div>
-                            <div className={`rounded-lg p-3 text-center ${par30Violates ? 'bg-red-100' : 'bg-green-100'}`}>
-                              <p className="text-gray-400 mb-1">PAR30 после</p>
-                              <p className={`text-xl font-bold ${par30Violates ? 'text-red-700' : 'text-green-700'}`}>
-                                {curPar30Pct > 0 ? `${par30After.toFixed(2)}%` : `+${par30Delta.toFixed(2)}%`}
-                              </p>
-                            </div>
-                          </div>
-                          {raPar30 > 0 && (
-                            <div className={`mt-3 inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold ${par30Violates ? 'bg-red-100 text-red-700' : 'bg-green-100 text-green-700'}`}>
-                              {par30Violates
-                                ? `❌ Нарушает риск-аппетит (лимит PAR30: ${raPar30}%)`
-                                : `✅ Не нарушает риск-аппетит (лимит PAR30: ${raPar30}%)`}
-                            </div>
-                          )}
-                        </div>
-                      )}
                     </div>
                   )}
                 </div>
               )}
 
-              {/* Tab 7: Дополнение */}
-              {tab === 7 && (
+              {/* Tab 5: Риск-аппетит */}
+              {tab === 5 && (
+                <div className="space-y-5">
+                  <div className="p-3 bg-orange-50 border border-orange-100 rounded-lg">
+                    <p className="text-xs text-orange-700 font-medium">Анализ риск-аппетита</p>
+                    <p className="text-xs text-orange-500 mt-0.5">Оценка влияния выдачи кредита на уровень PAR30 портфеля банка при уходе заёмщика в просрочку.</p>
+                  </div>
+                  <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+                    <div>
+                      <label className={lbl}>Текущий PAR30 портфеля (%)</label>
+                      <input type="text" inputMode="decimal"
+                        value={form.current_par30_pct}
+                        onChange={e => setF('current_par30_pct', e.target.value.replace(/[^0-9.]/g,''))}
+                        placeholder="2.50" className={inp} />
+                      <p className="text-xs text-gray-400 mt-1">Текущий PAR30 по всему кредитному портфелю банка</p>
+                    </div>
+                    <div>
+                      <label className={lbl}>Лимит риск-аппетита — PAR30 (%)</label>
+                      <input type="text" inputMode="decimal"
+                        value={form.ra_par30_limit}
+                        onChange={e => setF('ra_par30_limit', e.target.value.replace(/[^0-9.]/g,''))}
+                        placeholder="5.00" className={inp} />
+                      <p className="text-xs text-gray-400 mt-1">Максимально допустимый уровень PAR30 портфеля</p>
+                    </div>
+                  </div>
+                  {bankPf > 0 && loanAmt > 0 && (
+                    <div className={`p-4 rounded-xl border-2 ${par30Violates ? 'bg-red-50 border-red-300' : 'bg-green-50 border-green-300'}`}>
+                      <p className="text-xs font-semibold text-gray-600 uppercase tracking-wide mb-3">
+                        Влияние на PAR30 при уходе заёмщика в просрочку
+                      </p>
+                      <div className="grid grid-cols-3 gap-3 text-xs">
+                        <div className="bg-white rounded-lg p-3 text-center">
+                          <p className="text-gray-400 mb-1">PAR30 сейчас</p>
+                          <p className="text-xl font-bold text-gray-900">{curPar30Pct > 0 ? `${curPar30Pct.toFixed(2)}%` : '—'}</p>
+                        </div>
+                        <div className="bg-white rounded-lg p-3 text-center">
+                          <p className="text-gray-400 mb-1">Прирост PAR30</p>
+                          <p className="text-xl font-bold text-orange-600">+{par30Delta.toFixed(2)}%</p>
+                        </div>
+                        <div className={`rounded-lg p-3 text-center ${par30Violates ? 'bg-red-100' : 'bg-green-100'}`}>
+                          <p className="text-gray-400 mb-1">PAR30 после</p>
+                          <p className={`text-xl font-bold ${par30Violates ? 'text-red-700' : 'text-green-700'}`}>
+                            {curPar30Pct > 0 ? `${par30After.toFixed(2)}%` : `+${par30Delta.toFixed(2)}%`}
+                          </p>
+                        </div>
+                      </div>
+                      {raPar30 > 0 && (
+                        <div className={`mt-3 inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold ${par30Violates ? 'bg-red-100 text-red-700' : 'bg-green-100 text-green-700'}`}>
+                          {par30Violates
+                            ? `❌ Нарушает риск-аппетит (лимит PAR30: ${raPar30}%)`
+                            : `✅ Не нарушает риск-аппетит (лимит PAR30: ${raPar30}%)`}
+                        </div>
+                      )}
+                    </div>
+                  )}
+                  {(bankPf === 0 || loanAmt === 0) && (
+                    <p className="text-xs text-gray-400 text-center py-4">Заполните портфель банка на вкладке «Концентрация» и сумму линии на вкладке «Заёмщик»</p>
+                  )}
+                </div>
+              )}
+
+              {/* Tab 6: Дополнение */}
+              {tab === 6 && (
                 <div className="space-y-4">
                   <div className="p-3 bg-blue-50 border border-blue-100 rounded-lg">
                     <p className="text-xs text-blue-700 font-medium">Дополнительная информация о заёмщике</p>
@@ -1314,8 +1332,8 @@ export default function CreditRiskPage() {
                 </div>
               )}
 
-              {/* Tab 5: Залог */}
-              {tab === 5 && (
+              {/* Tab 3: Залог */}
+              {tab === 3 && (
                 <div className="space-y-3">
                   {/* Покрытие залога — только для Смены залога */}
                   {isCollateralChange && existing_balance > 0 && (
@@ -1355,22 +1373,26 @@ export default function CreditRiskPage() {
                         <h3 className="text-sm font-semibold text-gray-800">Залог №{idx + 1}</h3>
                         {collaterals.length > 1 && <button onClick={() => setCollaterals(p => p.filter((_,i) => i !== idx))} className="text-xs text-red-500 hover:text-red-700">Удалить</button>}
                       </div>
-                      <div className="grid grid-cols-1 lg:grid-cols-3 gap-3">
+                      <div className="grid grid-cols-1 lg:grid-cols-2 gap-3">
                         <div><label className={lbl}>Тип залога</label>
                           <select value={col.type} onChange={e => setCollaterals(p => p.map((c,i) => i===idx ? {...c,type:e.target.value} : c))} className={inp}>
                             {COLLATERAL_TYPES.map(t => <option key={t}>{t}</option>)}
                           </select></div>
-                        <div><label className={lbl}>Описание</label>
-                          <input type="text" value={col.description} onChange={e => setCollaterals(p => p.map((c,i) => i===idx ? {...c,description:e.target.value} : c))} placeholder="Адрес, марка..." className={inp} /></div>
                         <div><label className={lbl}>Стоимость (TJS)</label>
                           <input type="text" inputMode="numeric"
                           value={col.value ? new Intl.NumberFormat('ru-RU').format(col.value) : ''}
                           onChange={e => setCollaterals(p => p.map((c,i) => i===idx ? {...c,value:Number(e.target.value.replace(/[^0-9]/g,''))} : c))}
                           placeholder="0" className={inp} /></div>
                       </div>
+                      <div className="grid grid-cols-1 lg:grid-cols-2 gap-3">
+                        <div><label className={lbl}>Описание залога</label>
+                          <input type="text" value={col.description} onChange={e => setCollaterals(p => p.map((c,i) => i===idx ? {...c,description:e.target.value} : c))} placeholder="Марка, характеристики..." className={inp} /></div>
+                        <div><label className={lbl}>Адрес залога</label>
+                          <input type="text" value={col.address || ''} onChange={e => setCollaterals(p => p.map((c,i) => i===idx ? {...c,address:e.target.value} : c))} placeholder="г. Душанбе, ул. ..." className={inp} /></div>
+                      </div>
                     </div>
                   ))}
-                  <button onClick={() => setCollaterals(p => [...p, {type:'Недвижимость',description:'',value:0}])}
+                  <button onClick={() => setCollaterals(p => [...p, {type:'Недвижимость',description:'',address:'',value:0}])}
                     className="flex items-center gap-2 px-3 py-2 border border-dashed border-gray-300 rounded-lg text-sm text-gray-500 hover:border-[#1B8A4C] hover:text-[#1B8A4C] w-full justify-center">
                     <Plus className="w-4 h-4" /> Добавить залог
                   </button>
@@ -1437,7 +1459,7 @@ export default function CreditRiskPage() {
                   <div className="flex gap-2">
                     <button onClick={() => { setShowModal(false); setForm(EMPTY); setInputMode('manual'); setImageFiles([]); setExtractMsg(null) }}
                       className="px-4 py-2 border border-gray-200 rounded-lg text-sm text-gray-600 hover:bg-gray-50">Отмена</button>
-                    {tab < 7
+                    {tab < 6
                       ? <button onClick={() => setTab(tab+1)} className="px-4 py-2 bg-[#1B8A4C] text-white rounded-lg text-sm font-medium hover:bg-[#177040]">Далее →</button>
                       : <button onClick={handleGenerate} disabled={generating} className="flex items-center gap-2 px-4 py-2 bg-[#1B8A4C] text-white rounded-lg text-sm font-medium hover:bg-[#177040] disabled:opacity-70">
                           {generating ? <><Loader2 className="w-4 h-4 animate-spin" /> AI анализирует...</> : <><CheckCircle2 className="w-4 h-4" /> {editingId ? 'Перегенерировать' : 'Сгенерировать'}</>}

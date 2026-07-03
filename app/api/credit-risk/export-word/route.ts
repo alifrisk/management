@@ -131,7 +131,7 @@ export async function POST(request: Request) {
     const p2cashBegin = (c.p2_cf_cash_begin||0) || (c.p2_cash_begin||0)
     const p1cashEnd = (c.p1_cash_end||0) || p1cashBegin + p1opCF + p1invCF + p1finCF
 
-    let collaterals: {type: string; description: string; value: number}[] = []
+    let collaterals: {type: string; description: string; address?: string; value: number}[] = []
     if (Array.isArray(c.collaterals)) collaterals = c.collaterals
     else if (typeof c.collaterals === 'string') { try { collaterals = JSON.parse(c.collaterals) } catch { collaterals = [] } }
     const totalCollateral = collaterals.reduce((s, col) => s + (col.value || 0), 0)
@@ -211,136 +211,86 @@ export async function POST(request: Request) {
           }),
           para('', { after: 200 }),
 
-          // ── 1. ПАРАМЕТРЫ ──
-          sectionHead('1', 'ПАРАМЕТРЫ КРЕДИТНОЙ ЗАЯВКИ'),
+          // ── 1. ОБЩАЯ ИНФОРМАЦИЯ ──
+          sectionHead('1', 'ОБЩАЯ ИНФОРМАЦИЯ'),
           new Table({
             width: { size: 9354, type: WidthType.DXA },
             columnWidths: [3800, 5554],
             rows: [
-              new TableRow({ children: [cell('Наименование заёмщика', { green: true, bold: true }), cell(c.borrower_name || '—', { bold: true })] }),
-              new TableRow({ children: [cell('ИНН', { green: true }), cell(c.borrower_inn || '—')] }),
-              new TableRow({ children: [cell('Вид деятельности', { green: true }), cell(c.business_type || '—')] }),
-              new TableRow({ children: [cell('Лет в бизнесе', { green: true }), cell(String(c.years_in_business || '—'))] }),
-              new TableRow({ children: [cell('Сумма кредита', { green: true, bold: true }), cell(`${fmt(c.loan_amount)} ${c.loan_currency || 'TJS'}`, { bold: true })] }),
-              new TableRow({ children: [cell('Срок кредита', { green: true }), cell(c.loan_term || '—')] }),
-              new TableRow({ children: [cell('Процентная ставка', { green: true }), cell(c.interest_rate ? `${c.interest_rate}% годовых` : '—')] }),
-              new TableRow({ children: [cell('Ежемесячный платёж (аннуитет)', { green: true, bold: true }), cell(c.interest_rate ? `${fmt(monthly)} TJS` : '—', { bold: true })] }),
-              new TableRow({ children: [cell('Цель кредита', { green: true }), cell(c.loan_purpose || '—')] }),
+              new TableRow({ children: [cell('Код / Наименование заёмщика', { green: true, bold: true }), cell(c.borrower_name || '—', { bold: true })] }),
               new TableRow({ children: [cell('Кредитная история', { green: true }), cell(c.credit_history || '—')] }),
-              new TableRow({ children: [cell('Аналитик', { green: true }), cell(c.analyst_name || '—')] }),
+              new TableRow({ children: [cell('Сектор бизнеса', { green: true }), cell(c.sector || '—')] }),
+              new TableRow({ children: [cell('Вид деятельности', { green: true }), cell(c.business_type || '—')] }),
+              ...(c.conclusion_type === 'Увеличение кредитной линии' ? [
+                new TableRow({ children: [cell('Тип операции', { green: true }), cell(c.conclusion_type)] }),
+                new TableRow({ children: [cell('Действующий лимит', { green: true }), cell(`${fmt(c.existing_loan_balance)} ${c.loan_currency || 'TJS'}`)] }),
+                new TableRow({ children: [cell('Желаемый лимит', { green: true, bold: true }), cell(`${fmt(c.loan_amount)} ${c.loan_currency || 'TJS'}`, { bold: true })] }),
+              ] : c.conclusion_type === 'Смена залога' ? [
+                new TableRow({ children: [cell('Тип операции', { green: true }), cell(c.conclusion_type)] }),
+                new TableRow({ children: [cell('Остаток по кредиту', { green: true, bold: true }), cell(`${fmt(c.existing_loan_balance)} ${c.loan_currency || 'TJS'}`, { bold: true })] }),
+              ] : [
+                new TableRow({ children: [cell('Тип операции', { green: true }), cell(c.conclusion_type || 'Одобрение кредитной линии')] }),
+                new TableRow({ children: [cell('Сумма линии', { green: true, bold: true }), cell(`${fmt(c.loan_amount)} ${c.loan_currency || 'TJS'}`, { bold: true })] }),
+              ]),
+              new TableRow({ children: [cell('Цель кредита', { green: true }), cell(c.loan_purpose || '—')] }),
+              new TableRow({ children: [cell('Менеджер', { green: true }), cell(c.analyst_name || '—')] }),
             ]
           }),
           para('', { after: 60 }),
 
-          // ── 2. БАЛАНС (Форма №1) ──
-          sectionHead('2', 'ФИНАНСОВОЕ ПОЛОЖЕНИЕ (БАЛАНС — Форма №1)'),
-          finTable([
-            ['КРАТКОСРОЧНЫЕ АКТИВЫ', '', '', true],
-            ['Денежные средства в кассе (10100)', c.p1_cash_desk||0, c.p2_cash_desk||0],
-            ['Денежные средства в банках (10200)', c.p1_cash_bank||0, c.p2_cash_bank||0],
-            ['Краткосрочные инвестиции (10300)', c.p1_st_invest||0, c.p2_st_invest||0],
-            ['Торговая дебиторская задолженность (10400)', c.p1_trade_rec||0, c.p2_trade_rec||0],
-            ['Прочая дебиторская задолженность (10500)', c.p1_other_rec||0, c.p2_other_rec||0],
-            ['Задолженность учредителей (10600)', c.p1_founder_rec||0, c.p2_founder_rec||0],
-            ['ТМЗ (10700)', c.p1_inventory||0, c.p2_inventory||0],
-            ['Расходы будущих периодов (10800)', c.p1_prepaid||0, c.p2_prepaid||0],
-            ['Долгосроч. активы для продажи (10900)', c.p1_nca_sale||0, c.p2_nca_sale||0],
-            ['Итого краткосрочных активов', p1ca, p2ca, true],
-            ['ДОЛГОСРОЧНЫЕ АКТИВЫ', '', '', true],
-            ['Основные средства (11000)', c.p1_ppe||0, c.p2_ppe||0],
-            ['Природные ресурсы (11200)', c.p1_nat_res||0, c.p2_nat_res||0],
-            ['Нематериальные активы (11300)', c.p1_intangibles||0, c.p2_intangibles||0],
-            ['Биологические активы (11400)', c.p1_bio_assets||0, c.p2_bio_assets||0],
-            ['Инвестиционное имущество (11500)', c.p1_invest_prop||0, c.p2_invest_prop||0],
-            ['Долгосрочные инвестиции (11600)', c.p1_lt_invest||0, c.p2_lt_invest||0],
-            ['Отложенные налоговые активы (11700)', c.p1_def_tax_asset||0, c.p2_def_tax_asset||0],
-            ['Долгосрочная дебиторка (11800)', c.p1_lt_rec||0, c.p2_lt_rec||0],
-            ['Итого долгосрочных активов', p1nca, p2nca, true],
-            ['ИТОГО АКТИВЫ', p1a, p2a, true],
-            ['КРАТКОСРОЧНЫЕ ОБЯЗАТЕЛЬСТВА', '', '', true],
-            ['Торговая кредиторка (22000)', c.p1_trade_pay||0, c.p2_trade_pay||0],
-            ['Краткосрочные долговые обяз. (22100)', c.p1_st_debt||0, c.p2_st_debt||0],
-            ['Начисленные обязательства (22200)', c.p1_accrued||0, c.p2_accrued||0],
-            ['Налоговые обязательства (22300)', c.p1_taxes_pay||0, c.p2_taxes_pay||0],
-            ['Резервы на расходы (22400)', c.p1_exp_reserves||0, c.p2_exp_reserves||0],
-            ['Прочие краткосрочные обяз. (22500)', c.p1_other_st_liab||0, c.p2_other_st_liab||0],
-            ['Итого краткосрочных обязательств', p1cl, p2cl, true],
-            ['ДОЛГОСРОЧНЫЕ ОБЯЗАТЕЛЬСТВА', '', '', true],
-            ['Долгосрочные долговые обяз. (22600)', c.p1_lt_debt||0, c.p2_lt_debt||0],
-            ['Доходы будущих периодов (22700)', c.p1_def_income||0, c.p2_def_income||0],
-            ['Отложенные нал. обязательства (22800)', c.p1_def_tax_liab||0, c.p2_def_tax_liab||0],
-            ['Итого долгосрочных обязательств', p1ll, p2ll, true],
-            ['ИТОГО ОБЯЗАТЕЛЬСТВА', p1l, p2l, true],
-            ['СОБСТВЕННЫЙ КАПИТАЛ', '', '', true],
-            ['Уставный капитал (33000)', c.p1_charter_cap||0, c.p2_charter_cap||0],
-            ['Дополнительный капитал (33100)', c.p1_add_cap||0, c.p2_add_cap||0],
-            ['Нераспределённая прибыль (33200)', c.p1_retained||0, c.p2_retained||0],
-            ['Резервный капитал (33300)', c.p1_reserve_cap||0, c.p2_reserve_cap||0],
-            ['Доля меньшинства (33400)', c.p1_minority||0, c.p2_minority||0],
-            ['ИТОГО КАПИТАЛ', p1e, p2e, true],
-            ['ИТОГО ПАССИВЫ', p1l+p1e, p2l+p2e, true],
-          ], p1, p2, fmt),
+          // ── 2. ЗАЛОГ ──
+          sectionHead('2', 'ОБЕСПЕЧЕНИЕ (ЗАЛОГ)'),
+          new Table({
+            width: { size: 9354, type: WidthType.DXA },
+            columnWidths: [400, 1800, 3000, 2500, 1654],
+            rows: [
+              new TableRow({ children: [
+                cell('№', { green: true, bold: true, center: true }),
+                cell('Тип залога', { green: true, bold: true }),
+                cell('Описание', { green: true, bold: true }),
+                cell('Адрес', { green: true, bold: true }),
+                cell('Стоимость (TJS)', { green: true, bold: true, center: true }),
+              ]}),
+              ...(collaterals.length > 0
+                ? collaterals.map((col, i) => new TableRow({ children: [
+                    cell(String(i+1), { center: true }),
+                    cell(col.type || '—'),
+                    cell(col.description || '—'),
+                    cell(col.address || '—'),
+                    cell(fmt(col.value), { center: true }),
+                  ]}))
+                : [new TableRow({ children: [cell('Залог не указан', { colSpan: 5 })] })]),
+              new TableRow({ children: [
+                new TableCell({ borders, columnSpan: 4, margins: { top: 70, bottom: 70, left: 120, right: 120 }, children: [new Paragraph({ children: [new TextRun({ text: 'ИТОГО', size: 20, bold: true, font: 'Times New Roman' })] })] }),
+                cell(fmt(totalCollateral), { bold: true, center: true }),
+              ]}),
+            ]
+          }),
+          ...(guarantors.length > 0 ? [
+            para('Поручители', { bold: true, size: 20, after: 60, color: '1B8A4C' }),
+            new Table({
+              width: { size: 9354, type: WidthType.DXA },
+              columnWidths: [500, 3000, 2200, 3654],
+              rows: [
+                new TableRow({ children: [
+                  cell('№', { green: true, bold: true, center: true }),
+                  cell('ФИО / Название', { green: true, bold: true }),
+                  cell('Доход (TJS)', { green: true, bold: true }),
+                  cell('Связь с заёмщиком', { green: true, bold: true }),
+                ]}),
+                ...guarantors.map((g, i) => new TableRow({ children: [
+                  cell(String(i+1), { center: true }),
+                  cell(g.name || '—'),
+                  cell(g.inn || '—'),
+                  cell(g.relation || '—'),
+                ]})),
+              ]
+            }),
+          ] : []),
           para('', { after: 60 }),
 
-          // ── 3. ОПУ (Форма №2) ──
-          sectionHead('3', 'ФИНАНСОВЫЕ РЕЗУЛЬТАТЫ (ОПУ — Форма №2)'),
-          finTable([
-            ['Чистый доход от продаж (010)', p1rev, p2rev],
-            ['Себестоимость продаж (020)', c.p1_cogs||0, c.p2_cogs||0],
-            ['Валовая прибыль (030)', p1gross, p2gross, true],
-            ['Расходы на продажу (040)', c.p1_sell_exp||c.p1_sales_expense||0, c.p2_sell_exp||c.p2_sales_expense||0],
-            ['Административные расходы (050)', c.p1_admin_exp||c.p1_admin_expense||0, c.p2_admin_exp||c.p2_admin_expense||0],
-            ['Прочие операционные доходы/(расходы) (070)', c.p1_other_op||c.p1_other_op_income||0, c.p2_other_op||c.p2_other_op_income||0],
-            ['Операционная прибыль/(убыток) (080)', p1op, p2op, true],
-            ['Доходы/(расходы) по процентам (100)', c.p1_interest_exp||0, c.p2_interest_exp||0],
-            ['Доходы/(убыток) от инвестиций (110)', c.p1_invest_inc||0, c.p2_invest_inc||0],
-            ['Доходы/(убыток) от курсовых разниц (120)', c.p1_fx_diff||0, c.p2_fx_diff||0],
-            ['Доходы/(убыток) от обмена валюты (130)', c.p1_currency_ex||0, c.p2_currency_ex||0],
-            ['Доходы/(убыток) от выбытия активов (140)', c.p1_asset_disp||0, c.p2_asset_disp||0],
-            ['Убыток от обесценения (150)', c.p1_impairment||0, c.p2_impairment||0],
-            ['Прочие неоперационные (160)', c.p1_other_nonop||c.p1_non_op||0, c.p2_other_nonop||c.p2_non_op||0],
-            ['Итого неоперационных (170)', p1nonop, p2nonop, true],
-            ['Доля прибыли ассоц. компаний (180)', c.p1_assoc_profit||0, c.p2_assoc_profit||0],
-            ['Прибыль до налогообложения (190)', p1ebt, p2ebt, true],
-            ['Налог на прибыль (200)', c.p1_tax||0, c.p2_tax||0],
-            ['ЧИСТАЯ ПРИБЫЛЬ/(УБЫТОК) (230)', p1netProfit, p2netProfit, true],
-          ], p1, p2, fmt),
-          para('', { after: 60 }),
-
-          // ── 4. ОДДС (Форма №5) ──
-          sectionHead('4', 'ДВИЖЕНИЕ ДЕНЕЖНЫХ СРЕДСТВ (ОДДС — Форма №5)'),
-          finTable([
-            ['ОПЕРАЦИОННАЯ ДЕЯТЕЛЬНОСТЬ', '', '', true],
-            ['Поступления от продаж (010)', c.p1_cf_sales||0, c.p2_cf_sales||0],
-            ['Прочие опер. поступления (020)', c.p1_cf_other_op_in||0, c.p2_cf_other_op_in||0],
-            ['Оплата себестоимости (050)', c.p1_cf_cogs_paid||0, c.p2_cf_cogs_paid||0],
-            ['Оплата труда и отчислений (060)', c.p1_cf_salary||0, c.p2_cf_salary||0],
-            ['Оплата прочих услуг (070)', c.p1_cf_services||0, c.p2_cf_services||0],
-            ['Выплата процентов (080)', c.p1_cf_interest||0, c.p2_cf_interest||0],
-            ['Уплата налога на прибыль (090)', c.p1_cf_income_tax||0, c.p2_cf_income_tax||0],
-            ['Уплата прочих налогов (100)', c.p1_cf_other_taxes||0, c.p2_cf_other_taxes||0],
-            ['Прочие опер. выплаты (110)', c.p1_cf_other_op_out||0, c.p2_cf_other_op_out||0],
-            ['Чистый поток — операционная (200)', p1opCF, p2opCF, true],
-            ['ИНВЕСТИЦИОННАЯ ДЕЯТЕЛЬНОСТЬ', '', '', true],
-            ['Продажа ОС (210)', c.p1_cf_asset_sold||0, c.p2_cf_asset_sold||0],
-            ['Приобретение ОС (270)', c.p1_cf_asset_buy||0, c.p2_cf_asset_buy||0],
-            ['Выданные займы (300)', c.p1_cf_loans_given||0, c.p2_cf_loans_given||0],
-            ['Прочие инвестиционные нетто', c.p1_cf_intang_sold||0+c.p1_cf_sec_sold||0+c.p1_cf_loan_ret||0+c.p1_cf_other_inv_in||0-c.p1_cf_intang_buy||0-c.p1_cf_sec_buy||0-c.p1_cf_other_inv_out||0, c.p2_cf_intang_sold||0+c.p2_cf_sec_sold||0+c.p2_cf_loan_ret||0+c.p2_cf_other_inv_in||0-c.p2_cf_intang_buy||0-c.p2_cf_sec_buy||0-c.p2_cf_other_inv_out||0],
-            ['Чистый поток — инвестиционная (330)', p1invCF, p2invCF, true],
-            ['ФИНАНСОВАЯ ДЕЯТЕЛЬНОСТЬ', '', '', true],
-            ['Полученные займы и кредиты (440)', c.p1_cf_loans_in||0, c.p2_cf_loans_in||0],
-            ['Погашение займов и кредитов (480)', c.p1_cf_loans_out||0, c.p2_cf_loans_out||0],
-            ['Выплата дивидендов (470)', c.p1_cf_dividends||0, c.p2_cf_dividends||0],
-            ['Прочие финансовые нетто', c.p1_cf_shares||0+c.p1_cf_bonds||0+c.p1_cf_founders||0+c.p1_cf_other_fin_in||0-c.p1_cf_buyback||0-c.p1_cf_other_fin_out||0, c.p2_cf_shares||0+c.p2_cf_bonds||0+c.p2_cf_founders||0+c.p2_cf_other_fin_in||0-c.p2_cf_buyback||0-c.p2_cf_other_fin_out||0],
-            ['Чистый поток — финансовая (520)', p1finCF, p2finCF, true],
-            ['Влияние курсовых разниц (600)', c.p1_cf_fx||0, c.p2_cf_fx||0],
-            ['Остаток на начало периода', p1cashBegin, p2cashBegin],
-            ['Остаток на конец периода', p1cashEnd, (c.p2_cash_end||0)||p2cashBegin+p2opCF+p2invCF+p2finCF, true],
-          ], p1, p2, fmt),
-          para('', { after: 60 }),
-
-          // ── 5. КОЭФФИЦИЕНТЫ ──
-          sectionHead('5', 'КЛЮЧЕВЫЕ ФИНАНСОВЫЕ КОЭФФИЦИЕНТЫ'),
+          // ── 3. ФИНАНСОВЫЕ КОЭФФИЦИЕНТЫ ──
+          sectionHead('3', 'КЛЮЧЕВЫЕ ФИНАНСОВЫЕ КОЭФФИЦИЕНТЫ'),
           (() => {
             const p1inv = c.p1_inventory || 0
             const p2inv = c.p2_inventory || 0
@@ -418,58 +368,67 @@ export async function POST(request: Request) {
           })(),
           para('', { after: 60 }),
 
-          // ── 6. ЗАЛОГ ──
-          sectionHead('6', 'ОБЕСПЕЧЕНИЕ'),
-          new Table({
-            width: { size: 9354, type: WidthType.DXA },
-            columnWidths: [500, 2200, 4200, 2454],
-            rows: [
-              new TableRow({ children: [
-                cell('№', { green: true, bold: true, center: true }),
-                cell('Тип залога', { green: true, bold: true }),
-                cell('Описание', { green: true, bold: true }),
-                cell('Стоимость (TJS)', { green: true, bold: true, center: true }),
-              ]}),
-              ...(collaterals.length > 0
-                ? collaterals.map((col, i) => new TableRow({ children: [
-                    cell(String(i+1), { center: true }),
-                    cell(col.type || '—'),
-                    cell(col.description || '—'),
-                    cell(fmt(col.value), { center: true }),
-                  ]}))
-                : [new TableRow({ children: [cell('Залог не указан', { colSpan: 4 })] })]),
-              new TableRow({ children: [
-                new TableCell({ borders, columnSpan: 3, margins: { top: 70, bottom: 70, left: 120, right: 120 }, children: [new Paragraph({ children: [new TextRun({ text: 'ИТОГО', size: 20, bold: true, font: 'Times New Roman' })] })] }),
-                cell(fmt(totalCollateral), { bold: true, center: true }),
-              ]}),
+          // ── 4. КОНЦЕНТРАЦИЯ ──
+          ...(() => {
+            const smePf = c.sme_sector_portfolio || 0
+            const bankPf = c.bank_total_portfolio || 0
+            const loanAmt = c.loan_amount || 0
+            const raConc = c.ra_conc_limit || 0
+            if (!smePf && !bankPf) return []
+            const concSme = smePf > 0 && loanAmt > 0 ? (loanAmt / smePf * 100) : 0
+            const concBank = bankPf > 0 && loanAmt > 0 ? (loanAmt / bankPf * 100) : 0
+            const concViolates = raConc > 0 && concSme > raConc
+            return [
+              sectionHead('4', 'КОНЦЕНТРАЦИЯ КРЕДИТНОГО РИСКА'),
+              new Table({
+                width: { size: 9354, type: WidthType.DXA },
+                columnWidths: [4000, 2677, 2677],
+                rows: [
+                  new TableRow({ children: [cell('Показатель', { green: true, bold: true }), cell('Значение', { green: true, bold: true, center: true }), cell('Статус', { green: true, bold: true, center: true })] }),
+                  ...(smePf > 0 ? [new TableRow({ children: [
+                    cell(`Доля в портфеле МСБ (лимит: ${raConc > 0 ? raConc + '%' : 'не задан'})`, {}),
+                    cell(`${concSme.toFixed(2)}%`, { center: true, bold: true }),
+                    cell(concViolates ? '❌ Нарушает' : '✅ Норма', { center: true, color: concViolates ? 'C00000' : '1B8A4C' }),
+                  ]})] : []),
+                  ...(bankPf > 0 ? [new TableRow({ children: [
+                    cell('Доля от общего портфеля банка (инфо)', {}),
+                    cell(`${concBank.toFixed(2)}%`, { center: true }),
+                    cell('Информационно', { center: true, color: '555555' }),
+                  ]})] : []),
+                ]
+              }),
+              para('', { after: 60 }),
             ]
-          }),
-          // Поручители (если есть)
-          ...(guarantors.length > 0 ? [
-            para('Поручители', { bold: true, size: 20, after: 60, color: '1B8A4C' }),
-            new Table({
-              width: { size: 9354, type: WidthType.DXA },
-              columnWidths: [500, 3000, 2200, 3654],
-              rows: [
-                new TableRow({ children: [
-                  cell('№', { green: true, bold: true, center: true }),
-                  cell('ФИО / Название', { green: true, bold: true }),
-                  cell('ИНН', { green: true, bold: true }),
-                  cell('Связь с заёмщиком', { green: true, bold: true }),
-                ]}),
-                ...guarantors.map((g, i) => new TableRow({ children: [
-                  cell(String(i+1), { center: true }),
-                  cell(g.name || '—'),
-                  cell(g.inn || '—'),
-                  cell(g.relation || '—'),
-                ]})),
-              ]
-            }),
-            para('', { after: 60 }),
-          ] : []),
+          })(),
 
-          // ── 7. ЗАКЛЮЧЕНИЕ ──
-          sectionHead('7', 'ЗАКЛЮЧЕНИЕ СЛУЖБЫ УПРАВЛЕНИЯ РИСКАМИ'),
+          // ── 5. РИСК-АППЕТИТ ──
+          ...(() => {
+            const bankPf = c.bank_total_portfolio || 0
+            const loanAmt = c.loan_amount || 0
+            const curPar30 = c.current_par30_pct || 0
+            const raPar30 = c.ra_par30_limit || 0
+            if (!bankPf || !loanAmt) return []
+            const delta = loanAmt / bankPf * 100
+            const after = curPar30 + delta
+            const violates = raPar30 > 0 && after > raPar30
+            return [
+              sectionHead('5', 'РИСК-АППЕТИТ (PAR30)'),
+              new Table({
+                width: { size: 9354, type: WidthType.DXA },
+                columnWidths: [4000, 2677, 2677],
+                rows: [
+                  new TableRow({ children: [cell('Показатель', { green: true, bold: true }), cell('Значение', { green: true, bold: true, center: true }), cell('Статус', { green: true, bold: true, center: true })] }),
+                  new TableRow({ children: [cell('PAR30 до выдачи'), cell(curPar30 > 0 ? `${curPar30.toFixed(2)}%` : '—', { center: true }), cell('', {})] }),
+                  new TableRow({ children: [cell('Прирост PAR30 при дефолте'), cell(`+${delta.toFixed(2)}%`, { center: true, color: 'BF8F00', bold: true }), cell('', {})] }),
+                  new TableRow({ children: [cell(`PAR30 после выдачи (лимит: ${raPar30 > 0 ? raPar30 + '%' : 'не задан'})`), cell(`${after.toFixed(2)}%`, { center: true, bold: true }), cell(violates ? '❌ Нарушает' : '✅ Норма', { center: true, color: violates ? 'C00000' : '1B8A4C' })] }),
+                ]
+              }),
+              para('', { after: 60 }),
+            ]
+          })(),
+
+          // ── 6. ОЦЕНКА РИСКОВ / ЗАКЛЮЧЕНИЕ ──
+          sectionHead('6', 'ЗАКЛЮЧЕНИЕ СЛУЖБЫ УПРАВЛЕНИЯ РИСКАМИ'),
           ...conclusionParagraphs,
           para('', { after: 120 }),
 
@@ -528,7 +487,7 @@ export async function POST(request: Request) {
                   new TextRun({ text: 'Службы управления рисками:  _____________  Сангинова Ф. И.', size: 22, font: 'Times New Roman' }),
                 ] }),
                 new Paragraph({ children: [
-                  new TextRun({ text: 'Аналитик', size: 22, font: 'Times New Roman' }),
+                  new TextRun({ text: 'Менеджер', size: 22, font: 'Times New Roman' }),
                 ] }),
                 new Paragraph({ spacing: { after: 0 }, children: [
                   new TextRun({ text: `Службы управления рисками:  _____________  ${c.analyst_name || '___________________'}`, size: 22, font: 'Times New Roman' }),
