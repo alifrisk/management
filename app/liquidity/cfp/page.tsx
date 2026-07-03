@@ -248,8 +248,10 @@ export default function CfpPage() {
         funding_sources: sources.filter(s => s.source.trim()),
         ai_conclusion:   generatedDoc,
       }
-      const { error: dbErr } = await supabase.from('cfp_reports').insert(payload)
-      if (dbErr) throw new Error(dbErr.message)
+      console.log('[CFP] inserting payload:', JSON.stringify(payload).slice(0, 300))
+      const { error: dbErr, data: dbData } = await supabase.from('cfp_reports').insert(payload).select()
+      console.log('[CFP] result:', { dbErr, dbData })
+      if (dbErr) throw new Error(`${dbErr.code}: ${dbErr.message}`)
       // reset form
       try { localStorage.removeItem('cfp_draft') } catch { /* ignore */ }
       setGeneratedDoc(null); setPlanPeriod(''); setPlanDate('')
@@ -528,11 +530,6 @@ export default function CfpPage() {
           </div>
         </div>
 
-        {/* Error */}
-        {error && (
-          <div className="p-3 bg-red-50 border border-red-100 rounded-lg text-sm text-red-600">{error}</div>
-        )}
-
         {/* Generate button */}
         <button onClick={handleGenerate} disabled={generating}
           className="w-full flex items-center justify-center gap-2 py-3 bg-[#1B8A4C] text-white rounded-xl text-sm font-semibold hover:bg-[#177040] disabled:opacity-50 transition-colors">
@@ -545,20 +542,27 @@ export default function CfpPage() {
       {/* ── Generated Document ──────────────────────────────────────────────── */}
       {generatedDoc && (
         <div className="bg-white rounded-2xl border border-[#1B8A4C]/20 shadow-sm overflow-hidden">
-          <div className="flex items-center justify-between px-6 py-4 border-b border-gray-100 bg-green-50/40">
-            <div className="flex items-center gap-2">
-              <CheckCircle className="w-5 h-5 text-[#1B8A4C]" />
-              <div>
-                <p className="text-sm font-semibold text-gray-900">CFP сгенерирован — 6 разделов</p>
-                <p className="text-[11px] text-gray-500 mt-0.5">Инструкция №247 НБТ РТ</p>
+          <div className="px-6 py-4 border-b border-gray-100 bg-green-50/40 space-y-3">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <CheckCircle className="w-5 h-5 text-[#1B8A4C]" />
+                <div>
+                  <p className="text-sm font-semibold text-gray-900">CFP сгенерирован — 6 разделов</p>
+                  <p className="text-[11px] text-gray-500 mt-0.5">Инструкция №247 НБТ РТ</p>
+                </div>
               </div>
+              <button onClick={handleSave} disabled={saving}
+                className="flex items-center gap-2 px-4 py-2 bg-[#1B8A4C] text-white rounded-lg text-sm font-medium hover:bg-[#177040] disabled:opacity-50 transition-colors">
+                {saving
+                  ? <><Loader2 className="w-4 h-4 animate-spin" /> Сохранение...</>
+                  : <><CheckCircle className="w-4 h-4" /> Сохранить CFP</>}
+              </button>
             </div>
-            <button onClick={handleSave} disabled={saving}
-              className="flex items-center gap-2 px-4 py-2 bg-[#1B8A4C] text-white rounded-lg text-sm font-medium hover:bg-[#177040] disabled:opacity-50 transition-colors">
-              {saving
-                ? <><Loader2 className="w-4 h-4 animate-spin" /> Сохранение...</>
-                : <><CheckCircle className="w-4 h-4" /> Сохранить CFP</>}
-            </button>
+            {error && (
+              <div className="flex items-start gap-2 p-3 bg-red-50 border border-red-200 rounded-lg text-sm text-red-700">
+                <span className="font-medium">Ошибка сохранения:</span> {error}
+              </div>
+            )}
           </div>
           <div className="p-6">
             <div className="text-sm text-gray-800 whitespace-pre-wrap leading-relaxed">{generatedDoc}</div>
