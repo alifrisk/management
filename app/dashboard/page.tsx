@@ -2,6 +2,7 @@ import { Shield, FileText, TrendingUp, Droplets, ArrowRight, FolderOpen, Clipboa
 import Link from 'next/link'
 import CfpDashboardCard from '@/components/dashboard/CfpDashboardCard'
 import GapDashboardCard from '@/components/dashboard/GapDashboardCard'
+import NewsBlock from '@/components/dashboard/NewsBlock'
 
 export default function DashboardPage() {
   return (
@@ -190,6 +191,8 @@ export default function DashboardPage() {
         </Link>
 
       </div>
+
+      <NewsBlock />
     </div>
   )
 }
