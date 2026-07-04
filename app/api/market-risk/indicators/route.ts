@@ -64,6 +64,8 @@ export async function GET() {
     const p7 = fw7
 
     const chg = (a: number, b: number) => b ? Math.round((a-b)/b*10000)/100 : null
+
+    // USD-base pair: rate = cur[code] (units of `code` per 1 USD)
     const pair = (code: string, label: string) => ({
       id: `usd_${code}`, label,
       rate:     cur[code] != null ? Math.round(Number(cur[code]) * 10000) / 10000 : null,
@@ -71,9 +73,28 @@ export async function GET() {
       change7d: cur[code] && p7[code] ? chg(cur[code], p7[code]) : null,
       unit: code.toUpperCase(),
     })
+
+    // Cross-rate X/TJS: how many TJS per 1 unit of X
+    // cross = cur['tjs'] / cur[xCode]  (derived from shared USD base)
+    const cross = (xCode: string, label: string, decimals = 4) => {
+      const rate  = cur['tjs']  && cur[xCode]  ? Math.round(cur['tjs']  / cur[xCode]  * Math.pow(10, decimals)) / Math.pow(10, decimals) : null
+      const r1    = p1['tjs']   && p1[xCode]   ? p1['tjs']  / p1[xCode]  : null
+      const r7    = p7['tjs']   && p7[xCode]   ? p7['tjs']  / p7[xCode]  : null
+      return {
+        id: `${xCode}_tjs`, label,
+        rate,
+        change:   rate && r1 ? chg(rate, r1) : null,
+        change7d: rate && r7 ? chg(rate, r7) : null,
+        unit: 'TJS',
+      }
+    }
+
     const currencies = [
       pair('tjs','USD / TJS'), pair('rub','USD / RUB'), pair('eur','USD / EUR'),
       pair('cny','USD / CNY'), pair('aed','USD / AED'), pair('kzt','USD / KZT'),
+      cross('rub','RUB / TJS', 4),
+      cross('eur','EUR / TJS', 2),
+      cross('cny','CNY / TJS', 4),
     ]
 
     // ── Crypto ──────────────────────────────────────────────────────────────

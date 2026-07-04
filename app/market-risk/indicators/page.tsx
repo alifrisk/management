@@ -24,6 +24,7 @@ const fmtRate = (n: number | null, unit: string) => {
   if (n === null) return '—'
   if (unit === 'USD') return new Intl.NumberFormat('ru-RU', { style: 'currency', currency: 'USD', maximumFractionDigits: 0 }).format(n)
   if (unit.startsWith('USD/')) return n.toFixed(unit === 'USD/EUR' ? 4 : 2)
+  if (n < 1) return n.toFixed(4)
   return new Intl.NumberFormat('ru-RU', { maximumFractionDigits: 2 }).format(n)
 }
 
