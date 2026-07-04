@@ -138,23 +138,42 @@ export default function OpStressTest() {
   async function saveToRegistry() {
     if (!stats || !optim || !pess || !cat) return
     setSaving(true)
-    const scenarios = [
-      { name: 'Оптимистичный',    ...optim, totalLoss: Math.round(tLoss(optim)), totalRecovery: Math.round(tRec(optim)), netLoss: Math.round(netLoss(optim)), adjProfit: bp > 0 ? Math.round(adjP(optim)) : null },
-      { name: 'Пессимистичный',   ...pess,  totalLoss: Math.round(tLoss(pess)),  totalRecovery: Math.round(tRec(pess)),  netLoss: Math.round(netLoss(pess)),  adjProfit: bp > 0 ? Math.round(adjP(pess))  : null },
-      { name: 'Катастрофический', ...cat,   totalLoss: Math.round(tLoss(cat)),   totalRecovery: Math.round(tRec(cat)),   netLoss: Math.round(netLoss(cat)),   adjProfit: bp > 0 ? Math.round(adjP(cat))   : null },
-    ]
+
+    const mkSc = (sc: Sc) => ({
+      loss_per_month:    Math.round(sc.lossPerMonth),
+      recovery_rate_pct: Math.round(sc.recoveryRate * 10) / 10,
+      total_loss:        Math.round(tLoss(sc)),
+      total_recovery:    Math.round(tRec(sc)),
+      net_loss:          Math.round(netLoss(sc)),
+      adj_profit:        bp > 0 ? Math.round(adjP(sc)) : null,
+    })
+
     const conclusion = [
       `Период: ${dateFrom} — ${dateTo} (${stats.calendarMonths} мес.), горизонт: ${H.label}.`,
       `Инцидентов: ${stats.totalIncidents}, общий ущерб: ${fmt(stats.totalLoss)} TJS.`,
-      `Оптимистичный: ущерб ${fmt(scenarios[0].totalLoss)} TJS, чистый убыток ${fmt(scenarios[0].netLoss)} TJS.`,
-      `Пессимистичный: ущерб ${fmt(scenarios[1].totalLoss)} TJS, чистый убыток ${fmt(scenarios[1].netLoss)} TJS.`,
-      `Катастрофический: ущерб ${fmt(scenarios[2].totalLoss)} TJS, чистый убыток ${fmt(scenarios[2].netLoss)} TJS.`,
+      `Оптимистичный: ущерб ${fmt(Math.round(tLoss(optim)))} TJS, чистый убыток ${fmt(Math.round(netLoss(optim)))} TJS.`,
+      `Пессимистичный: ущерб ${fmt(Math.round(tLoss(pess)))} TJS, чистый убыток ${fmt(Math.round(netLoss(pess)))} TJS.`,
+      `Катастрофический: ущерб ${fmt(Math.round(tLoss(cat)))} TJS, чистый убыток ${fmt(Math.round(netLoss(cat)))} TJS.`,
     ].join(' ')
+
     const { error } = await supabase.from('stress_test_registry').insert({
       risk_type: 'Операционный риск', analyst_name: analystName,
       period: `${dateFrom} — ${dateTo}`,
-      inputs: { date_from: dateFrom, date_to: dateTo, horizon: H.label, base_profit: bp || null },
-      results: { model1: { historical: stats, scenarios }, model2: { loss_rows: lossRows, recovery_cols: RECOVERY_COLS, base_profit: bp || null } },
+      inputs: {
+        date_from:          dateFrom,
+        date_to:            dateTo,
+        horizon:            H.label,
+        base_profit:        bp || null,
+        incidents:          stats.totalIncidents,
+        total_loss_hist:    Math.round(stats.totalLoss),
+        calendar_months:    stats.calendarMonths,
+        avg_loss_per_month: Math.round(stats.avgLossPerMonth),
+      },
+      results: {
+        optimistic:   mkSc(optim),
+        pessimistic:  mkSc(pess),
+        catastrophic: mkSc(cat),
+      },
       conclusion, status: 'Проведён',
     })
     setSaving(false)

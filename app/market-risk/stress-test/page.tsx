@@ -204,32 +204,38 @@ export default function MarketStressTest() {
   async function saveToRegistry() {
     setSaving(true)
 
-    // Модель 2 — всегда доступна (не требует запуска)
-    const m2scenarios = [
-      { name: 'Оптимистичный',    g: optGrowth,  r: optRemit  },
-      { name: 'Пессимистичный',   g: pessGrowth, r: pessRemit },
-      { name: 'Катастрофический', g: catGrowth,  r: catRemit  },
-    ].map(sc => ({ ...sc, income: Math.round(calcIncome(sc.g, sc.r)), effect: Math.round(calcIncome(sc.g, sc.r) - biVal) }))
-    const model2_inputs  = { gdp_base: gdp0, alif_share: alifShare, margin, base_income: biVal, opt: { g: optGrowth, r: optRemit }, pess: { g: pessGrowth, r: pessRemit }, cat: { g: catGrowth, r: catRemit } }
-    const model2_results = { scenarios: m2scenarios }
     const h = HORIZONS.find(hh => hh.days === horizon)?.label || `${horizon} дн.`
 
-    // Модель 1 — только если Monte Carlo уже запущен
-    const model1_inputs  = mcResult ? { currency, date_from: dateFrom, date_to: dateTo, mean, std_dev: stdDev, iterations: iters, horizon_days: horizon } : null
-    const model1_results = mcResult ? { var95_hist: mcResult.histVar95, var99_hist: mcResult.histVar99, var95_param: mcResult.paramVar95, var99_param: mcResult.paramVar99, cvar95: mcResult.cvar95, cvar99: mcResult.cvar99, expected: mcResult.expected, median: mcResult.median, appreciation_pct: mcResult.appreciationPct, depreciation_pct: mcResult.depreciationPct } : null
-
-    const conclusions = [
-      mcResult ? `Модель 1 — Монте Карло (${currency}/TJS). Горизонт: ${h}. μ=${mean}%, σ=${stdDev}%. VaR 95%: ${mcResult.histVar95}%, VaR 99%: ${mcResult.histVar99}%. CVaR 95%: ${mcResult.cvar95}%, CVaR 99%: ${mcResult.cvar99}%.` : 'Модель 1 — Монте Карло не запускался.',
-      `Модель 2 — Денежные переводы. ВВП: ${fmtNum(gdp0)} сом. Оптимистичный: ${fmtNum(m2scenarios[0].income)} сом. Пессимистичный: ${fmtNum(m2scenarios[1].income)} сом (${m2scenarios[1].effect >= 0 ? '+' : ''}${fmtNum(m2scenarios[1].effect)}). Катастрофический: ${fmtNum(m2scenarios[2].income)} сом (${m2scenarios[2].effect >= 0 ? '+' : ''}${fmtNum(m2scenarios[2].effect)}).`,
-    ]
+    const conclusion = mcResult
+      ? `Монте Карло (${currency}/TJS). Горизонт: ${h}. μ=${mean}%, σ=${stdDev}%. VaR 95%: ${mcResult.histVar95}%, VaR 99%: ${mcResult.histVar99}%. CVaR 95%: ${mcResult.cvar95}%, CVaR 99%: ${mcResult.cvar99}%.`
+      : 'Модель 1 — Монте Карло не запускался.'
 
     const { error } = await supabase.from('stress_test_registry').insert({
       risk_type: 'Рыночный риск',
       analyst_name: analystName,
       period: `${dateFrom} — ${dateTo}`,
-      inputs:  { model1: model1_inputs,  model2: model2_inputs  },
-      results: { model1: model1_results, model2: model2_results },
-      conclusion: conclusions.join(' '),
+      inputs: mcResult ? {
+        currency,
+        date_from:    dateFrom,
+        date_to:      dateTo,
+        mean,
+        std_dev:      stdDev,
+        iterations:   iters,
+        horizon_days: horizon,
+      } : null,
+      results: mcResult ? {
+        var95_hist:       mcResult.histVar95,
+        var99_hist:       mcResult.histVar99,
+        var95_param:      mcResult.paramVar95,
+        var99_param:      mcResult.paramVar99,
+        cvar95:           mcResult.cvar95,
+        cvar99:           mcResult.cvar99,
+        expected:         mcResult.expected,
+        median:           mcResult.median,
+        appreciation_pct: mcResult.appreciationPct,
+        depreciation_pct: mcResult.depreciationPct,
+      } : null,
+      conclusion,
       status: 'Проведён',
     })
     setSaving(false)

@@ -108,44 +108,41 @@ export default function CreditStressTest() {
   // ── Сохранить в реестр ───────────────────────────
   async function saveToRegistry() {
     setSaving(true)
-    const scenarios = [
-      { name: 'Оптимистичный',    par: optim.par, cov: optim.cov },
-      { name: 'Пессимистичный',   par: pess.par,  cov: pess.cov  },
-      { name: 'Катастрофический', par: cat.par,   cov: cat.cov   },
-    ].map(sc => ({
-      ...sc,
-      reserve:    Math.round(Math.max(0, addReserve(sc.par, sc.cov))),
-      effect:     -Math.round(Math.max(0, addReserve(sc.par, sc.cov))),
-      adj_profit: BP > 0 ? Math.round(adjProfit(sc.par, sc.cov)) : null,
-    }))
-    const catSc = scenarios[2]
-
-    // Модель 2 — ключевые точки What-If матрицы
-    const model2 = P > 0 ? {
-      par_rows: parRows,
-      cov_cols: COV_COLS,
-      base_profit: BP,
-      pess_point: { par: pess.par, cov: pess.cov, reserve: Math.round(Math.max(0, addReserve(pess.par, pess.cov))), adj_profit: BP > 0 ? Math.round(adjProfit(pess.par, pess.cov)) : null },
-      cat_point:  { par: cat.par,  cov: cat.cov,  reserve: Math.round(Math.max(0, addReserve(cat.par,  cat.cov))),  adj_profit: BP > 0 ? Math.round(adjProfit(cat.par,  cat.cov))  : null },
-    } : null
+    const mkSc = (par: number, cov: number) => ({
+      par,
+      cov,
+      reserve:    Math.round(Math.max(0, addReserve(par, cov))),
+      adj_profit: BP > 0 ? Math.round(adjProfit(par, cov)) : null,
+    })
+    const sc0 = mkSc(optim.par, optim.cov)
+    const sc1 = mkSc(pess.par,  pess.cov)
+    const sc2 = mkSc(cat.par,   cat.cov)
 
     const conclusion = [
       `Дата отчётности: ${new Date(reportDate).toLocaleDateString('ru-RU')}. Горизонт: ${currentHorizon.label}.`,
       P > 0 ? `Портфель: ${fmt(P)} TJS. Текущий PAR30: ${CP}%, Coverage: ${CC}%.` : null,
-      `Модель 1 — Оптимистичный: PAR=${optim.par.toFixed(1)}%, доп. резерв ${fmt(scenarios[0].reserve)} TJS.`,
-      `Пессимистичный: PAR=${pess.par.toFixed(1)}%, доп. резерв ${fmt(scenarios[1].reserve)} TJS.`,
-      `Катастрофический: PAR=${cat.par.toFixed(1)}%, доп. резерв ${fmt(catSc.reserve)} TJS${BP > 0 && catSc.adj_profit !== null ? `, скорр. прибыль ${fmt(catSc.adj_profit)} TJS` : ''}.`,
-      model2?.cat_point?.adj_profit != null ? `Модель 2 — What-If: при катастрофе скорр. прибыль ${fmt(model2.cat_point.adj_profit)} TJS.` : null,
+      `Оптимистичный: PAR=${sc0.par.toFixed(1)}%, доп. резерв ${fmt(sc0.reserve)} TJS.`,
+      `Пессимистичный: PAR=${sc1.par.toFixed(1)}%, доп. резерв ${fmt(sc1.reserve)} TJS.`,
+      `Катастрофический: PAR=${sc2.par.toFixed(1)}%, доп. резерв ${fmt(sc2.reserve)} TJS${BP > 0 && sc2.adj_profit !== null ? `, скорр. прибыль ${fmt(sc2.adj_profit)} TJS` : ''}.`,
     ].filter(Boolean).join(' ')
 
     const { error } = await supabase.from('stress_test_registry').insert({
       risk_type: 'Кредитный риск',
       analyst_name: analystName,
       period: new Date(reportDate).toLocaleDateString('ru-RU'),
-      inputs: { report_date: reportDate, portfolio: P, current_par: CP, current_cov: CC, base_profit: BP, optim_par: optim.par || null, optim_cov: optim.cov || null, pess_par: pess.par || null, cat_par: cat.par || null, grow_table: growTable, horizon: currentHorizon.label },
+      inputs: {
+        report_date: reportDate,
+        horizon:     currentHorizon.label,
+        portfolio:   P    || null,
+        current_par: CP   || null,
+        current_cov: CC   || null,
+        base_profit: BP   || null,
+        grow_table:  growTable,
+      },
       results: {
-        model1: { scenarios },
-        model2,
+        optimistic:   sc0,
+        pessimistic:  sc1,
+        catastrophic: sc2,
       },
       conclusion,
       status: 'Проведён',
