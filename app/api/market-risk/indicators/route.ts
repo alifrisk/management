@@ -6,7 +6,7 @@ export const dynamic = 'force-dynamic'
 async function get(url: string): Promise<unknown> {
   try {
     const ctrl = new AbortController()
-    const t = setTimeout(() => ctrl.abort(), 5000)
+    const t = setTimeout(() => ctrl.abort(), 6000)
     const res = await fetch(url, {
       signal: ctrl.signal,
       headers: { 'Accept': 'application/json', 'User-Agent': 'Mozilla/5.0' },
@@ -23,6 +23,17 @@ function dateStr(daysAgo: number) {
   return new Date(Date.now() - daysAgo * 86400000).toISOString().split('T')[0]
 }
 
+// Tries Cloudflare Pages mirror + jsdelivr CDN in parallel; returns USD-keyed dict
+async function getFWRates(daysAgo: number): Promise<Record<string, number>> {
+  type FW = Record<string, Record<string, number>>
+  const d = daysAgo === 0 ? 'latest' : dateStr(daysAgo)
+  const [cf, js] = await Promise.all([
+    get(`https://${d}.currency-api.pages.dev/v1/currencies/usd.json`),
+    get(`https://cdn.jsdelivr.net/npm/@fawazahmed0/currency-api@${d}/v1/currencies/usd.json`),
+  ])
+  return (cf as FW)?.usd ?? (js as FW)?.usd ?? {}
+}
+
 export async function GET() {
   try {
     // ── Все запросы параллельно ─────────────────────────────────────────────
@@ -33,19 +44,25 @@ export async function GET() {
       { id:'wti',    label:'Нефть WTI',       s:'CL=F', u:'USD/bbl' },
     ]
 
-    const [dToday, d1, d7, cg, ...yahooResults] = await Promise.all([
-      get(`https://cdn.jsdelivr.net/npm/@fawazahmed0/currency-api@${dateStr(0)}/v1/currencies/usd.json`),
-      get(`https://cdn.jsdelivr.net/npm/@fawazahmed0/currency-api@${dateStr(1)}/v1/currencies/usd.json`),
-      get(`https://cdn.jsdelivr.net/npm/@fawazahmed0/currency-api@${dateStr(7)}/v1/currencies/usd.json`),
+    const [fw0, fw1, fw7, erApi, cg, ...yahooResults] = await Promise.all([
+      getFWRates(0),
+      getFWRates(1),
+      getFWRates(7),
+      // open.er-api — free, no key, direct USD-base rates; fallback for any missing pairs
+      get('https://open.er-api.com/v6/latest/USD'),
       get('https://api.coingecko.com/api/v3/coins/markets?vs_currency=usd&ids=bitcoin,ethereum&price_change_percentage=7d'),
       ...syms.map(t => get(`https://query1.finance.yahoo.com/v8/finance/chart/${t.s}?interval=1d&range=30d`)),
     ])
 
     // ── Currencies ──────────────────────────────────────────────────────────
-    type R = Record<string, number>
-    const cur = ((dToday as Record<string,R>)?.usd) ?? {}
-    const p1  = ((d1     as Record<string,R>)?.usd) ?? {}
-    const p7  = ((d7     as Record<string,R>)?.usd) ?? {}
+    // open.er-api uses uppercase keys; normalise to lowercase
+    const erRates = ((erApi as Record<string, unknown>)?.rates ?? {}) as Record<string, number>
+    const erLower = Object.fromEntries(Object.entries(erRates).map(([k, v]) => [k.toLowerCase(), v]))
+    // fawazahmed0 takes precedence; open.er-api fills any gaps
+    const cur: Record<string, number> = { ...erLower, ...fw0 }
+    const p1 = fw1
+    const p7 = fw7
+
     const chg = (a: number, b: number) => b ? Math.round((a-b)/b*10000)/100 : null
     const pair = (code: string, label: string) => ({
       id: `usd_${code}`, label,
