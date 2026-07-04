@@ -14,35 +14,61 @@ export interface NewsItem {
 }
 
 const FEEDS: { url: string; source: string; category: NewsCategory }[] = [
-  // Tajikistan
-  { url: 'https://tj.sputniknews.ru/export/rss2/archive/index.xml', source: 'Sputnik TJ', category: 'tj' },
-  { url: 'https://asiaplustj.info/ru/rss', source: 'Asia-Plus', category: 'tj' },
-  { url: 'https://avesta.tj/feed', source: 'Avesta.tj', category: 'tj' },
+  // ── Tajikistan ────────────────────────────────────────────────────────────
+  { url: 'https://tj.sputniknews.ru/export/rss2/archive/index.xml', source: 'Sputnik TJ',  category: 'tj' },
+  { url: 'https://asiaplustj.info/ru/rss',                          source: 'Asia-Plus',   category: 'tj' },
+  { url: 'https://avesta.tj/feed',                                   source: 'Avesta.tj',   category: 'tj' },
   {
     url: 'https://news.google.com/rss/search?q=%D0%A2%D0%B0%D0%B4%D0%B6%D0%B8%D0%BA%D0%B8%D1%81%D1%82%D0%B0%D0%BD+%D1%8D%D0%BA%D0%BE%D0%BD%D0%BE%D0%BC%D0%B8%D0%BA%D0%B0+%D0%B1%D0%B0%D0%BD%D0%BA&hl=ru&gl=TJ&ceid=TJ:ru',
-    source: 'Google TJ',
-    category: 'tj',
+    source: 'Google TJ', category: 'tj',
   },
-  // CIS / Russia
-  { url: 'https://tass.ru/rss/v2.xml', source: 'ТАСС', category: 'cis' },
-  { url: 'https://www.kommersant.ru/RSS/news.xml', source: 'Коммерсантъ', category: 'cis' },
-  { url: 'https://www.interfax.ru/rss.asp', source: 'Интерфакс', category: 'cis' },
-  // World
-  { url: 'https://oilprice.com/rss/main', source: 'OilPrice.com', category: 'world' },
-  { url: 'https://www.mining.com/feed/', source: 'Mining.com', category: 'world' },
-  { url: 'https://financialpost.com/feed', source: 'Financial Post', category: 'world' },
-  { url: 'https://feeds.marketwatch.com/marketwatch/topstories/', source: 'MarketWatch', category: 'world' },
+
+  // ── CIS / Russia ──────────────────────────────────────────────────────────
+  { url: 'https://tass.ru/rss/v2.xml',              source: 'ТАСС',        category: 'cis' },
+  { url: 'https://www.kommersant.ru/RSS/news.xml',  source: 'Коммерсантъ', category: 'cis' },
+  { url: 'https://www.interfax.ru/rss.asp',         source: 'Интерфакс',   category: 'cis' },
+  // Banki.ru — confirmed valid
+  { url: 'https://www.banki.ru/xml/news.rss',       source: 'Banki.ru',    category: 'cis' },
+  // AKIpress (Кыргызстан/ЦА) — confirmed valid
+  { url: 'https://akipress.com/rss/news.rss',       source: 'AKIpress',    category: 'cis' },
+  // Finmarket.ru — may return 403 on some hosts; silently skipped if so
+  { url: 'http://www.finmarket.ru/rss/',            source: 'Finmarket',   category: 'cis' },
+  // Google News CIS economics — covers Fergana/Kursiv/EADaily content via Google index
+  {
+    url: 'https://news.google.com/rss/search?q=%D1%8D%D0%BA%D0%BE%D0%BD%D0%BE%D0%BC%D0%B8%D0%BA%D0%B0+%D0%B1%D0%B0%D0%BD%D0%BA+%D1%84%D0%B8%D0%BD%D0%B0%D0%BD%D1%81%D1%8B+%D0%A1%D0%9D%D0%93&hl=ru&gl=RU&ceid=RU:ru',
+    source: 'Google CIS', category: 'cis',
+  },
+
+  // ── World ─────────────────────────────────────────────────────────────────
+  { url: 'https://oilprice.com/rss/main',                           source: 'OilPrice.com',   category: 'world' },
+  { url: 'https://www.mining.com/feed/',                            source: 'Mining.com',     category: 'world' },
+  { url: 'https://financialpost.com/feed',                          source: 'Financial Post', category: 'world' },
+  { url: 'https://feeds.marketwatch.com/marketwatch/topstories/',   source: 'MarketWatch',    category: 'world' },
 ]
 
-// All sources filtered — only finance / banking / economics topics
+// Named entities — shown unconditionally (acts as extra trigger alongside finance filter)
+const NAMED_ENTITIES = [
+  'jefferson capital holdings',
+  'jefferson trust ltd',
+  'jefferson trust',
+  'хофиз шахиди',
+  'хофиза шахиди',
+  'алиф банк',
+  'alif bank',
+]
+
+// Strict finance / banking / economics / risk-management keyword list
 const FINANCE_KW = [
   // Russian
   'банк', 'риск', 'ликвидност', 'ставк', 'инфляци', 'нефт', 'золот', 'биткоин', 'курс',
-  'цб', 'нбт', 'капитал', 'кредит', 'экономик', 'финанс', 'рынок', 'инвестиц',
+  'цб', 'нбт', 'нбрк', 'нацбанк', 'капитал', 'кредит', 'экономик', 'финанс', 'рынок', 'инвестиц',
   'доллар', 'рубл', 'сомони', 'ввп', 'санкц', 'регулятор', 'бюджет', 'долг',
   'процент', 'актив', 'торгов', 'валют', 'доход', 'прибыл', 'убыт', 'дефицит',
   'профицит', 'монетарн', 'платёж', 'вклад', 'депозит', 'денеж', 'резерв',
   'мвф', 'минфин', 'набиуллин', 'акци', 'облигац', 'фондов', 'биржа',
+  'банкрот', 'рефинансирован', 'надзор', 'нормативы', 'ипотек', 'микрофинанс',
+  'налог', 'пошлин', 'тариф', 'экспорт', 'импорт', 'трансфер', 'ремитт',
+  'эмитент', 'листинг', 'ipo', 'дивиденд', 'рентабельн', 'платёжеспособн',
   // English
   'bank', 'risk', 'liquidity', 'rate', 'inflation', 'oil', 'gold', 'bitcoin', 'crypto',
   'fed', 'ecb', 'imf', 'credit', 'finance', 'market', 'economy', 'monetary', 'gdp',
@@ -51,11 +77,15 @@ const FINANCE_KW = [
   'profit', 'revenue', 'debt', 'bond', 'yield', 'dollar', 'ruble', 'somoni',
   'sanction', 'regulator', 'budget', 'deficit', 'surplus', 'payment', 'fiscal',
   'financial', 'economic', 'treasury', 'central bank', 'reserve', 'equity',
+  'bankruptcy', 'mortgage', 'tax', 'tariff', 'export', 'import', 'remittance',
+  'ipo', 'dividend', 'rating', 'audit',
 ]
 
+// Show if: finance keyword match OR named entity mention
 function matchesFinance(title: string): boolean {
   const lower = title.toLowerCase()
   return FINANCE_KW.some(kw => lower.includes(kw))
+    || NAMED_ENTITIES.some(e => lower.includes(e))
 }
 
 // TJ and CIS sources are shown first within the same hour bucket
@@ -85,7 +115,6 @@ export async function GET() {
         for (const item of feed.items || []) {
           const title = item.title?.trim() || ''
           if (!title) continue
-          // All sources filtered by finance/banking keywords
           if (!matchesFinance(title)) continue
           const iso = item.isoDate || item.pubDate || ''
           const rawDesc: string = (item as unknown as Record<string, unknown>).rawDesc as string || ''
@@ -131,7 +160,7 @@ export async function GET() {
     return tb - ta
   })
 
-  const items = deduped.slice(0, 40)
+  const items = deduped.slice(0, 50)
   cache = { items, ts: Date.now() }
 
   return NextResponse.json(items)
