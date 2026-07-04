@@ -198,7 +198,49 @@ ${is_collateral_change ? `
 Залог / Новый лимит: ${pct(collateral_coverage)} ${collateral_coverage > 120 ? '✓ норма' : collateral_coverage >= 100 ? '⚠ допустимо' : '✗ ниже нормы'}
 ` : ''}
 
-${fd.additional_info ? `═══ ДОПОЛНИТЕЛЬНАЯ ИНФОРМАЦИЯ ОТ АНАЛИТИКА ═══
+${(() => {
+      const sme  = Number(fd.sme_sector_portfolio  || 0)
+      const bank = Number(fd.bank_total_portfolio   || 0)
+      const la   = loan_amount
+      const rcl  = Number(fd.risk_appetite_conc_pct || 0)
+      const cNow   = sme > 0 && bank > 0 ? (sme / bank * 100) : 0
+      const cAfter = bank > 0 ? ((sme + la) / bank * 100) : 0
+      const cVio   = rcl > 0 && cAfter > rcl
+      const bInSme = sme > 0 && la > 0 ? (la / sme * 100) : 0
+      // PAR30 MSB
+      const msbPar30Now   = Number(fd.current_msb_par30_pct || 0)
+      const raMsb         = Number(fd.risk_appetite_msb_par30_pct || 0)
+      const msbDelta      = sme > 0 && la > 0 ? (la / sme * 100) : 0
+      const msbAfter      = msbPar30Now + msbDelta
+      const msbVio        = raMsb > 0 && msbAfter > raMsb
+      // PAR30 bank total
+      const bankPar30Now  = Number(fd.current_par30_pct || 0)
+      const raBank        = Number(fd.risk_appetite_par30_pct || 0)
+      const bankDelta     = bank > 0 && la > 0 ? (la / bank * 100) : 0
+      const bankAfter     = bankPar30Now + bankDelta
+      const bankVio       = raBank > 0 && bankAfter > raBank
+      if (!sme && !bank && !msbPar30Now && !bankPar30Now) return ''
+      return `═══ КОНЦЕНТРАЦИЯ И РИСК-АППЕТИТ (ВЫСОКИЙ ПРИОРИТЕТ) ═══
+${sme > 0 && bank > 0 ? `КОНЦЕНТРАЦИЯ МСБ В ПОРТФЕЛЕ БАНКА:
+  Портфель МСБ сейчас: ${f(sme)} TJS | Портфель банка: ${f(bank)} TJS
+  Доля МСБ до выдачи:  ${cNow.toFixed(2)}%
+  Доля МСБ после выдачи: ${cAfter.toFixed(2)}% ${rcl > 0 ? `(лимит: ${rcl}%)` : ''}
+  Статус: ${cVio ? `❌ НАРУШАЕТ лимит концентрации (${cAfter.toFixed(2)}% > ${rcl}%)` : `✅ В пределах лимита`}
+  Доля заёмщика в МСБ-портфеле (справочно): ${bInSme.toFixed(2)}%
+` : ''}${msbPar30Now > 0 || raMsb > 0 ? `РИСК-АППЕТИТ PAR30 — ПОРТФЕЛЬ МСБ:
+  PAR30 МСБ сейчас: ${msbPar30Now > 0 ? msbPar30Now.toFixed(2)+'%' : 'не указан'}
+  Прирост при дефолте заёмщика: +${msbDelta.toFixed(2)}%
+  PAR30 МСБ после: ${msbAfter.toFixed(2)}% ${raMsb > 0 ? `(лимит: ${raMsb}%)` : ''}
+  Статус: ${msbVio ? `❌ НАРУШАЕТ лимит PAR30 МСБ (${msbAfter.toFixed(2)}% > ${raMsb}%)` : raMsb > 0 ? `✅ В пределах лимита PAR30 МСБ` : 'лимит не задан'}
+` : ''}${bankPar30Now > 0 || raBank > 0 ? `РИСК-АППЕТИТ PAR30 — ОБЩИЙ ПОРТФЕЛЬ БАНКА:
+  PAR30 банка сейчас: ${bankPar30Now > 0 ? bankPar30Now.toFixed(2)+'%' : 'не указан'}
+  Прирост при дефолте заёмщика: +${bankDelta.toFixed(2)}%
+  PAR30 банка после: ${bankAfter.toFixed(2)}% ${raBank > 0 ? `(лимит: ${raBank}%)` : ''}
+  Статус: ${bankVio ? `❌ НАРУШАЕТ лимит PAR30 банка (${bankAfter.toFixed(2)}% > ${raBank}%)` : raBank > 0 ? `✅ В пределах лимита PAR30 банка` : 'лимит не задан'}
+` : ''}ОБЯЗАТЕЛЬНО упомяни концентрацию и PAR30 в разделе "4. ОЦЕНКА РИСКОВ" — это ключевые ограничения риск-аппетита.
+${(cVio || msbVio || bankVio) ? 'ВНИМАНИЕ: выявлено нарушение риск-аппетита — обязательно отрази это в разделе "5. РЕШЕНИЕ" и учти при рекомендации.' : ''}
+`
+    })()}${fd.additional_info ? `═══ ДОПОЛНИТЕЛЬНАЯ ИНФОРМАЦИЯ ОТ АНАЛИТИКА ═══
 ${fd.additional_info}
 ВАЖНО: Учти эту информацию при составлении заключения — она может влиять на оценку рисков и рекомендацию.
 
