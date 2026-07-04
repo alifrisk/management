@@ -3,10 +3,10 @@ import { createServerClient } from '@/supabase/server'
 
 export const dynamic = 'force-dynamic'
 
-async function get(url: string): Promise<unknown> {
+async function get(url: string, ms = 2500): Promise<unknown> {
   try {
     const ctrl = new AbortController()
-    const t = setTimeout(() => ctrl.abort(), 6000)
+    const t = setTimeout(() => ctrl.abort(), ms)
     const res = await fetch(url, {
       signal: ctrl.signal,
       headers: { 'Accept': 'application/json', 'User-Agent': 'Mozilla/5.0' },
@@ -34,51 +34,69 @@ async function getFWRates(daysAgo: number): Promise<Record<string, number>> {
   return (cf as FW)?.usd ?? (js as FW)?.usd ?? {}
 }
 
-// Urals crude oil from MOEX ISS (free, no key) — USD/bbl
-// Ticker prefix 'UR', quarterly FORTS contracts: URH6, URM6, URU6, URZ6…
-async function getUralsFromMOEX(): Promise<{ rate: number | null; change: number | null; change7d: number | null }> {
-  const MONTH = 'FGHJKMNQUVXZ'
+// Returns the nearest 2 quarterly Urals contract tickers (H=Mar, M=Jun, U=Sep, Z=Dec)
+function nearUralsContracts(): string[] {
+  const quarters = [
+    { month: 2, code: 'H' }, { month: 5, code: 'M' },
+    { month: 8, code: 'U' }, { month: 11, code: 'Z' },
+  ]
   const now = new Date()
-  const d7 = dateStr(7)
-
-  // Build candidate tickers: current month + next 4 months
-  const candidates = Array.from({ length: 5 }, (_, i) => {
-    const d = new Date(now.getFullYear(), now.getMonth() + i, 1)
-    return `UR${MONTH[d.getMonth()]}${String(d.getFullYear()).slice(-1)}`
-  })
-
-  // Fetch all candidates in parallel
-  const fetched = await Promise.all(candidates.map(async secid => {
-    const [today, hist] = await Promise.all([
-      get(`https://iss.moex.com/iss/engines/futures/markets/forts/boards/RFUD/securities/${secid}.json?iss.meta=off&marketdata.columns=LAST,OPEN`),
-      get(`https://iss.moex.com/iss/engines/futures/markets/forts/boards/RFUD/securities/${secid}/candles.json?from=${d7}&till=${d7}&interval=24&iss.meta=off&candles.columns=close`),
-    ])
-    return { secid, today, hist }
-  }))
-
-  for (const { today, hist } of fetched) {
-    if (!today) continue
-    type MOEXSection = { columns: string[]; data: (number | null)[][] }
-    const md = (today as Record<string, MOEXSection>)?.marketdata
-    if (!md?.data?.[0]) continue
-
-    const last = md.data[0][md.columns.indexOf('LAST')]
-    const open = md.data[0][md.columns.indexOf('OPEN')]
-    if (!last || last <= 0) continue
-
-    const change = open && open > 0 ? Math.round((last - open) / open * 10000) / 100 : null
-
-    let change7d: number | null = null
-    if (hist) {
-      const cv = (hist as Record<string, MOEXSection>)?.candles
-      const close7 = cv?.data?.[0]?.[cv.columns.indexOf('close')] ?? null
-      if (close7 && close7 > 0) change7d = Math.round((last - close7) / close7 * 10000) / 100
+  const result: string[] = []
+  for (let y = now.getFullYear(); y <= now.getFullYear() + 1 && result.length < 2; y++) {
+    for (const q of quarters) {
+      if (result.length >= 2) break
+      if (y > now.getFullYear() || q.month >= now.getMonth()) {
+        result.push(`UR${q.code}${String(y).slice(-1)}`)
+      }
     }
+  }
+  return result
+}
 
-    return { rate: Math.round(last * 100) / 100, change, change7d }
+// Urals crude oil from MOEX ISS (free, no key) — USD/bbl
+// Hard 3 s cap so a slow/blocked MOEX never stalls the whole route
+async function getUralsFromMOEX(): Promise<{ rate: number | null; change: number | null; change7d: number | null }> {
+  const NULL_R = { rate: null, change: null, change7d: null }
+
+  const doFetch = async () => {
+    const d7 = dateStr(7)
+    const candidates = nearUralsContracts()   // max 2 tickers
+    type Sec = { columns: string[]; data: (number | null)[][] }
+
+    const results = await Promise.all(candidates.map(async secid => {
+      const base = `https://iss.moex.com/iss/engines/futures/markets/forts/boards/RFUD/securities/${secid}`
+      const [today, hist] = await Promise.all([
+        get(`${base}.json?iss.meta=off&marketdata.columns=LAST,OPEN`, 2000),
+        get(`${base}/candles.json?from=${d7}&till=${d7}&interval=24&iss.meta=off&candles.columns=close`, 2000),
+      ])
+      return { today, hist }
+    }))
+
+    for (const { today, hist } of results) {
+      if (!today) continue
+      const md = (today as Record<string, Sec>)?.marketdata
+      if (!md?.data?.[0]) continue
+      const last = md.data[0][md.columns.indexOf('LAST')]
+      const open = md.data[0][md.columns.indexOf('OPEN')]
+      if (!last || last <= 0) continue
+
+      const change = open && open > 0 ? Math.round((last - open) / open * 10000) / 100 : null
+      let change7d: number | null = null
+      if (hist) {
+        const cv = (hist as Record<string, Sec>)?.candles
+        const c7 = cv?.data?.[0]?.[cv.columns.indexOf('close')] ?? null
+        if (c7 && c7 > 0) change7d = Math.round((last - c7) / c7 * 10000) / 100
+      }
+      return { rate: Math.round(last * 100) / 100, change, change7d }
+    }
+    return NULL_R
   }
 
-  return { rate: null, change: null, change7d: null }
+  // Never wait more than 3 s for MOEX
+  return Promise.race([
+    doFetch(),
+    new Promise<typeof NULL_R>(resolve => setTimeout(() => resolve(NULL_R), 3000)),
+  ])
 }
 
 export async function GET() {
@@ -102,17 +120,14 @@ export async function GET() {
     ])
 
     // ── Currencies ──────────────────────────────────────────────────────────
-    // open.er-api uses uppercase keys; normalise to lowercase
     const erRates = ((erApi as Record<string, unknown>)?.rates ?? {}) as Record<string, number>
     const erLower = Object.fromEntries(Object.entries(erRates).map(([k, v]) => [k.toLowerCase(), v]))
-    // fawazahmed0 takes precedence; open.er-api fills any gaps
     const cur: Record<string, number> = { ...erLower, ...fw0 }
     const p1 = fw1
     const p7 = fw7
 
     const chg = (a: number, b: number) => b ? Math.round((a-b)/b*10000)/100 : null
 
-    // USD-base pair: rate = cur[code] (units of `code` per 1 USD)
     const pair = (code: string, label: string) => ({
       id: `usd_${code}`, label,
       rate:     cur[code] != null ? Math.round(Number(cur[code]) * 10000) / 10000 : null,
@@ -121,14 +136,12 @@ export async function GET() {
       unit: code.toUpperCase(),
     })
 
-    // Cross-rate X/TJS: how many TJS per 1 unit of X = cur['tjs'] / cur[xCode]
     const cross = (xCode: string, label: string, decimals = 4) => {
-      const rate  = cur['tjs']  && cur[xCode]  ? Math.round(cur['tjs']  / cur[xCode]  * Math.pow(10, decimals)) / Math.pow(10, decimals) : null
-      const r1    = p1['tjs']   && p1[xCode]   ? p1['tjs']  / p1[xCode]  : null
-      const r7    = p7['tjs']   && p7[xCode]   ? p7['tjs']  / p7[xCode]  : null
+      const rate = cur['tjs'] && cur[xCode] ? Math.round(cur['tjs'] / cur[xCode] * Math.pow(10, decimals)) / Math.pow(10, decimals) : null
+      const r1   = p1['tjs'] && p1[xCode] ? p1['tjs'] / p1[xCode] : null
+      const r7   = p7['tjs'] && p7[xCode] ? p7['tjs'] / p7[xCode] : null
       return {
-        id: `${xCode}_tjs`, label,
-        rate,
+        id: `${xCode}_tjs`, label, rate,
         change:   rate && r1 ? chg(rate, r1) : null,
         change7d: rate && r7 ? chg(rate, r7) : null,
         unit: 'TJS',
@@ -179,17 +192,16 @@ export async function GET() {
       } catch { return null }
     }).filter(Boolean)
 
-    // Insert Urals after Brent (index 2)
     const uralsItem = uralsData.rate !== null
       ? { id: 'urals', label: 'Нефть Urals', rate: uralsData.rate, change: uralsData.change, change7d: uralsData.change7d, unit: 'USD/bbl' }
       : null
     const commodities = [
-      ...yahooMapped.slice(0, 3),   // gold, silver, brent
+      ...yahooMapped.slice(0, 3),
       uralsItem,
-      ...yahooMapped.slice(3),       // wti
+      ...yahooMapped.slice(3),
     ].filter(Boolean)
 
-    // ── Macro (from Supabase, editable by admin) ────────────────────────────
+    // ── Macro ────────────────────────────────────────────────────────────────
     const MACRO_FALLBACK = [
       { id:'nbt_key',    label:'Ставка рефинансирования НБТ', rate: 7.0, change: null, unit:'%', year:'с 02.02.2026' },
       { id:'nbt_ann',    label:'Годовая инфляция',            rate: null, change: null, unit:'%', year:'' },
@@ -201,7 +213,7 @@ export async function GET() {
       const sb = createServerClient()
       const { data } = await sb.from('nbt_indicators').select('*').order('sort_order', { ascending: true })
       if (data && data.length > 0) macro = data
-    } catch { /* fallback to static */ }
+    } catch { /* fallback */ }
 
     return NextResponse.json({ updatedAt: new Date().toISOString(), currencies, crypto, commodities, macro })
 
