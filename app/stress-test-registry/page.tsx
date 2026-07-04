@@ -34,37 +34,93 @@ function formatDateTime(iso: string) {
   return new Date(iso).toLocaleString('ru-RU', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' })
 }
 
-function JsonBlock({ label, data }: { label: string; data: Record<string, unknown> }) {
-  const entries = Object.entries(data)
+// Recursive value renderer — never produces [object Object]
+function renderJsonValue(v: unknown, depth = 0): JSX.Element | null {
+  if (v === null || v === undefined) {
+    return <span className="text-gray-400 italic text-[11px]">—</span>
+  }
+
+  if (typeof v !== 'object') {
+    return <span className="text-xs font-medium text-gray-800">{String(v)}</span>
+  }
+
+  if (Array.isArray(v)) {
+    if (v.length === 0) return <span className="text-gray-400 italic text-[11px]">—</span>
+
+    // Array of plain objects → mini-table
+    if (v.every(item => item !== null && typeof item === 'object' && !Array.isArray(item))) {
+      const cols = Array.from(new Set(v.flatMap(item => Object.keys(item as object))))
+      return (
+        <div className="mt-1.5 overflow-x-auto rounded border border-gray-200">
+          <table className="text-xs border-collapse min-w-full">
+            <thead>
+              <tr className="bg-gray-200">
+                {cols.map(c => (
+                  <th key={c} className="px-2.5 py-1.5 text-left text-[10px] font-semibold text-gray-600 uppercase tracking-wide whitespace-nowrap">{c}</th>
+                ))}
+              </tr>
+            </thead>
+            <tbody>
+              {(v as Record<string, unknown>[]).map((row, i) => (
+                <tr key={i} className={i % 2 === 0 ? 'bg-white' : 'bg-gray-50'}>
+                  {cols.map(c => (
+                    <td key={c} className="px-2.5 py-1.5 text-gray-700 whitespace-nowrap border-t border-gray-100">
+                      {renderJsonValue(row[c], depth + 1)}
+                    </td>
+                  ))}
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )
+    }
+
+    // Array of primitives / mixed
+    return (
+      <span className="text-xs text-gray-700">
+        {v.map((item, i) => (
+          <span key={i}>{i > 0 ? ', ' : ''}{typeof item === 'object' && item !== null ? JSON.stringify(item) : String(item)}</span>
+        ))}
+      </span>
+    )
+  }
+
+  // Plain object
+  const entries = Object.entries(v as Record<string, unknown>).filter(([, val]) => val !== null && val !== undefined)
   if (!entries.length) return null
+
+  return (
+    <div className={`space-y-1.5 ${depth > 0 ? 'mt-1 ml-1 pl-2.5 border-l-2 border-gray-200' : ''}`}>
+      {entries.map(([k, val]) => {
+        const isComplex = val !== null && typeof val === 'object'
+        return (
+          <div key={k}>
+            {isComplex ? (
+              <div>
+                <span className="text-[11px] font-semibold text-gray-500">{k}:</span>
+                {renderJsonValue(val, depth + 1)}
+              </div>
+            ) : (
+              <div className="flex gap-2 items-baseline">
+                <span className="text-[11px] text-gray-400 shrink-0 w-40 truncate">{k}</span>
+                <span className="text-xs font-medium text-gray-800 break-all">{String(val)}</span>
+              </div>
+            )}
+          </div>
+        )
+      })}
+    </div>
+  )
+}
+
+function JsonBlock({ label, data }: { label: string; data: Record<string, unknown> }) {
+  if (!Object.keys(data).length) return null
   return (
     <div>
       <h4 className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-2">{label}</h4>
-      <div className="bg-gray-50 rounded-lg p-3 space-y-1.5">
-        {entries.map(([k, v]) => {
-          if (v === null || v === undefined) return null
-          if (typeof v === 'object') {
-            return (
-              <div key={k}>
-                <p className="text-xs font-medium text-gray-600 mb-1">{k}:</p>
-                <div className="pl-3 space-y-1">
-                  {Object.entries(v as Record<string, unknown>).map(([k2, v2]) => (
-                    <div key={k2} className="flex gap-2 text-xs">
-                      <span className="text-gray-400 shrink-0 w-40 truncate">{k2}</span>
-                      <span className="text-gray-800 font-medium">{String(v2)}</span>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            )
-          }
-          return (
-            <div key={k} className="flex gap-2 text-xs">
-              <span className="text-gray-400 shrink-0 w-44 truncate">{k}</span>
-              <span className="text-gray-800 font-medium">{String(v)}</span>
-            </div>
-          )
-        })}
+      <div className="bg-gray-50 rounded-lg p-3">
+        {renderJsonValue(data, 0)}
       </div>
     </div>
   )
