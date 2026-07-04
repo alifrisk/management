@@ -28,11 +28,19 @@ interface StressTest {
   coverage_cash_t30: number; coverage_only_t30: number; risk_t30: string
   created_at: string
   results?: {
-    exchange_rate: number
-    scenario: string
-    tjs: { inputs: Record<string, number>; rates: Record<string, HRate>; t1: HData; t7: HData; t30: HData }
-    fx:  { inputs: Record<string, number>; rates: Record<string, HRate>; t1: HData; t7: HData; t30: HData }
-    cons: { t1: HData; t7: HData; t30: HData }
+    version?: number
+    scenario?: string
+    // v1 legacy fields
+    exchange_rate?: number
+    tjs?: { inputs: Record<string, number>; rates: Record<string, HRate>; t1: HData; t7: HData; t30: HData }
+    fx?: { inputs: Record<string, number>; rates: Record<string, HRate>; t1: HData; t7: HData; t30: HData }
+    cons?: { t1: HData; t7: HData; t30: HData }
+    // v2 fields
+    fx_rates?: { usd: number; eur: number; rub: number }
+    rates_map?: Record<string, HRate>
+    total?: { inputs: Record<string, number>; t1: HData; t7: HData; t30: HData }
+    fx_only?: { inputs: Record<string, number>; t1: HData; t7: HData; t30: HData }
+    per_row_fx?: Record<string, { cur: string; native: number; tjs: number }>
   }
 }
 
@@ -40,7 +48,7 @@ type HRate = { t1: number; t7: number; t30: number }
 type ScRates = Record<string, HRate>
 type ScenarioName = 'Оптимистичный' | 'Пессимистичный' | 'Катастрофический'
 type RatesMap = Record<ScenarioName, ScRates>
-type CurrencyTab = 'TJS' | 'FX' | 'CONS'
+type ViewMode = 'TOTAL' | 'FX'
 type HData = { liab: number; draw: number; need: number; cov_cash: number; cov_only: number; risk: string }
 type CalcResult = { t1: HData; t7: HData; t30: HData }
 
@@ -107,30 +115,16 @@ function calcStress(f: Record<string, number>, scenario: ScenarioName, rm: Rates
   return { t1: calc('t1'), t7: calc('t7'), t30: calc('t30') }
 }
 
-function calcConsolidated(
-  tjsI: Record<string, number>, fxI: Record<string, number>,
-  scenario: ScenarioName, tjsRm: RatesMap, fxRm: RatesMap, exRate: number
-): CalcResult {
-  const tjs = calcStress(tjsI, scenario, tjsRm)
-  const fx  = calcStress(fxI,  scenario, fxRm)
-  const calc = (h: 't1' | 't7' | 't30'): HData => {
-    const liab = tjs[h].liab + fx[h].liab * exRate
-    const draw = tjs[h].draw + fx[h].draw * exRate
-    const need = liab + draw
-    const hqla  = (tjsI.cash_equivalents || 0) + (fxI.cash_equivalents || 0) * exRate
-    const hqlaO = (tjsI.cash_only        || 0) + (fxI.cash_only        || 0) * exRate
-    const cov_cash = need > 0 ? hqla  / need : 0
-    const cov_only = need > 0 ? hqlaO / need : 0
-    const risk = cov_only < 1 ? 'High' : cov_cash < 1 ? 'High' : cov_only < 1.1 ? 'Elevated' : cov_cash < 1.1 ? 'Elevated' : 'Normal'
-    return { liab, draw, need, cov_cash, cov_only, risk }
-  }
-  return { t1: calc('t1'), t7: calc('t7'), t30: calc('t30') }
-}
-
 const MONTHS = ['Январь','Февраль','Март','Апрель','Май','Июнь','Июль','Август','Сентябрь','Октябрь','Ноябрь','Декабрь']
 const fmt = (n: number) => n ? new Intl.NumberFormat('ru-RU').format(Math.round(n)) : '—'
 const formatNum = (v: string) => { const num = v.replace(/\D/g, ''); if (!num) return ''; return new Intl.NumberFormat('ru-RU').format(Number(num)) }
 const parseNum = (v: string) => Number(v.replace(/\D/g, '')) || 0
+
+const ALL_ROW_KEYS = [
+  'due_to_banks', 'current_accounts', 'electronic_wallet', 'savings', 'term_deposits',
+  'borrowings', 'other_liabilities', 'credit_line_salom', 'credit_line_sme',
+  'cash_equivalents', 'cash_only',
+]
 
 const EMPTY: Record<string, string> = {
   test_name: '', analyst_name: '',
@@ -138,17 +132,19 @@ const EMPTY: Record<string, string> = {
   term_deposits: '', borrowings: '', other_liabilities: '',
   credit_line_salom: '', credit_line_sme: '',
   cash_equivalents: '', cash_only: '',
-  fx_due_to_banks: '', fx_current_accounts: '', fx_electronic_wallet: '', fx_savings: '',
-  fx_term_deposits: '', fx_borrowings: '', fx_other_liabilities: '',
-  fx_credit_line_salom: '', fx_credit_line_sme: '',
-  fx_cash_equivalents: '', fx_cash_only: '',
-  exchange_rate: '18',
+  ...Object.fromEntries(ALL_ROW_KEYS.flatMap(k => [
+    [k + '_fx_cur', 'none'],
+    [k + '_fx_native', ''],
+  ])),
+  rate_usd: '10.90',
+  rate_eur: '11.80',
+  rate_rub: '0.12',
 }
 
 const SCENARIO_STYLES: Record<ScenarioName, { bg: string; text: string; border: string; badge: string }> = {
-  'Оптимистичный':   { bg: 'bg-green-50',  text: 'text-green-700',  border: 'border-green-300',  badge: 'bg-green-100 text-green-700'  },
-  'Пессимистичный':  { bg: 'bg-yellow-50', text: 'text-yellow-700', border: 'border-yellow-300', badge: 'bg-yellow-100 text-yellow-700' },
-  'Катастрофический':{ bg: 'bg-red-50',    text: 'text-red-700',    border: 'border-red-300',    badge: 'bg-red-100 text-red-700'      },
+  'Оптимистичный':    { bg: 'bg-green-50',  text: 'text-green-700',  border: 'border-green-300',  badge: 'bg-green-100 text-green-700'  },
+  'Пессимистичный':   { bg: 'bg-yellow-50', text: 'text-yellow-700', border: 'border-yellow-300', badge: 'bg-yellow-100 text-yellow-700' },
+  'Катастрофический': { bg: 'bg-red-50',    text: 'text-red-700',    border: 'border-red-300',    badge: 'bg-red-100 text-red-700'      },
 }
 
 const LIAB_DEFS = [
@@ -171,13 +167,13 @@ export default function LiquidityPage() {
   const [showModal, setShowModal] = useState(false)
   const [form, setForm] = useState<Record<string, string>>(EMPTY)
   const [scenario, setScenario] = useState<ScenarioName>('Пессимистичный')
-  const [currencyTab, setCurrencyTab] = useState<CurrencyTab>('TJS')
-  const [customRatesTJS, setCustomRatesTJS] = useState<RatesMap>(initRates)
-  const [customRatesFX, setCustomRatesFX] = useState<RatesMap>(initRates)
+  const [viewMode, setViewMode] = useState<ViewMode>('TOTAL')
+  const [customRates, setCustomRates] = useState<RatesMap>(initRates)
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [viewing, setViewing] = useState<StressTest | null>(null)
   const [viewScenario, setViewScenario] = useState<ScenarioName>('Пессимистичный')
+  const [viewViewMode, setViewViewMode] = useState<ViewMode>('TOTAL')
   const [filterYear, setFilterYear] = useState('')
   const [filterMonth, setFilterMonth] = useState('')
 
@@ -197,56 +193,54 @@ export default function LiquidityPage() {
   const setF = (k: string, v: string) => setForm(p => ({ ...p, [k]: v }))
   const setNum = (k: string, v: string) => setForm(p => ({ ...p, [k]: formatNum(v) }))
 
-  const inputs = {
+  const getFxRate = useCallback((cur: string) => {
+    if (cur === 'USD') return parseFloat(form.rate_usd) || 0
+    if (cur === 'EUR') return parseFloat(form.rate_eur) || 0
+    if (cur === 'RUB') return parseFloat(form.rate_rub) || 0
+    return 0
+  }, [form.rate_usd, form.rate_eur, form.rate_rub])
+
+  const getFxTjs = useCallback((key: string) => {
+    const cur = form[key + '_fx_cur']
+    if (!cur || cur === 'none') return 0
+    return parseNum(form[key + '_fx_native'] || '') * getFxRate(cur)
+  }, [form, getFxRate])
+
+  const totalInputs = {
     due_to_banks: n('due_to_banks'), current_accounts: n('current_accounts'),
     electronic_wallet: n('electronic_wallet'), savings: n('savings'), term_deposits: n('term_deposits'),
     borrowings: n('borrowings'), other_liabilities: n('other_liabilities'),
     credit_line_salom: n('credit_line_salom'), credit_line_sme: n('credit_line_sme'),
     cash_equivalents: n('cash_equivalents'), cash_only: n('cash_only'),
   }
-  const fxInputs = {
-    due_to_banks: n('fx_due_to_banks'), current_accounts: n('fx_current_accounts'),
-    electronic_wallet: n('fx_electronic_wallet'), savings: n('fx_savings'), term_deposits: n('fx_term_deposits'),
-    borrowings: n('fx_borrowings'), other_liabilities: n('fx_other_liabilities'),
-    credit_line_salom: n('fx_credit_line_salom'), credit_line_sme: n('fx_credit_line_sme'),
-    cash_equivalents: n('fx_cash_equivalents'), cash_only: n('fx_cash_only'),
+  const fxOnlyInputs = {
+    due_to_banks: getFxTjs('due_to_banks'), current_accounts: getFxTjs('current_accounts'),
+    electronic_wallet: getFxTjs('electronic_wallet'), savings: getFxTjs('savings'),
+    term_deposits: getFxTjs('term_deposits'), borrowings: getFxTjs('borrowings'),
+    other_liabilities: getFxTjs('other_liabilities'),
+    credit_line_salom: getFxTjs('credit_line_salom'), credit_line_sme: getFxTjs('credit_line_sme'),
+    cash_equivalents: getFxTjs('cash_equivalents'), cash_only: getFxTjs('cash_only'),
   }
-  const exRate = parseFloat(form.exchange_rate) || 1
 
-  const computed = calcStress(inputs, scenario, customRatesTJS)
+  const updateRate = (key: string, h: 't1' | 't7' | 't30', val: string) => {
+    const num = Math.max(0, Math.min(100, parseFloat(val) || 0)) / 100
+    setCustomRates(prev => ({
+      ...prev,
+      [scenario]: { ...prev[scenario], [key]: { ...prev[scenario][key], [h]: num } }
+    }))
+  }
 
-  const allComputedTJS: Record<ScenarioName, CalcResult> = {
-    'Оптимистичный':    calcStress(inputs,   'Оптимистичный',    customRatesTJS),
-    'Пессимистичный':   calcStress(inputs,   'Пессимистичный',   customRatesTJS),
-    'Катастрофический': calcStress(inputs,   'Катастрофический', customRatesTJS),
+  const allComputedTotal: Record<ScenarioName, CalcResult> = {
+    'Оптимистичный':    calcStress(totalInputs, 'Оптимистичный',    customRates),
+    'Пессимистичный':   calcStress(totalInputs, 'Пессимистичный',   customRates),
+    'Катастрофический': calcStress(totalInputs, 'Катастрофический', customRates),
   }
   const allComputedFX: Record<ScenarioName, CalcResult> = {
-    'Оптимистичный':    calcStress(fxInputs, 'Оптимистичный',    customRatesFX),
-    'Пессимистичный':   calcStress(fxInputs, 'Пессимистичный',   customRatesFX),
-    'Катастрофический': calcStress(fxInputs, 'Катастрофический', customRatesFX),
+    'Оптимистичный':    calcStress(fxOnlyInputs, 'Оптимистичный',    customRates),
+    'Пессимистичный':   calcStress(fxOnlyInputs, 'Пессимистичный',   customRates),
+    'Катастрофический': calcStress(fxOnlyInputs, 'Катастрофический', customRates),
   }
-  const allComputedCONS: Record<ScenarioName, CalcResult> = {
-    'Оптимистичный':    calcConsolidated(inputs, fxInputs, 'Оптимистичный',    customRatesTJS, customRatesFX, exRate),
-    'Пессимистичный':   calcConsolidated(inputs, fxInputs, 'Пессимистичный',   customRatesTJS, customRatesFX, exRate),
-    'Катастрофический': calcConsolidated(inputs, fxInputs, 'Катастрофический', customRatesTJS, customRatesFX, exRate),
-  }
-  const displayedAll = currencyTab === 'TJS' ? allComputedTJS : currencyTab === 'FX' ? allComputedFX : allComputedCONS
-  const displayUnit = currencyTab === 'FX' ? 'USD' : 'TJS'
-
-  const updateRateTJS = (key: string, h: 't1' | 't7' | 't30', val: string) => {
-    const num = Math.max(0, Math.min(100, parseFloat(val) || 0)) / 100
-    setCustomRatesTJS(prev => ({
-      ...prev,
-      [scenario]: { ...prev[scenario], [key]: { ...prev[scenario][key], [h]: num } }
-    }))
-  }
-  const updateRateFX = (key: string, h: 't1' | 't7' | 't30', val: string) => {
-    const num = Math.max(0, Math.min(100, parseFloat(val) || 0)) / 100
-    setCustomRatesFX(prev => ({
-      ...prev,
-      [scenario]: { ...prev[scenario], [key]: { ...prev[scenario][key], [h]: num } }
-    }))
-  }
+  const displayedAll = viewMode === 'TOTAL' ? allComputedTotal : allComputedFX
 
   const riskColor = (r: string) => r === 'High' ? 'text-red-600 bg-red-50' : r === 'Elevated' ? 'text-yellow-600 bg-yellow-50' : 'text-green-600 bg-green-50'
   const riskLabel = (r: string) => r === 'High' ? 'Высокий' : r === 'Elevated' ? 'Повышенный' : 'Нормальный'
@@ -256,67 +250,68 @@ export default function LiquidityPage() {
     if (!form.test_name.trim()) { setError('Введите название теста'); return }
     setSaving(true); setError(null)
     try {
-      const fxComputed   = calcStress(fxInputs, scenario, customRatesFX)
-      const consComputed = calcConsolidated(inputs, fxInputs, scenario, customRatesTJS, customRatesFX, exRate)
+      const totalResult = calcStress(totalInputs, scenario, customRates)
+      const fxResult    = calcStress(fxOnlyInputs, scenario, customRates)
+
+      const perRowFx: Record<string, { cur: string; native: number; tjs: number }> = {}
+      for (const key of ALL_ROW_KEYS) {
+        const cur = form[key + '_fx_cur']
+        if (cur && cur !== 'none') {
+          const native = parseNum(form[key + '_fx_native'] || '')
+          const tjs = native * getFxRate(cur)
+          if (native > 0) perRowFx[key] = { cur, native, tjs }
+        }
+      }
 
       const resultsPayload = {
-        exchange_rate: exRate,
+        version: 2,
         scenario,
-        tjs: {
-          inputs: { ...inputs },
-          rates: customRatesTJS[scenario],
-          t1: computed.t1, t7: computed.t7, t30: computed.t30,
+        fx_rates: {
+          usd: parseFloat(form.rate_usd) || 0,
+          eur: parseFloat(form.rate_eur) || 0,
+          rub: parseFloat(form.rate_rub) || 0,
         },
-        fx: {
-          inputs: { ...fxInputs },
-          rates: customRatesFX[scenario],
-          t1: fxComputed.t1, t7: fxComputed.t7, t30: fxComputed.t30,
-        },
-        cons: {
-          t1: consComputed.t1, t7: consComputed.t7, t30: consComputed.t30,
-        },
+        rates_map: customRates[scenario],
+        total: { inputs: { ...totalInputs }, t1: totalResult.t1, t7: totalResult.t7, t30: totalResult.t30 },
+        fx_only: { inputs: { ...fxOnlyInputs }, t1: fxResult.t1, t7: fxResult.t7, t30: fxResult.t30 },
+        per_row_fx: perRowFx,
       }
 
       const { error: dbErr } = await supabase.from('liquidity_stress_tests').insert({
         test_name: form.test_name, analyst_name: form.analyst_name,
         scenario,
         test_date: new Date().toISOString().split('T')[0],
-        due_to_banks: n('due_to_banks'), current_accounts: n('current_accounts'),
-        electronic_wallet: n('electronic_wallet'), savings: n('savings'), term_deposits: n('term_deposits'),
-        borrowings: n('borrowings'), other_liabilities: n('other_liabilities'),
-        credit_line_salom: n('credit_line_salom'), credit_line_sme: n('credit_line_sme'),
-        cash_equivalents: n('cash_equivalents'), cash_only: n('cash_only'),
-        // Flat columns → consolidated (main result shown in list)
-        outflow_t1: consComputed.t1.liab, drawdown_t1: consComputed.t1.draw, need_t1: consComputed.t1.need,
-        coverage_cash_t1: consComputed.t1.cov_cash, coverage_only_t1: consComputed.t1.cov_only, risk_t1: consComputed.t1.risk,
-        outflow_t7: consComputed.t7.liab, drawdown_t7: consComputed.t7.draw, need_t7: consComputed.t7.need,
-        coverage_cash_t7: consComputed.t7.cov_cash, coverage_only_t7: consComputed.t7.cov_only, risk_t7: consComputed.t7.risk,
-        outflow_t30: consComputed.t30.liab, drawdown_t30: consComputed.t30.draw, need_t30: consComputed.t30.need,
-        coverage_cash_t30: consComputed.t30.cov_cash, coverage_only_t30: consComputed.t30.cov_only, risk_t30: consComputed.t30.risk,
+        ...totalInputs,
+        outflow_t1: totalResult.t1.liab, drawdown_t1: totalResult.t1.draw, need_t1: totalResult.t1.need,
+        coverage_cash_t1: totalResult.t1.cov_cash, coverage_only_t1: totalResult.t1.cov_only, risk_t1: totalResult.t1.risk,
+        outflow_t7: totalResult.t7.liab, drawdown_t7: totalResult.t7.draw, need_t7: totalResult.t7.need,
+        coverage_cash_t7: totalResult.t7.cov_cash, coverage_only_t7: totalResult.t7.cov_only, risk_t7: totalResult.t7.risk,
+        outflow_t30: totalResult.t30.liab, drawdown_t30: totalResult.t30.draw, need_t30: totalResult.t30.need,
+        coverage_cash_t30: totalResult.t30.cov_cash, coverage_only_t30: totalResult.t30.cov_only, risk_t30: totalResult.t30.risk,
         results: resultsPayload,
       })
       if (dbErr) throw new Error(dbErr.message)
 
-      const cons30 = consComputed.t30
       const conclusion = [
-        `Сценарий: ${scenario}. Курс НБТ: ${exRate} TJS/USD.`,
-        `T+1 (конс.) — потребность: ${fmt(consComputed.t1.need)} TJS, покрытие: ${(consComputed.t1.cov_cash*100).toFixed(0)}%, риск: ${riskLabel(consComputed.t1.risk)}.`,
-        `T+7 (конс.) — потребность: ${fmt(consComputed.t7.need)} TJS, покрытие: ${(consComputed.t7.cov_cash*100).toFixed(0)}%, риск: ${riskLabel(consComputed.t7.risk)}.`,
-        `T+30 (конс.) — потребность: ${fmt(cons30.need)} TJS, покрытие: ${(cons30.cov_cash*100).toFixed(0)}%, риск: ${riskLabel(cons30.risk)}.`,
-        `TJS T+30: покрытие ${(computed.t30.cov_cash*100).toFixed(0)}%. FX T+30: покрытие ${(fxComputed.t30.cov_cash*100).toFixed(0)}%.`,
-      ].join(' ')
+        `Сценарий: ${scenario}.`,
+        `T+1 — потребность: ${fmt(totalResult.t1.need)} TJS, покрытие: ${(totalResult.t1.cov_cash*100).toFixed(0)}%, риск: ${riskLabel(totalResult.t1.risk)}.`,
+        `T+7 — потребность: ${fmt(totalResult.t7.need)} TJS, покрытие: ${(totalResult.t7.cov_cash*100).toFixed(0)}%, риск: ${riskLabel(totalResult.t7.risk)}.`,
+        `T+30 — потребность: ${fmt(totalResult.t30.need)} TJS, покрытие: ${(totalResult.t30.cov_cash*100).toFixed(0)}%, риск: ${riskLabel(totalResult.t30.risk)}.`,
+        fxResult.t30.need > 0 ? `В т.ч. ин. валюта (TJS экв.) T+30: потребность ${fmt(fxResult.t30.need)} TJS, покрытие ${(fxResult.t30.cov_cash*100).toFixed(0)}%.` : '',
+      ].filter(Boolean).join(' ')
+
       await supabase.from('stress_test_registry').insert({
         risk_type: 'Риск ликвидности',
         analyst_name: form.analyst_name,
         period: form.test_name,
-        inputs: { tjs: inputs, fx: fxInputs, exchange_rate: exRate, scenario },
+        inputs: { total: totalInputs, fx_only: fxOnlyInputs, per_row_fx: perRowFx, scenario },
         results: resultsPayload,
         conclusion,
         status: 'Проведён',
       })
 
       setShowModal(false); setForm(EMPTY); setScenario('Пессимистичный')
-      setCurrencyTab('TJS'); setCustomRatesTJS(initRates()); setCustomRatesFX(initRates())
+      setViewMode('TOTAL'); setCustomRates(initRates())
       fetch_()
     } catch (err: unknown) {
       setError('Ошибка: ' + (err instanceof Error ? err.message : String(err)))
@@ -348,16 +343,16 @@ export default function LiquidityPage() {
   const lbl = "block text-xs font-medium text-gray-600 mb-1"
   const rInp = "w-full px-1 py-0.5 border border-gray-200 rounded text-[11px] text-center focus:outline-none focus:ring-1 focus:ring-[#1B8A4C] bg-white"
 
-  const HorizonCard = ({ h, data, unit = 'TJS' }: { h: string; data: HData; unit?: string }) => (
+  const HorizonCard = ({ h, data }: { h: string; data: HData }) => (
     <div className={`p-4 rounded-xl border-2 ${data.risk === 'High' ? 'border-red-200 bg-red-50' : data.risk === 'Elevated' ? 'border-yellow-200 bg-yellow-50' : 'border-green-200 bg-green-50'}`}>
       <div className="flex items-center justify-between mb-3">
         <p className="text-sm font-bold text-gray-800">{h}</p>
         <span className={`text-xs font-semibold px-2 py-0.5 rounded-full ${riskColor(data.risk)}`}>{riskLabel(data.risk)}</span>
       </div>
       <div className="space-y-1.5 text-xs">
-        <div className="flex justify-between"><span className="text-gray-500">Отток обязательств:</span><span className="font-medium">{fmt(data.liab)} {unit}</span></div>
-        <div className="flex justify-between"><span className="text-gray-500">Использование линий:</span><span className="font-medium">{fmt(data.draw)} {unit}</span></div>
-        <div className="flex justify-between border-t border-gray-200 pt-1.5 mt-1.5"><span className="font-semibold text-gray-700">Стресс-потребность:</span><span className="font-bold text-gray-900">{fmt(data.need)} {unit}</span></div>
+        <div className="flex justify-between"><span className="text-gray-500">Отток обязательств:</span><span className="font-medium">{fmt(data.liab)} TJS</span></div>
+        <div className="flex justify-between"><span className="text-gray-500">Использование линий:</span><span className="font-medium">{fmt(data.draw)} TJS</span></div>
+        <div className="flex justify-between border-t border-gray-200 pt-1.5 mt-1.5"><span className="font-semibold text-gray-700">Стресс-потребность:</span><span className="font-bold text-gray-900">{fmt(data.need)} TJS</span></div>
         <div className="flex justify-between"><span className="text-gray-500">Покрытие (Cash & Eq):</span><span className={`font-bold ${covColor(data.cov_cash)}`}>{(data.cov_cash * 100).toFixed(0)}%</span></div>
         <div className="flex justify-between"><span className="text-gray-500">Покрытие (Cash Only):</span><span className={`font-bold ${covColor(data.cov_only)}`}>{(data.cov_only * 100).toFixed(0)}%</span></div>
         {data.cov_cash >= 1 && data.cov_only < 1 && (
@@ -365,91 +360,16 @@ export default function LiquidityPage() {
         )}
         <div className="flex justify-between border-t border-gray-200 pt-1 mt-1">
           {data.cov_cash >= 1
-            ? <><span className="text-green-700 font-semibold">Профицит:</span><span className="font-bold text-green-700">+{fmt(Math.round((data.cov_cash - 1) * data.need))} {unit}</span></>
-            : <><span className="text-red-700 font-semibold">Дефицит:</span><span className="font-bold text-red-700">-{fmt(Math.round((1 - data.cov_cash) * data.need))} {unit}</span></>
+            ? <><span className="text-green-700 font-semibold">Профицит:</span><span className="font-bold text-green-700">+{fmt(Math.round((data.cov_cash - 1) * data.need))} TJS</span></>
+            : <><span className="text-red-700 font-semibold">Дефицит:</span><span className="font-bold text-red-700">-{fmt(Math.round((1 - data.cov_cash) * data.need))} TJS</span></>
           }
         </div>
         {data.cov_only < 1 && (
           <div className="flex justify-between">
             <span className="text-red-700 font-semibold">Дефицит (Only):</span>
-            <span className="font-bold text-red-700">-{fmt(Math.round((1 - data.cov_only) * data.need))} {unit}</span>
+            <span className="font-bold text-red-700">-{fmt(Math.round((1 - data.cov_only) * data.need))} TJS</span>
           </div>
         )}
-      </div>
-    </div>
-  )
-
-  const RateInputs = ({ ratesMap, updateFn, fKey }: {
-    ratesMap: RatesMap
-    updateFn: (k: string, h: 't1' | 't7' | 't30', v: string) => void
-    fKey: string
-  }) => {
-    const r = (ratesMap[scenario] || {})[fKey] || { t1: 0, t7: 0, t30: 0 }
-    return (
-      <div className="flex gap-1 mt-1.5">
-        {(['t1', 't7', 't30'] as const).map(h => (
-          <div key={h} className="flex-1">
-            <div className="text-[9px] text-gray-400 text-center mb-0.5">{h === 't1' ? 'T+1' : h === 't7' ? 'T+7' : 'T+30'}</div>
-            <div className="flex items-center gap-0.5">
-              <input type="number" min="0" max="100" step="1"
-                value={(r[h] * 100).toFixed(0)}
-                onChange={e => updateFn(fKey, h, e.target.value)}
-                className={rInp} />
-              <span className="text-[9px] text-gray-400">%</span>
-            </div>
-          </div>
-        ))}
-      </div>
-    )
-  }
-
-  const LiabInputs = ({ prefix, currency, ratesMap, updateFn }: {
-    prefix: string; currency: string; ratesMap: RatesMap
-    updateFn: (k: string, h: 't1' | 't7' | 't30', v: string) => void
-  }) => (
-    <div className="space-y-5">
-      <div>
-        <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-3">Обязательства ({currency})</p>
-        <div className="grid grid-cols-2 gap-3">
-          {LIAB_DEFS.map(f => (
-            <div key={f.key}>
-              <label className={lbl}>{f.label}</label>
-              <input type="text" inputMode="numeric" value={form[prefix + f.key]}
-                onChange={e => setNum(prefix + f.key, e.target.value)} placeholder="0" className={inp} />
-              <RateInputs ratesMap={ratesMap} updateFn={updateFn} fKey={f.key} />
-            </div>
-          ))}
-        </div>
-      </div>
-      <div>
-        <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-3">Кредитные линии ({currency})</p>
-        <div className="grid grid-cols-2 gap-3">
-          {CL_DEFS.map(f => (
-            <div key={f.key}>
-              <label className={lbl}>{f.label}</label>
-              <input type="text" inputMode="numeric" value={form[prefix + f.key]}
-                onChange={e => setNum(prefix + f.key, e.target.value)} placeholder="0" className={inp} />
-              <RateInputs ratesMap={ratesMap} updateFn={updateFn} fKey={f.key} />
-            </div>
-          ))}
-        </div>
-      </div>
-      <div>
-        <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-3">Буфер ликвидности ({currency})</p>
-        <div className="grid grid-cols-2 gap-3">
-          <div>
-            <label className={lbl}>{prefix === 'fx_' ? 'FX Cash + Ностро USD/EUR' : 'Cash & Cash Equivalents'}</label>
-            <input type="text" inputMode="numeric" value={form[prefix + 'cash_equivalents']}
-              onChange={e => setNum(prefix + 'cash_equivalents', e.target.value)} placeholder="0" className={inp} />
-            <p className="text-xs text-gray-400 mt-0.5">{prefix === 'fx_' ? 'Наличная ин. валюта + счета ностро' : 'Наличные + счета в ЦБ + краткосрочные ЦБ'}</p>
-          </div>
-          <div>
-            <label className={lbl}>{prefix === 'fx_' ? 'FX Cash Only' : 'Cash Only (наличные)'}</label>
-            <input type="text" inputMode="numeric" value={form[prefix + 'cash_only']}
-              onChange={e => setNum(prefix + 'cash_only', e.target.value)} placeholder="0" className={inp} />
-            <p className="text-xs text-gray-400 mt-0.5">Только физические наличные {prefix === 'fx_' ? 'в ин. валюте' : 'деньги'}</p>
-          </div>
-        </div>
       </div>
     </div>
   )
@@ -462,7 +382,7 @@ export default function LiquidityPage() {
             <h1 className="text-xl font-semibold text-gray-900">Ликвидность — Стресс-тест</h1>
             <p className="text-sm text-gray-500 mt-0.5">Оптимистичный / Пессимистичный / Катастрофический · T+1 / T+7 / T+30</p>
           </div>
-          <button onClick={() => { setForm(EMPTY); setScenario('Пессимистичный'); setCurrencyTab('TJS'); setCustomRatesTJS(initRates()); setCustomRatesFX(initRates()); setError(null); setShowModal(true) }}
+          <button onClick={() => { setForm(EMPTY); setScenario('Пессимистичный'); setViewMode('TOTAL'); setCustomRates(initRates()); setError(null); setShowModal(true) }}
             className="flex items-center gap-2 px-4 py-2 bg-[#1B8A4C] text-white rounded-lg text-sm font-medium hover:bg-[#177040]">
             <Plus className="w-4 h-4" /> Новый стресс-тест
           </button>
@@ -470,10 +390,10 @@ export default function LiquidityPage() {
 
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 mt-4">
           {[
-            { label: 'Всего тестов', value: tests.length, c: 'text-gray-900' },
-            { label: 'Нормальный', value: tests.filter(t => t.risk_t30 === 'Normal').length, c: 'text-green-600' },
-            { label: 'Повышенный', value: tests.filter(t => t.risk_t30 === 'Elevated').length, c: 'text-yellow-600' },
-            { label: 'Высокий риск', value: tests.filter(t => t.risk_t30 === 'High').length, c: 'text-red-600' },
+            { label: 'Всего тестов',  value: tests.length,                                          c: 'text-gray-900'   },
+            { label: 'Нормальный',    value: tests.filter(t => t.risk_t30 === 'Normal').length,    c: 'text-green-600'  },
+            { label: 'Повышенный',    value: tests.filter(t => t.risk_t30 === 'Elevated').length,  c: 'text-yellow-600' },
+            { label: 'Высокий риск',  value: tests.filter(t => t.risk_t30 === 'High').length,      c: 'text-red-600'    },
           ].map(s => (
             <div key={s.label} className="bg-white rounded-xl border border-gray-100 p-4 shadow-sm">
               <p className={`text-2xl font-bold ${s.c}`}>{s.value}</p>
@@ -538,7 +458,8 @@ export default function LiquidityPage() {
                         <td className="px-4 py-3 text-gray-600 text-xs">{t.analyst_name || '—'}</td>
                         <td className="px-4 py-3">
                           <div className="flex items-center gap-1">
-                            <button onClick={() => { setViewing(t); setViewScenario((t.scenario as ScenarioName) || 'Пессимистичный') }} className="p-1.5 text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg"><Eye className="w-3.5 h-3.5" /></button>
+                            <button onClick={() => { setViewing(t); setViewScenario((t.scenario as ScenarioName) || 'Пессимистичный'); setViewViewMode('TOTAL') }}
+                              className="p-1.5 text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg"><Eye className="w-3.5 h-3.5" /></button>
                             <button onClick={() => downloadWord(t)} className="p-1.5 text-gray-400 hover:text-[#1B8A4C] hover:bg-green-50 rounded-lg"><Download className="w-3.5 h-3.5" /></button>
                             <button onClick={() => handleDelete(t.id)} className="p-1.5 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg"><Trash2 className="w-3.5 h-3.5" /></button>
                           </div>
@@ -568,126 +489,174 @@ export default function LiquidityPage() {
               <button onClick={() => setViewing(null)}><X className="w-5 h-5 text-gray-400" /></button>
             </div>
             <div className="flex-1 overflow-y-auto p-6 space-y-5">
-              {/* Scenario switcher — only for legacy (no results jsonb) */}
-              {!viewing.results && (
-                <div className="grid grid-cols-3 gap-2">
-                  {(Object.keys(ALL_SCENARIOS) as ScenarioName[]).map(sc => {
-                    const style = SCENARIO_STYLES[sc]
-                    const active = viewScenario === sc
-                    const isSaved = (viewing.scenario || 'Пессимистичный') === sc
-                    return (
-                      <button key={sc} onClick={() => setViewScenario(sc)}
-                        className={`px-3 py-2.5 rounded-xl border-2 text-xs font-semibold transition-all ${active ? `${style.bg} ${style.border} ${style.text}` : 'bg-white border-gray-200 text-gray-500 hover:border-gray-300'}`}>
-                        {sc === 'Оптимистичный' ? '📈' : sc === 'Пессимистичный' ? '📉' : '⚠️'} {sc}
-                        {isSaved && <span className="ml-1 text-[10px] opacity-70">(сохранён)</span>}
-                      </button>
-                    )
-                  })}
-                </div>
-              )}
 
-              {viewing.results ? (
-                /* New format: consolidated + TJS/FX breakdown */
+              {/* v2 format */}
+              {(viewing.results?.version === 2 || viewing.results?.total) ? (() => {
+                const r = viewing.results!
+                const sc = (r.scenario || 'Пессимистичный') as ScenarioName
+                const displayComp = viewViewMode === 'FX' && r.fx_only
+                  ? { t1: r.fx_only.t1, t7: r.fx_only.t7, t30: r.fx_only.t30 }
+                  : r.total
+                    ? { t1: r.total.t1, t7: r.total.t7, t30: r.total.t30 }
+                    : null
+                return (
+                  <>
+                    <div className="flex items-center gap-3 flex-wrap">
+                      <span className={`text-xs font-semibold px-3 py-1 rounded-full ${SCENARIO_STYLES[sc]?.badge || 'bg-gray-100 text-gray-600'}`}>{sc}</span>
+                      {r.fx_rates && (
+                        <span className="text-xs text-gray-500 bg-blue-50 px-3 py-1 rounded-full">
+                          💱 USD: {r.fx_rates.usd} · EUR: {r.fx_rates.eur} · RUB: {r.fx_rates.rub} TJS
+                        </span>
+                      )}
+                    </div>
+
+                    <div className="flex gap-1 bg-gray-100 p-1 rounded-xl w-full max-w-sm">
+                      {([
+                        { id: 'TOTAL' as ViewMode, label: '🇹🇯 Сомони' },
+                        { id: 'FX'    as ViewMode, label: '💵 В т.ч. инвалюта' },
+                      ]).map(tab => (
+                        <button key={tab.id} onClick={() => setViewViewMode(tab.id)}
+                          className={`flex-1 py-1.5 px-3 rounded-lg text-xs font-semibold transition-all ${viewViewMode === tab.id ? 'bg-white shadow-sm text-gray-900' : 'text-gray-500 hover:text-gray-700'}`}>
+                          {tab.label}
+                        </button>
+                      ))}
+                    </div>
+
+                    {displayComp && (
+                      <div>
+                        <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">
+                          {viewViewMode === 'FX' ? '💵 В т.ч. иностранная валюта (TJS экв.)' : '🇹🇯 Сомони — общий расчёт'}
+                        </p>
+                        <div className="grid grid-cols-3 gap-3">
+                          <HorizonCard h="T+1 (1 день)" data={displayComp.t1} />
+                          <HorizonCard h="T+7 (7 дней)" data={displayComp.t7} />
+                          <HorizonCard h="T+30 (30 дней)" data={displayComp.t30} />
+                        </div>
+                      </div>
+                    )}
+
+                    <div className="bg-gray-50 rounded-xl p-4">
+                      <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-3">
+                        Входные данные (TJS)
+                        {r.rates_map && <span className="ml-2 text-[#1B8A4C] font-normal">% отток: {sc}</span>}
+                      </p>
+                      <div className="grid grid-cols-1 gap-1.5 text-xs">
+                        {([
+                          { label: 'Межбанковские обязательства', key: 'due_to_banks' },
+                          { label: 'Текущие счета',               key: 'current_accounts' },
+                          { label: 'Электронный кошелёк',         key: 'electronic_wallet' },
+                          { label: 'Накопительные счета',         key: 'savings' },
+                          { label: 'Срочные депозиты',            key: 'term_deposits' },
+                          { label: 'Заимствования',               key: 'borrowings' },
+                          { label: 'Прочие обязательства',        key: 'other_liabilities' },
+                          { label: 'Кредитная линия Salom',       key: 'credit_line_salom' },
+                          { label: 'Кредитная линия SME',         key: 'credit_line_sme' },
+                        ]).map(item => {
+                          const totalVal = r.total?.inputs[item.key] || 0
+                          const fxInfo   = r.per_row_fx?.[item.key]
+                          const rm = r.rates_map as Record<string, HRate> | undefined
+                          const rate = rm?.[item.key]
+                          const rateStr = rate ? `${(rate.t1*100).toFixed(0)}% / ${(rate.t7*100).toFixed(0)}% / ${(rate.t30*100).toFixed(0)}%` : null
+                          return (
+                            <div key={item.key} className="p-1.5 bg-white rounded">
+                              <div className="flex items-center justify-between gap-2">
+                                <span className="text-gray-500 flex-1">{item.label}</span>
+                                {rateStr && <span className="text-[#1B8A4C] font-medium text-[10px] whitespace-nowrap">{rateStr}</span>}
+                                <span className="font-medium text-gray-900 whitespace-nowrap">{fmt(totalVal)} TJS</span>
+                              </div>
+                              {fxInfo && (
+                                <div className="text-[10px] text-blue-500 mt-0.5">
+                                  В т.ч.: {fmt(fxInfo.native)} {fxInfo.cur} ≈ {fmt(fxInfo.tjs)} TJS
+                                  {totalVal > 0 && <span className="text-gray-400"> ({Math.round(fxInfo.tjs/totalVal*100)}%)</span>}
+                                </div>
+                              )}
+                            </div>
+                          )
+                        })}
+                        <div className="border-t border-gray-200 mt-1 pt-1.5 space-y-1">
+                          {[
+                            { label: 'Буфер: Cash & Equivalents', key: 'cash_equivalents' },
+                            { label: 'Буфер: Cash Only',          key: 'cash_only' },
+                          ].map(item => {
+                            const totalVal = r.total?.inputs[item.key] || 0
+                            const fxInfo   = r.per_row_fx?.[item.key]
+                            return (
+                              <div key={item.key} className="p-1.5 bg-white rounded">
+                                <div className="flex justify-between">
+                                  <span className="text-gray-500">{item.label}</span>
+                                  <span className="font-bold">{fmt(totalVal)} TJS</span>
+                                </div>
+                                {fxInfo && (
+                                  <div className="text-[10px] text-blue-500 mt-0.5">
+                                    В т.ч.: {fmt(fxInfo.native)} {fxInfo.cur} ≈ {fmt(fxInfo.tjs)} TJS
+                                  </div>
+                                )}
+                              </div>
+                            )
+                          })}
+                        </div>
+                      </div>
+                    </div>
+                  </>
+                )
+              })()
+
+              /* v1 legacy: has results.tjs */
+              : viewing.results?.tjs ? (
                 <>
-                  {/* Header info */}
                   <div className="flex items-center gap-3 flex-wrap">
                     <span className={`text-xs font-semibold px-3 py-1 rounded-full ${SCENARIO_STYLES[viewing.results.scenario as ScenarioName]?.badge || 'bg-gray-100 text-gray-600'}`}>
                       {viewing.results.scenario}
                     </span>
                     <span className="text-xs text-gray-500 bg-blue-50 px-3 py-1 rounded-full">
-                      💱 Курс НБТ: <strong>{viewing.results.exchange_rate}</strong> TJS/USD
+                      💱 Курс НБТ: <strong>{viewing.results.exchange_rate}</strong> TJS/USD (устаревший формат)
                     </span>
                   </div>
-
-                  {/* Consolidated cards */}
                   <div>
-                    <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">🔗 Консолидировано (TJS + FX × {viewing.results.exchange_rate})</p>
+                    <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">🔗 Консолидировано</p>
                     <div className="grid grid-cols-3 gap-3">
-                      <HorizonCard h="T+1 (1 день)" data={viewing.results.cons.t1} />
-                      <HorizonCard h="T+7 (7 дней)" data={viewing.results.cons.t7} />
-                      <HorizonCard h="T+30 (30 дней)" data={viewing.results.cons.t30} />
+                      <HorizonCard h="T+1 (1 день)" data={viewing.results.cons!.t1} />
+                      <HorizonCard h="T+7 (7 дней)" data={viewing.results.cons!.t7} />
+                      <HorizonCard h="T+30 (30 дней)" data={viewing.results.cons!.t30} />
                     </div>
                   </div>
-
-                  {/* TJS breakdown */}
                   <div className="bg-gray-50 rounded-xl p-4">
                     <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-3">🇹🇯 Сомони (TJS)</p>
-                    <div className="grid grid-cols-3 gap-3 mb-3">
+                    <div className="grid grid-cols-3 gap-3">
                       <HorizonCard h="T+1" data={viewing.results.tjs.t1} />
                       <HorizonCard h="T+7" data={viewing.results.tjs.t7} />
                       <HorizonCard h="T+30" data={viewing.results.tjs.t30} />
                     </div>
-                    <div className="grid grid-cols-1 gap-1.5 text-xs">
-                      {([
-                        { label: 'Межбанковские обязательства', key: 'due_to_banks' },
-                        { label: 'Текущие счета',               key: 'current_accounts' },
-                        { label: 'Электронный кошелёк',         key: 'electronic_wallet' },
-                        { label: 'Накопительные счета',         key: 'savings' },
-                        { label: 'Срочные депозиты',            key: 'term_deposits' },
-                        { label: 'Заимствования',               key: 'borrowings' },
-                        { label: 'Прочие обязательства',        key: 'other_liabilities' },
-                        { label: 'Кредитная линия Salom',       key: 'credit_line_salom' },
-                        { label: 'Кредитная линия SME',         key: 'credit_line_sme' },
-                      ]).map(item => {
-                        const val = viewing.results!.tjs.inputs[item.key] || 0
-                        const r = viewing.results!.tjs.rates[item.key] as HRate | undefined
-                        const rateStr = r ? `${(r.t1*100).toFixed(0)}% / ${(r.t7*100).toFixed(0)}% / ${(r.t30*100).toFixed(0)}%` : null
-                        return (
-                          <div key={item.key} className="flex items-center justify-between p-1.5 bg-white rounded gap-2">
-                            <span className="text-gray-500 flex-1">{item.label}</span>
-                            {rateStr && <span className="text-[#1B8A4C] font-medium text-[10px] whitespace-nowrap">{rateStr}</span>}
-                            <span className="font-medium text-gray-900 whitespace-nowrap">{fmt(val)} TJS</span>
-                          </div>
-                        )
-                      })}
-                      <div className="border-t border-gray-200 mt-1 pt-1.5 space-y-1">
-                        <div className="flex justify-between p-1.5 bg-white rounded"><span className="text-gray-500">Буфер: Cash & Equivalents</span><span className="font-bold">{fmt(viewing.results.tjs.inputs.cash_equivalents || 0)} TJS</span></div>
-                        <div className="flex justify-between p-1.5 bg-white rounded"><span className="text-gray-500">Буфер: Cash Only</span><span className="font-bold">{fmt(viewing.results.tjs.inputs.cash_only || 0)} TJS</span></div>
+                  </div>
+                  {viewing.results.fx && (
+                    <div className="bg-blue-50 rounded-xl p-4">
+                      <p className="text-xs font-semibold text-blue-700 uppercase tracking-wide mb-3">💵 Иностранная валюта (в TJS экв.)</p>
+                      <div className="grid grid-cols-3 gap-3">
+                        <HorizonCard h="T+1" data={viewing.results.fx.t1} />
+                        <HorizonCard h="T+7" data={viewing.results.fx.t7} />
+                        <HorizonCard h="T+30" data={viewing.results.fx.t30} />
                       </div>
                     </div>
-                  </div>
-
-                  {/* FX breakdown */}
-                  <div className="bg-blue-50 rounded-xl p-4">
-                    <p className="text-xs font-semibold text-blue-700 uppercase tracking-wide mb-3">💵 Иностранная валюта (USD экв.)</p>
-                    <div className="grid grid-cols-3 gap-3 mb-3">
-                      <HorizonCard h="T+1" data={viewing.results.fx.t1} unit="USD" />
-                      <HorizonCard h="T+7" data={viewing.results.fx.t7} unit="USD" />
-                      <HorizonCard h="T+30" data={viewing.results.fx.t30} unit="USD" />
-                    </div>
-                    <div className="grid grid-cols-1 gap-1.5 text-xs">
-                      {([
-                        { label: 'Межбанковские обязательства', key: 'due_to_banks' },
-                        { label: 'Текущие счета',               key: 'current_accounts' },
-                        { label: 'Электронный кошелёк',         key: 'electronic_wallet' },
-                        { label: 'Накопительные счета',         key: 'savings' },
-                        { label: 'Срочные депозиты',            key: 'term_deposits' },
-                        { label: 'Заимствования',               key: 'borrowings' },
-                        { label: 'Прочие обязательства',        key: 'other_liabilities' },
-                        { label: 'Кредитная линия Salom',       key: 'credit_line_salom' },
-                        { label: 'Кредитная линия SME',         key: 'credit_line_sme' },
-                      ]).map(item => {
-                        const val = viewing.results!.fx.inputs[item.key] || 0
-                        const r = viewing.results!.fx.rates[item.key] as HRate | undefined
-                        const rateStr = r ? `${(r.t1*100).toFixed(0)}% / ${(r.t7*100).toFixed(0)}% / ${(r.t30*100).toFixed(0)}%` : null
-                        return val > 0 ? (
-                          <div key={item.key} className="flex items-center justify-between p-1.5 bg-white rounded gap-2">
-                            <span className="text-gray-500 flex-1">{item.label}</span>
-                            {rateStr && <span className="text-blue-500 font-medium text-[10px] whitespace-nowrap">{rateStr}</span>}
-                            <span className="font-medium text-gray-900 whitespace-nowrap">{fmt(val)} USD</span>
-                          </div>
-                        ) : null
-                      })}
-                      <div className="border-t border-blue-200 mt-1 pt-1.5 space-y-1">
-                        <div className="flex justify-between p-1.5 bg-white rounded"><span className="text-gray-500">FX Cash + Ностро USD/EUR</span><span className="font-bold">{fmt(viewing.results.fx.inputs.cash_equivalents || 0)} USD</span></div>
-                        <div className="flex justify-between p-1.5 bg-white rounded"><span className="text-gray-500">FX Cash Only</span><span className="font-bold">{fmt(viewing.results.fx.inputs.cash_only || 0)} USD</span></div>
-                      </div>
-                    </div>
-                  </div>
+                  )}
                 </>
+
+              /* No results JSONB: recalculate from flat columns */
               ) : (
-                /* Legacy format: TJS only */
                 <>
+                  <div className="grid grid-cols-3 gap-2">
+                    {(Object.keys(ALL_SCENARIOS) as ScenarioName[]).map(sc => {
+                      const style = SCENARIO_STYLES[sc]
+                      const active = viewScenario === sc
+                      const isSaved = (viewing.scenario || 'Пессимистичный') === sc
+                      return (
+                        <button key={sc} onClick={() => setViewScenario(sc)}
+                          className={`px-3 py-2.5 rounded-xl border-2 text-xs font-semibold transition-all ${active ? `${style.bg} ${style.border} ${style.text}` : 'bg-white border-gray-200 text-gray-500 hover:border-gray-300'}`}>
+                          {sc === 'Оптимистичный' ? '📈' : sc === 'Пессимистичный' ? '📉' : '⚠️'} {sc}
+                          {isSaved && <span className="ml-1 text-[10px] opacity-70">(сохранён)</span>}
+                        </button>
+                      )
+                    })}
+                  </div>
                   {(() => {
                     const vi = {
                       due_to_banks: viewing.due_to_banks, current_accounts: viewing.current_accounts,
@@ -706,42 +675,6 @@ export default function LiquidityPage() {
                       </div>
                     )
                   })()}
-                  <div className="bg-gray-50 rounded-xl p-4">
-                    <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-3">
-                      Входные данные · <span className="text-[#1B8A4C]">% отток: {viewScenario}</span>
-                    </p>
-                    <div className="grid grid-cols-1 gap-1.5 text-xs">
-                      {([
-                        { label: 'Межбанковские обязательства', val: viewing.due_to_banks,      key: 'due_to_banks' },
-                        { label: 'Текущие счета',               val: viewing.current_accounts,   key: 'current_accounts' },
-                        { label: 'Электронный кошелёк',         val: viewing.electronic_wallet,  key: 'electronic_wallet' },
-                        { label: 'Накопительные счета',         val: viewing.savings,            key: 'savings' },
-                        { label: 'Срочные депозиты',            val: viewing.term_deposits,      key: 'term_deposits' },
-                        { label: 'Заимствования',               val: viewing.borrowings,         key: 'borrowings' },
-                        { label: 'Прочие обязательства',        val: viewing.other_liabilities,  key: 'other_liabilities' },
-                        { label: 'Кредитная линия Salom',       val: viewing.credit_line_salom,  key: 'credit_line_salom' },
-                        { label: 'Кредитная линия SME',         val: viewing.credit_line_sme,    key: 'credit_line_sme' },
-                      ] as { label: string; val: number; key: string }[]).map(item => {
-                        const r = ALL_SCENARIOS[viewScenario][item.key] as HRate | undefined
-                        const rateStr = r ? `${(r.t1*100).toFixed(0)}% / ${(r.t7*100).toFixed(0)}% / ${(r.t30*100).toFixed(0)}%` : null
-                        return (
-                          <div key={item.label} className="flex items-center justify-between p-1.5 bg-white rounded gap-2">
-                            <span className="text-gray-500 flex-1">{item.label}</span>
-                            {rateStr && <span className="text-[#1B8A4C] font-medium text-[10px] whitespace-nowrap">{rateStr}</span>}
-                            <span className="font-medium text-gray-900 whitespace-nowrap">{fmt(item.val)} TJS</span>
-                          </div>
-                        )
-                      })}
-                      <div className="border-t border-gray-200 mt-1 pt-1.5">
-                        {[{ label: 'Буфер: Cash & Equivalents', val: viewing.cash_equivalents }, { label: 'Буфер: Cash Only', val: viewing.cash_only }].map(item => (
-                          <div key={item.label} className="flex justify-between p-1.5 bg-white rounded mt-1">
-                            <span className="text-gray-500">{item.label}</span>
-                            <span className="font-bold text-gray-900">{fmt(item.val)} TJS</span>
-                          </div>
-                        ))}
-                      </div>
-                    </div>
-                  </div>
                 </>
               )}
             </div>
@@ -760,7 +693,7 @@ export default function LiquidityPage() {
             <div className="flex items-center justify-between p-5 border-b border-gray-100">
               <div>
                 <h2 className="text-base font-semibold">Стресс-тест ликвидности</h2>
-                <p className="text-xs text-gray-500 mt-0.5">3 сценария · T+1 / T+7 / T+30 · Сомони и Иностранная валюта</p>
+                <p className="text-xs text-gray-500 mt-0.5">3 сценария · T+1 / T+7 / T+30 · Единый расчёт в сомони с разбивкой по валютам</p>
               </div>
               <button onClick={() => setShowModal(false)} className="text-gray-400 hover:text-gray-600"><X className="w-5 h-5" /></button>
             </div>
@@ -776,6 +709,26 @@ export default function LiquidityPage() {
                 <div><label className={lbl}>Аналитик</label>
                   <input type="text" value={form.analyst_name} onChange={e => setF('analyst_name', e.target.value)} placeholder="ФИО"
                     className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#1B8A4C] bg-white" /></div>
+              </div>
+
+              {/* FX rates */}
+              <div className="bg-blue-50 border border-blue-100 rounded-xl p-4">
+                <p className="text-xs font-semibold text-blue-700 mb-3">💱 Курсы валют НБТ (TJS за 1 единицу)</p>
+                <div className="grid grid-cols-3 gap-3">
+                  {[
+                    { key: 'rate_usd', label: 'USD', placeholder: '10.90' },
+                    { key: 'rate_eur', label: 'EUR', placeholder: '11.80' },
+                    { key: 'rate_rub', label: 'RUB', placeholder: '0.12'  },
+                  ].map(r => (
+                    <div key={r.key}>
+                      <label className={lbl}>{r.label}</label>
+                      <input type="text" inputMode="decimal" value={form[r.key]}
+                        onChange={e => setF(r.key, e.target.value)} placeholder={r.placeholder}
+                        className="w-full px-3 py-2 border border-blue-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#1B8A4C] bg-white text-right" />
+                    </div>
+                  ))}
+                </div>
+                <p className="text-[11px] text-blue-500 mt-2">Курсы применяются к строкам с выбранной иностранной валютой · конвертируются в TJS-эквивалент</p>
               </div>
 
               {/* Scenario selector */}
@@ -795,21 +748,23 @@ export default function LiquidityPage() {
                 </div>
               </div>
 
-              {/* Currency tab switcher */}
+              {/* View mode toggle */}
               <div>
-                <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">Валюта</p>
+                <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">Отображение результатов</p>
                 <div className="flex gap-1 bg-gray-100 p-1 rounded-xl">
                   {([
-                    { id: 'TJS' as CurrencyTab,  label: '🇹🇯 Сомони (TJS)' },
-                    { id: 'FX'  as CurrencyTab,  label: '💵 Ин. валюта (USD экв.)' },
-                    { id: 'CONS'as CurrencyTab,  label: '🔗 Консолидировано' },
+                    { id: 'TOTAL' as ViewMode, label: '🇹🇯 Сомони' },
+                    { id: 'FX'    as ViewMode, label: '💵 В т.ч. инвалюта' },
                   ]).map(tab => (
-                    <button key={tab.id} onClick={() => setCurrencyTab(tab.id)}
-                      className={`flex-1 py-2 px-2 rounded-lg text-xs font-semibold transition-all ${currencyTab === tab.id ? 'bg-white shadow-sm text-gray-900' : 'text-gray-500 hover:text-gray-700'}`}>
+                    <button key={tab.id} onClick={() => setViewMode(tab.id)}
+                      className={`flex-1 py-2 px-2 rounded-lg text-xs font-semibold transition-all ${viewMode === tab.id ? 'bg-white shadow-sm text-gray-900' : 'text-gray-500 hover:text-gray-700'}`}>
                       {tab.label}
                     </button>
                   ))}
                 </div>
+                {viewMode === 'FX' && (
+                  <p className="text-[11px] text-blue-500 mt-1.5 text-center">Только валютная часть (TJS экв.) — подмножество «Сомони», не добавка</p>
+                )}
               </div>
 
               {/* Scenario result cards */}
@@ -823,70 +778,183 @@ export default function LiquidityPage() {
                       <div className={`px-4 py-2 flex items-center justify-between ${isSaved ? style.bg : 'bg-gray-50'}`}>
                         <span className={`text-xs font-bold ${isSaved ? style.text : 'text-gray-500'}`}>
                           {sc === 'Оптимистичный' ? '📈' : sc === 'Пессимистичный' ? '📉' : '⚠️'} {sc}
-                          {currencyTab === 'FX' && <span className="ml-1 opacity-60 font-normal">(USD)</span>}
-                          {currencyTab === 'CONS' && <span className="ml-1 opacity-60 font-normal">(конс. TJS)</span>}
+                          {viewMode === 'FX' && <span className="ml-1 opacity-60 font-normal">(в т.ч. инвалюта TJS экв.)</span>}
                         </span>
                         {isSaved && <span className={`text-xs px-2 py-0.5 rounded-full ${style.badge}`}>будет сохранён</span>}
                       </div>
                       <div className="grid grid-cols-3 gap-3 p-3">
-                        <HorizonCard h="T+1" data={res.t1} unit={displayUnit} />
-                        <HorizonCard h="T+7" data={res.t7} unit={displayUnit} />
-                        <HorizonCard h="T+30" data={res.t30} unit={displayUnit} />
+                        <HorizonCard h="T+1" data={res.t1} />
+                        <HorizonCard h="T+7" data={res.t7} />
+                        <HorizonCard h="T+30" data={res.t30} />
                       </div>
                     </div>
                   )
                 })}
               </div>
 
-              {/* Tab content */}
-              {currencyTab === 'TJS' && (
-                <LiabInputs prefix="" currency="TJS" ratesMap={customRatesTJS} updateFn={updateRateTJS} />
-              )}
-              {currencyTab === 'FX' && (
-                <LiabInputs prefix="fx_" currency="USD экв." ratesMap={customRatesFX} updateFn={updateRateFX} />
-              )}
-              {currencyTab === 'CONS' && (
-                <div className="space-y-4">
-                  <div className="bg-blue-50 border border-blue-100 rounded-xl p-4">
-                    <p className="text-xs font-semibold text-blue-700 mb-1">Консолидированный расчёт</p>
-                    <p className="text-xs text-blue-600">Coverage = (HQLA TJS + HQLA FX × Курс) / (Отток TJS + Отток FX × Курс) × 100%</p>
-                  </div>
-                  <div className="max-w-xs">
-                    <label className={lbl}>Курс обмена (TJS за 1 USD)</label>
-                    <input type="text" inputMode="decimal" value={form.exchange_rate}
-                      onChange={e => setF('exchange_rate', e.target.value)} placeholder="18"
-                      className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#1B8A4C] bg-white text-right" />
-                    <p className="text-xs text-gray-400 mt-0.5">Официальный курс НБТ</p>
-                  </div>
-                  <div className="grid grid-cols-2 gap-3 text-xs">
-                    <div className="bg-gray-50 rounded-xl p-3 border border-gray-100">
-                      <p className="font-semibold text-gray-600 mb-2">TJS · T+30 · {scenario}</p>
-                      <div className="space-y-1">
-                        <div className="flex justify-between"><span className="text-gray-500">Потребность:</span><span className="font-bold">{fmt(allComputedTJS[scenario].t30.need)} TJS</span></div>
-                        <div className="flex justify-between"><span className="text-gray-500">Буфер:</span><span className="font-bold">{fmt(inputs.cash_equivalents)} TJS</span></div>
-                        <div className={`flex justify-between font-bold ${covColor(allComputedTJS[scenario].t30.cov_cash)}`}>
-                          <span>Покрытие:</span><span>{(allComputedTJS[scenario].t30.cov_cash * 100).toFixed(0)}%</span>
+              {/* Liabilities */}
+              <div className="space-y-5">
+                <div>
+                  <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-3">Обязательства (TJS)</p>
+                  <div className="grid grid-cols-2 gap-3">
+                    {LIAB_DEFS.map(f => {
+                      const cur = form[f.key + '_fx_cur'] || 'none'
+                      const fxTjs = getFxTjs(f.key)
+                      const totalTjs = n(f.key)
+                      const r = (customRates[scenario] || {})[f.key] || { t1: 0, t7: 0, t30: 0 }
+                      return (
+                        <div key={f.key}>
+                          <label className={lbl}>{f.label}</label>
+                          <input type="text" inputMode="numeric" value={form[f.key]}
+                            onChange={e => setNum(f.key, e.target.value)} placeholder="0" className={inp} />
+                          <div className="mt-1.5 flex items-center gap-1.5 flex-wrap">
+                            <span className="text-[10px] text-gray-400 whitespace-nowrap">В т.ч.:</span>
+                            <select value={cur} onChange={e => setF(f.key + '_fx_cur', e.target.value)}
+                              className="px-1.5 py-0.5 border border-gray-200 rounded text-[11px] bg-white focus:outline-none focus:ring-1 focus:ring-[#1B8A4C]">
+                              <option value="none">TJS</option>
+                              <option value="USD">USD</option>
+                              <option value="EUR">EUR</option>
+                              <option value="RUB">RUB</option>
+                            </select>
+                            {cur !== 'none' && (
+                              <>
+                                <input type="text" inputMode="numeric" value={form[f.key + '_fx_native'] || ''}
+                                  onChange={e => setNum(f.key + '_fx_native', e.target.value)}
+                                  placeholder={`0 ${cur}`}
+                                  className="flex-1 min-w-0 px-2 py-0.5 border border-gray-200 rounded text-[11px] bg-white focus:outline-none focus:ring-1 focus:ring-[#1B8A4C] text-right" />
+                                {fxTjs > 0 && (
+                                  <span className="text-[10px] text-blue-500 whitespace-nowrap">
+                                    ≈{fmt(fxTjs)} TJS{totalTjs > 0 ? ` (${Math.round(fxTjs/totalTjs*100)}%)` : ''}
+                                  </span>
+                                )}
+                              </>
+                            )}
+                          </div>
+                          <div className="flex gap-1 mt-1.5">
+                            {(['t1', 't7', 't30'] as const).map(h => (
+                              <div key={h} className="flex-1">
+                                <div className="text-[9px] text-gray-400 text-center mb-0.5">{h === 't1' ? 'T+1' : h === 't7' ? 'T+7' : 'T+30'}</div>
+                                <div className="flex items-center gap-0.5">
+                                  <input type="number" min="0" max="100" step="1"
+                                    value={(r[h] * 100).toFixed(0)}
+                                    onChange={e => updateRate(f.key, h, e.target.value)}
+                                    className={rInp} />
+                                  <span className="text-[9px] text-gray-400">%</span>
+                                </div>
+                              </div>
+                            ))}
+                          </div>
                         </div>
-                      </div>
-                    </div>
-                    <div className="bg-gray-50 rounded-xl p-3 border border-gray-100">
-                      <p className="font-semibold text-gray-600 mb-2">FX в TJS (×{exRate}) · T+30 · {scenario}</p>
-                      <div className="space-y-1">
-                        <div className="flex justify-between"><span className="text-gray-500">Потребность:</span><span className="font-bold">{fmt(allComputedFX[scenario].t30.need * exRate)} TJS</span></div>
-                        <div className="flex justify-between"><span className="text-gray-500">Буфер:</span><span className="font-bold">{fmt(fxInputs.cash_equivalents * exRate)} TJS</span></div>
-                        <div className={`flex justify-between font-bold ${covColor(allComputedFX[scenario].t30.cov_cash)}`}>
-                          <span>Покрытие FX:</span><span>{(allComputedFX[scenario].t30.cov_cash * 100).toFixed(0)}%</span>
-                        </div>
-                      </div>
-                    </div>
+                      )
+                    })}
                   </div>
-                  <p className="text-[11px] text-gray-400 text-center">Данные TJS и FX вводятся на соответствующих вкладках · Консолидация пересчитывается автоматически</p>
                 </div>
-              )}
+
+                <div>
+                  <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-3">Кредитные линии (TJS)</p>
+                  <div className="grid grid-cols-2 gap-3">
+                    {CL_DEFS.map(f => {
+                      const cur = form[f.key + '_fx_cur'] || 'none'
+                      const fxTjs = getFxTjs(f.key)
+                      const totalTjs = n(f.key)
+                      const r = (customRates[scenario] || {})[f.key] || { t1: 0, t7: 0, t30: 0 }
+                      return (
+                        <div key={f.key}>
+                          <label className={lbl}>{f.label}</label>
+                          <input type="text" inputMode="numeric" value={form[f.key]}
+                            onChange={e => setNum(f.key, e.target.value)} placeholder="0" className={inp} />
+                          <div className="mt-1.5 flex items-center gap-1.5 flex-wrap">
+                            <span className="text-[10px] text-gray-400 whitespace-nowrap">В т.ч.:</span>
+                            <select value={cur} onChange={e => setF(f.key + '_fx_cur', e.target.value)}
+                              className="px-1.5 py-0.5 border border-gray-200 rounded text-[11px] bg-white focus:outline-none focus:ring-1 focus:ring-[#1B8A4C]">
+                              <option value="none">TJS</option>
+                              <option value="USD">USD</option>
+                              <option value="EUR">EUR</option>
+                              <option value="RUB">RUB</option>
+                            </select>
+                            {cur !== 'none' && (
+                              <>
+                                <input type="text" inputMode="numeric" value={form[f.key + '_fx_native'] || ''}
+                                  onChange={e => setNum(f.key + '_fx_native', e.target.value)}
+                                  placeholder={`0 ${cur}`}
+                                  className="flex-1 min-w-0 px-2 py-0.5 border border-gray-200 rounded text-[11px] bg-white focus:outline-none focus:ring-1 focus:ring-[#1B8A4C] text-right" />
+                                {fxTjs > 0 && (
+                                  <span className="text-[10px] text-blue-500 whitespace-nowrap">
+                                    ≈{fmt(fxTjs)} TJS{totalTjs > 0 ? ` (${Math.round(fxTjs/totalTjs*100)}%)` : ''}
+                                  </span>
+                                )}
+                              </>
+                            )}
+                          </div>
+                          <div className="flex gap-1 mt-1.5">
+                            {(['t1', 't7', 't30'] as const).map(h => (
+                              <div key={h} className="flex-1">
+                                <div className="text-[9px] text-gray-400 text-center mb-0.5">{h === 't1' ? 'T+1' : h === 't7' ? 'T+7' : 'T+30'}</div>
+                                <div className="flex items-center gap-0.5">
+                                  <input type="number" min="0" max="100" step="1"
+                                    value={(r[h] * 100).toFixed(0)}
+                                    onChange={e => updateRate(f.key, h, e.target.value)}
+                                    className={rInp} />
+                                  <span className="text-[9px] text-gray-400">%</span>
+                                </div>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      )
+                    })}
+                  </div>
+                </div>
+
+                <div>
+                  <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-3">Буфер ликвидности (TJS)</p>
+                  <div className="grid grid-cols-2 gap-3">
+                    {[
+                      { key: 'cash_equivalents', label: 'Cash & Cash Equivalents', hint: 'Наличные + счета в ЦБ + краткосрочные ЦБ' },
+                      { key: 'cash_only',         label: 'Cash Only (наличные)',    hint: 'Только физические наличные деньги' },
+                    ].map(f => {
+                      const cur = form[f.key + '_fx_cur'] || 'none'
+                      const fxTjs = getFxTjs(f.key)
+                      const totalTjs = n(f.key)
+                      return (
+                        <div key={f.key}>
+                          <label className={lbl}>{f.label}</label>
+                          <input type="text" inputMode="numeric" value={form[f.key]}
+                            onChange={e => setNum(f.key, e.target.value)} placeholder="0" className={inp} />
+                          <p className="text-xs text-gray-400 mt-0.5">{f.hint}</p>
+                          <div className="mt-1.5 flex items-center gap-1.5 flex-wrap">
+                            <span className="text-[10px] text-gray-400 whitespace-nowrap">В т.ч.:</span>
+                            <select value={cur} onChange={e => setF(f.key + '_fx_cur', e.target.value)}
+                              className="px-1.5 py-0.5 border border-gray-200 rounded text-[11px] bg-white focus:outline-none focus:ring-1 focus:ring-[#1B8A4C]">
+                              <option value="none">TJS</option>
+                              <option value="USD">USD</option>
+                              <option value="EUR">EUR</option>
+                              <option value="RUB">RUB</option>
+                            </select>
+                            {cur !== 'none' && (
+                              <>
+                                <input type="text" inputMode="numeric" value={form[f.key + '_fx_native'] || ''}
+                                  onChange={e => setNum(f.key + '_fx_native', e.target.value)}
+                                  placeholder={`0 ${cur}`}
+                                  className="flex-1 min-w-0 px-2 py-0.5 border border-gray-200 rounded text-[11px] bg-white focus:outline-none focus:ring-1 focus:ring-[#1B8A4C] text-right" />
+                                {fxTjs > 0 && (
+                                  <span className="text-[10px] text-blue-500 whitespace-nowrap">
+                                    ≈{fmt(fxTjs)} TJS{totalTjs > 0 ? ` (${Math.round(fxTjs/totalTjs*100)}%)` : ''}
+                                  </span>
+                                )}
+                              </>
+                            )}
+                          </div>
+                        </div>
+                      )
+                    })}
+                  </div>
+                </div>
+              </div>
             </div>
 
             <div className="flex items-center justify-between gap-3 p-5 border-t border-gray-100">
-              <p className="text-xs text-gray-400">В базу сохраняются данные TJS · FX используется только для анализа</p>
+              <p className="text-xs text-gray-400">Суммы в TJS · ин. валюта — часть TJS-суммы, не добавка</p>
               <div className="flex gap-2">
                 <button onClick={() => setShowModal(false)} className="px-4 py-2 border border-gray-200 rounded-lg text-sm text-gray-600 hover:bg-gray-50">Отмена</button>
                 <button onClick={handleSave} disabled={saving}
