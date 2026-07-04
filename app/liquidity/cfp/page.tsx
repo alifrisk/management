@@ -118,6 +118,9 @@ export default function CfpPage() {
   const [bufferCashEq, setBufferCashEq] = useState('')
   const [bufferCash,   setBufferCash]   = useState('')
 
+  // history collapse
+  const [historyOpen,  setHistoryOpen]  = useState(false)
+
   // generation
   const [generating,   setGenerating]   = useState(false)
   const [generatedDoc, setGeneratedDoc] = useState<string | null>(() => {
@@ -328,6 +331,76 @@ export default function CfpPage() {
           </button>
         </div>
       )}
+
+      {/* ── HISTORY (collapsible) ────────────────────────────────────────────── */}
+      <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
+        <button
+          onClick={() => setHistoryOpen(prev => !prev)}
+          className="w-full flex items-center justify-between px-6 py-4 border-b border-gray-100 hover:bg-gray-50/60 transition-colors"
+        >
+          <div className="flex items-center gap-3">
+            <h2 className="text-sm font-semibold text-gray-900">История CFP-планов</h2>
+            <span className="text-xs text-gray-400 bg-gray-100 px-2 py-0.5 rounded-full">{reports.length}</span>
+          </div>
+          <svg className={`w-4 h-4 text-gray-400 transition-transform duration-200 ${historyOpen ? 'rotate-180' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+          </svg>
+        </button>
+        {historyOpen && (
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="bg-gray-50 border-b border-gray-100">
+                  {['Период плана', 'Дата', 'CAR 1.1', 'К2-1', 'Действия'].map(h => (
+                    <th key={h} className="text-left px-4 py-3 text-xs font-medium text-gray-500 uppercase whitespace-nowrap">{h}</th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-gray-50">
+                {loadingList
+                  ? <tr><td colSpan={5} className="text-center py-10"><Loader2 className="w-5 h-5 animate-spin mx-auto text-gray-300" /></td></tr>
+                  : reports.length === 0
+                  ? <tr><td colSpan={5} className="text-center py-10 text-gray-400 text-sm">Нет сохранённых CFP-планов</td></tr>
+                  : reports.map(r => {
+                      const rs11  = r.car11 != null ? statusCar11(r.car11) : null
+                      const rsk21 = r.k21   != null ? statusK21(r.k21)     : null
+                      return (
+                        <tr key={r.id} className="hover:bg-gray-50">
+                          <td className="px-4 py-3 font-medium text-gray-900">{r.plan_period || r.report_name || '—'}</td>
+                          <td className="px-4 py-3 text-xs text-gray-400">
+                            {r.plan_date ? new Date(r.plan_date + 'T00:00:00').toLocaleDateString('ru-RU') : new Date(r.created_at).toLocaleDateString('ru-RU')}
+                          </td>
+                          <td className="px-4 py-3 text-xs">
+                            {rs11 ? <span className="font-medium">{r.car11}% {EWI_EMOJI[rs11]}</span> : <span className="text-gray-300">—</span>}
+                          </td>
+                          <td className="px-4 py-3 text-xs">
+                            {rsk21 ? <span className="font-medium">{r.k21}% {EWI_EMOJI[rsk21]}</span> : <span className="text-gray-300">—</span>}
+                          </td>
+                          <td className="px-4 py-3">
+                            <div className="flex items-center gap-1">
+                              <button onClick={() => setViewing(r)} title="Просмотр"
+                                className="p-1.5 text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors">
+                                <Eye className="w-3.5 h-3.5" />
+                              </button>
+                              <button onClick={() => downloadWord(r)} title="Скачать Word"
+                                className="p-1.5 text-gray-400 hover:text-[#1B8A4C] hover:bg-green-50 rounded-lg transition-colors">
+                                <Download className="w-3.5 h-3.5" />
+                              </button>
+                              <button onClick={() => handleDelete(r.id)} title="Удалить"
+                                className="p-1.5 text-gray-400 hover:text-red-500 hover:bg-red-50 rounded-lg transition-colors">
+                                <Trash2 className="w-3.5 h-3.5" />
+                              </button>
+                            </div>
+                          </td>
+                        </tr>
+                      )
+                    })
+                }
+              </tbody>
+            </table>
+          </div>
+        )}
+      </div>
 
       {/* ── FORM ─────────────────────────────────────────────────────────────── */}
       <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-6 space-y-6">
@@ -569,66 +642,6 @@ export default function CfpPage() {
           </div>
         </div>
       )}
-
-      {/* ── HISTORY ──────────────────────────────────────────────────────────── */}
-      <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
-        <div className="px-6 py-4 border-b border-gray-100">
-          <h2 className="text-sm font-semibold text-gray-900">История CFP-планов</h2>
-          <p className="text-xs text-gray-400 mt-0.5">{reports.length} сохранено</p>
-        </div>
-        <div className="overflow-x-auto">
-          <table className="w-full text-sm">
-            <thead>
-              <tr className="bg-gray-50 border-b border-gray-100">
-                {['Период плана', 'Дата', 'CAR 1.1', 'К2-1', 'Действия'].map(h => (
-                  <th key={h} className="text-left px-4 py-3 text-xs font-medium text-gray-500 uppercase whitespace-nowrap">{h}</th>
-                ))}
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-gray-50">
-              {loadingList
-                ? <tr><td colSpan={5} className="text-center py-10"><Loader2 className="w-5 h-5 animate-spin mx-auto text-gray-300" /></td></tr>
-                : reports.length === 0
-                ? <tr><td colSpan={5} className="text-center py-10 text-gray-400 text-sm">Нет сохранённых CFP-планов</td></tr>
-                : reports.map(r => {
-                    const rs11  = r.car11 != null ? statusCar11(r.car11) : null
-                    const rsk21 = r.k21   != null ? statusK21(r.k21)     : null
-                    return (
-                      <tr key={r.id} className="hover:bg-gray-50">
-                        <td className="px-4 py-3 font-medium text-gray-900">{r.plan_period || r.report_name || '—'}</td>
-                        <td className="px-4 py-3 text-xs text-gray-400">
-                          {r.plan_date ? new Date(r.plan_date + 'T00:00:00').toLocaleDateString('ru-RU') : new Date(r.created_at).toLocaleDateString('ru-RU')}
-                        </td>
-                        <td className="px-4 py-3 text-xs">
-                          {rs11 ? <span className="font-medium">{r.car11}% {EWI_EMOJI[rs11]}</span> : <span className="text-gray-300">—</span>}
-                        </td>
-                        <td className="px-4 py-3 text-xs">
-                          {rsk21 ? <span className="font-medium">{r.k21}% {EWI_EMOJI[rsk21]}</span> : <span className="text-gray-300">—</span>}
-                        </td>
-                        <td className="px-4 py-3">
-                          <div className="flex items-center gap-1">
-                            <button onClick={() => setViewing(r)} title="Просмотр"
-                              className="p-1.5 text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors">
-                              <Eye className="w-3.5 h-3.5" />
-                            </button>
-                            <button onClick={() => downloadWord(r)} title="Скачать Word"
-                              className="p-1.5 text-gray-400 hover:text-[#1B8A4C] hover:bg-green-50 rounded-lg transition-colors">
-                              <Download className="w-3.5 h-3.5" />
-                            </button>
-                            <button onClick={() => handleDelete(r.id)} title="Удалить"
-                              className="p-1.5 text-gray-400 hover:text-red-500 hover:bg-red-50 rounded-lg transition-colors">
-                              <Trash2 className="w-3.5 h-3.5" />
-                            </button>
-                          </div>
-                        </td>
-                      </tr>
-                    )
-                  })
-              }
-            </tbody>
-          </table>
-        </div>
-      </div>
 
       {/* ── View Modal ──────────────────────────────────────────────────────── */}
       {viewing && (
