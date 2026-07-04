@@ -34,9 +34,55 @@ async function getFWRates(daysAgo: number): Promise<Record<string, number>> {
   return (cf as FW)?.usd ?? (js as FW)?.usd ?? {}
 }
 
+// Urals crude oil from MOEX ISS (free, no key) — USD/bbl
+// Ticker prefix 'UR', quarterly FORTS contracts: URH6, URM6, URU6, URZ6…
+async function getUralsFromMOEX(): Promise<{ rate: number | null; change: number | null; change7d: number | null }> {
+  const MONTH = 'FGHJKMNQUVXZ'
+  const now = new Date()
+  const d7 = dateStr(7)
+
+  // Build candidate tickers: current month + next 4 months
+  const candidates = Array.from({ length: 5 }, (_, i) => {
+    const d = new Date(now.getFullYear(), now.getMonth() + i, 1)
+    return `UR${MONTH[d.getMonth()]}${String(d.getFullYear()).slice(-1)}`
+  })
+
+  // Fetch all candidates in parallel
+  const fetched = await Promise.all(candidates.map(async secid => {
+    const [today, hist] = await Promise.all([
+      get(`https://iss.moex.com/iss/engines/futures/markets/forts/boards/RFUD/securities/${secid}.json?iss.meta=off&marketdata.columns=LAST,OPEN`),
+      get(`https://iss.moex.com/iss/engines/futures/markets/forts/boards/RFUD/securities/${secid}/candles.json?from=${d7}&till=${d7}&interval=24&iss.meta=off&candles.columns=close`),
+    ])
+    return { secid, today, hist }
+  }))
+
+  for (const { today, hist } of fetched) {
+    if (!today) continue
+    type MOEXSection = { columns: string[]; data: (number | null)[][] }
+    const md = (today as Record<string, MOEXSection>)?.marketdata
+    if (!md?.data?.[0]) continue
+
+    const last = md.data[0][md.columns.indexOf('LAST')]
+    const open = md.data[0][md.columns.indexOf('OPEN')]
+    if (!last || last <= 0) continue
+
+    const change = open && open > 0 ? Math.round((last - open) / open * 10000) / 100 : null
+
+    let change7d: number | null = null
+    if (hist) {
+      const cv = (hist as Record<string, MOEXSection>)?.candles
+      const close7 = cv?.data?.[0]?.[cv.columns.indexOf('close')] ?? null
+      if (close7 && close7 > 0) change7d = Math.round((last - close7) / close7 * 10000) / 100
+    }
+
+    return { rate: Math.round(last * 100) / 100, change, change7d }
+  }
+
+  return { rate: null, change: null, change7d: null }
+}
+
 export async function GET() {
   try {
-    // ── Все запросы параллельно ─────────────────────────────────────────────
     const syms = [
       { id:'gold',   label:'Золото (XAU)',    s:'GC=F', u:'USD/oz'  },
       { id:'silver', label:'Серебро (XAG)',   s:'SI=F', u:'USD/oz'  },
@@ -44,14 +90,15 @@ export async function GET() {
       { id:'wti',    label:'Нефть WTI',       s:'CL=F', u:'USD/bbl' },
     ]
 
-    const [fw0, fw1, fw7, erApi, cg, ...yahooResults] = await Promise.all([
-      getFWRates(0),
-      getFWRates(1),
-      getFWRates(7),
-      // open.er-api — free, no key, direct USD-base rates; fallback for any missing pairs
-      get('https://open.er-api.com/v6/latest/USD'),
-      get('https://api.coingecko.com/api/v3/coins/markets?vs_currency=usd&ids=bitcoin,ethereum&price_change_percentage=7d'),
-      ...syms.map(t => get(`https://query1.finance.yahoo.com/v8/finance/chart/${t.s}?interval=1d&range=30d`)),
+    // All sources run in parallel
+    const [[fw0, fw1, fw7], [erApi, cg], uralsData, yahooResults] = await Promise.all([
+      Promise.all([getFWRates(0), getFWRates(1), getFWRates(7)]),
+      Promise.all([
+        get('https://open.er-api.com/v6/latest/USD'),
+        get('https://api.coingecko.com/api/v3/coins/markets?vs_currency=usd&ids=bitcoin,ethereum&price_change_percentage=7d'),
+      ]),
+      getUralsFromMOEX(),
+      Promise.all(syms.map(t => get(`https://query1.finance.yahoo.com/v8/finance/chart/${t.s}?interval=1d&range=30d`))),
     ])
 
     // ── Currencies ──────────────────────────────────────────────────────────
@@ -74,8 +121,7 @@ export async function GET() {
       unit: code.toUpperCase(),
     })
 
-    // Cross-rate X/TJS: how many TJS per 1 unit of X
-    // cross = cur['tjs'] / cur[xCode]  (derived from shared USD base)
+    // Cross-rate X/TJS: how many TJS per 1 unit of X = cur['tjs'] / cur[xCode]
     const cross = (xCode: string, label: string, decimals = 4) => {
       const rate  = cur['tjs']  && cur[xCode]  ? Math.round(cur['tjs']  / cur[xCode]  * Math.pow(10, decimals)) / Math.pow(10, decimals) : null
       const r1    = p1['tjs']   && p1[xCode]   ? p1['tjs']  / p1[xCode]  : null
@@ -106,7 +152,7 @@ export async function GET() {
     ].filter(Boolean)
 
     // ── Commodities ─────────────────────────────────────────────────────────
-    const commodities = yahooResults.map((d, i) => {
+    const yahooMapped = yahooResults.map((d, i) => {
       try {
         const r0         = ((d as Record<string,unknown>)?.chart as Record<string,unknown>)?.result as Record<string,unknown>[]
         const meta       = r0[0].meta as Record<string,number>
@@ -117,7 +163,6 @@ export async function GET() {
         const prv        = cls.length > 1 ? cls[cls.length-2] : meta.previousClose
         if (!cur2) return null
 
-        // find close price closest to 7 calendar days ago
         let change7d: number | null = null
         const ts7 = Date.now() / 1000 - 7 * 86400
         if (timestamps.length > 0 && cls.length > 0) {
@@ -133,6 +178,16 @@ export async function GET() {
         return { id: syms[i].id, label: syms[i].label, rate: Math.round(cur2*100)/100, change: prv ? Math.round((cur2-prv)/prv*10000)/100 : null, change7d, unit: syms[i].u }
       } catch { return null }
     }).filter(Boolean)
+
+    // Insert Urals after Brent (index 2)
+    const uralsItem = uralsData.rate !== null
+      ? { id: 'urals', label: 'Нефть Urals', rate: uralsData.rate, change: uralsData.change, change7d: uralsData.change7d, unit: 'USD/bbl' }
+      : null
+    const commodities = [
+      ...yahooMapped.slice(0, 3),   // gold, silver, brent
+      uralsItem,
+      ...yahooMapped.slice(3),       // wti
+    ].filter(Boolean)
 
     // ── Macro (from Supabase, editable by admin) ────────────────────────────
     const MACRO_FALLBACK = [
