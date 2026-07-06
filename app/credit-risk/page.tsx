@@ -676,6 +676,25 @@ export default function CreditRiskPage() {
 
   const riskColor = (l: string) => l === 'Высокий' ? 'bg-red-100 text-red-800' : l === 'Средний' ? 'bg-yellow-100 text-yellow-800' : 'bg-green-100 text-green-800'
   const recColor = (r: string) => r === 'Не рекомендуется' ? 'text-red-600' : 'text-green-600'
+
+  const parseAISection = (text: string, key: string): string => {
+    const marker = `[${key}]`
+    const idx = text.indexOf(marker)
+    if (idx === -1) return ''
+    const start = idx + marker.length
+    const siblings = ['[ХАРАКТЕРИСТИКА ЗАЁМЩИКА]', '[ОБОСНОВАНИЕ ОПЕРАЦИИ]', '[ОЦЕНКА РИСКОВ]', '[РЕШЕНИЕ И ОБОСНОВАНИЕ]']
+    let end = text.length
+    for (const m of siblings) {
+      if (m === marker) continue
+      const i = text.indexOf(m, start)
+      if (i > -1 && i < end) end = i
+    }
+    const stopAt = text.indexOf('Руководитель СУР', start)
+    if (stopAt > -1 && stopAt < end) end = stopAt
+    const stopRec = text.indexOf('РЕКОМЕНДАЦИЯ:', start)
+    if (stopRec > -1 && stopRec < end) end = stopRec
+    return text.slice(start, end).trim()
+  }
   const inp = "w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#1B8A4C] bg-white"
   const lbl = "block text-xs font-medium text-gray-600 mb-1"
 
@@ -814,11 +833,16 @@ export default function CreditRiskPage() {
                     <div key={String(l)}><p className="text-xs text-gray-500">{l}</p><p className="text-sm font-medium text-gray-900 mt-0.5">{v}</p></div>
                   ))}
                 </div>
+                {viewing.ai_conclusion && parseAISection(viewing.ai_conclusion, 'ХАРАКТЕРИСТИКА ЗАЁМЩИКА') && (
+                  <div className="mt-3 p-3 bg-blue-50 rounded-lg border border-blue-100">
+                    <p className="text-xs text-gray-700 whitespace-pre-wrap leading-relaxed">{parseAISection(viewing.ai_conclusion, 'ХАРАКТЕРИСТИКА ЗАЁМЩИКА')}</p>
+                  </div>
+                )}
               </div>
 
-              {/* 2. Залог */}
+              {/* 2. Обеспечение (залог) */}
               <div>
-                <p className="text-xs font-bold text-gray-500 uppercase tracking-wide border-b border-gray-100 pb-1 mb-3">2. Залог</p>
+                <p className="text-xs font-bold text-gray-500 uppercase tracking-wide border-b border-gray-100 pb-1 mb-3">2. Обеспечение (залог)</p>
                 {(viewing.collaterals || []).length === 0
                   ? <p className="text-xs text-gray-400">Залог не указан</p>
                   : <div className="space-y-2">
@@ -923,7 +947,7 @@ export default function CreditRiskPage() {
               {/* 5. Риск-аппетит */}
               {(viewing.current_msb_par30_pct != null || viewing.current_par30_pct != null) && (
                 <div>
-                  <p className="text-xs font-bold text-gray-500 uppercase tracking-wide border-b border-gray-100 pb-1 mb-3">5. Риск-аппетит (PAR30)</p>
+                  <p className="text-xs font-bold text-gray-500 uppercase tracking-wide border-b border-gray-100 pb-1 mb-3">5. Риск-аппетит</p>
                   <div className="space-y-3">
                     {/* PAR30 МСБ */}
                     {viewing.current_msb_par30_pct != null && viewing.sme_sector_portfolio && viewing.loan_amount ? (() => {
@@ -933,7 +957,8 @@ export default function CreditRiskPage() {
                       const vio   = viewing.ra_msb_par30_limit && after > viewing.ra_msb_par30_limit
                       return (
                         <div className={`p-3 rounded-xl border-2 ${vio ? 'bg-red-50 border-red-300' : 'bg-green-50 border-green-300'}`}>
-                          <p className="text-xs font-semibold text-gray-600 mb-2">PAR30 портфеля МСБ</p>
+                          <p className="text-xs font-semibold text-gray-600">PAR30 МСБ-портфеля</p>
+                          <p className="text-[10px] text-blue-500 mb-2">Информационно — не является критерием вердикта</p>
                           <div className="grid grid-cols-3 gap-2 text-xs text-center">
                             <div><p className="text-gray-400">Сейчас</p><p className="font-bold text-lg">{viewing.current_msb_par30_pct.toFixed(2)}%</p></div>
                             <div><p className="text-gray-400">Прирост</p><p className="font-bold text-lg text-orange-600">+{delta.toFixed(2)}%</p></div>
@@ -955,7 +980,8 @@ export default function CreditRiskPage() {
                       const vio   = viewing.ra_par30_limit && after > viewing.ra_par30_limit
                       return (
                         <div className={`p-3 rounded-xl border-2 ${vio ? 'bg-red-50 border-red-300' : 'bg-green-50 border-green-300'}`}>
-                          <p className="text-xs font-semibold text-gray-600 mb-2">PAR30 общего портфеля банка</p>
+                          <p className="text-xs font-semibold text-gray-600">PAR30 общего портфеля банка</p>
+                          <p className="text-[10px] text-orange-500 mb-2">Нарушение = основание для «Не рекомендуется»</p>
                           <div className="grid grid-cols-3 gap-2 text-xs text-center">
                             <div><p className="text-gray-400">Сейчас</p><p className="font-bold text-lg">{viewing.current_par30_pct.toFixed(2)}%</p></div>
                             <div><p className="text-gray-400">Прирост</p><p className="font-bold text-lg text-orange-600">+{delta.toFixed(2)}%</p></div>
@@ -973,33 +999,59 @@ export default function CreditRiskPage() {
                 </div>
               )}
 
-              {/* 6. AI Заключение */}
-              <div>
-                <p className="text-xs font-bold text-gray-500 uppercase tracking-wide border-b border-gray-100 pb-1 mb-2">6. Заключение СУР</p>
-                <div className="bg-blue-50 border border-blue-100 rounded-lg p-4">
-                  <p className="text-sm text-gray-800 whitespace-pre-wrap">{viewing.ai_conclusion}</p>
-                </div>
-              </div>
-
-              {/* 7. Рекомендация */}
-              <div className={`p-4 rounded-xl border-2 ${viewing.recommendation === 'Не рекомендуется' ? 'bg-red-50 border-red-200' : 'bg-green-50 border-green-200'}`}>
-                <p className="text-xs text-gray-500 mb-1">Рекомендация</p>
-                <p className={`text-xl font-bold ${recColor(viewing.recommendation)}`}>{viewing.recommendation}</p>
-              </div>
-
-              {/* 8. Подписи */}
-              <div>
-                <p className="text-xs font-bold text-gray-500 uppercase tracking-wide border-b border-gray-100 pb-1 mb-3">8. Подписи</p>
-                <div className="grid grid-cols-2 gap-4">
-                  <div className="p-3 bg-gray-50 rounded-lg">
-                    <p className="text-[10px] text-gray-400 uppercase tracking-wide">Руководитель СУР</p>
-                    <p className="text-sm font-semibold text-gray-900 mt-1">Сангинова Ф.</p>
-                    <p className="text-xs text-gray-400 mt-2 border-t border-dashed border-gray-300 pt-2">Подпись ________________</p>
+              {/* 6. Обоснование операции (only for new records with section markers) */}
+              {viewing.ai_conclusion && parseAISection(viewing.ai_conclusion, 'ОБОСНОВАНИЕ ОПЕРАЦИИ') && (
+                <div>
+                  <p className="text-xs font-bold text-gray-500 uppercase tracking-wide border-b border-gray-100 pb-1 mb-2">6. Обоснование операции</p>
+                  <div className="p-4 bg-gray-50 rounded-lg border border-gray-100">
+                    <p className="text-sm text-gray-800 whitespace-pre-wrap leading-relaxed">
+                      {parseAISection(viewing.ai_conclusion, 'ОБОСНОВАНИЕ ОПЕРАЦИИ')}
+                    </p>
                   </div>
-                  <div className="p-3 bg-gray-50 rounded-lg">
-                    <p className="text-[10px] text-gray-400 uppercase tracking-wide">Менеджер</p>
-                    <p className="text-sm font-semibold text-gray-900 mt-1">{viewing.analyst_name || '—'}</p>
-                    <p className="text-xs text-gray-400 mt-2 border-t border-dashed border-gray-300 pt-2">Подпись ________________</p>
+                </div>
+              )}
+
+              {/* 7. Заключение СУР */}
+              <div>
+                <p className="text-xs font-bold text-gray-500 uppercase tracking-wide border-b border-gray-100 pb-1 mb-3">7. Заключение Службы управления рисками</p>
+                <div className="space-y-3">
+                  {viewing.ai_conclusion && parseAISection(viewing.ai_conclusion, 'ОЦЕНКА РИСКОВ') && (
+                    <div>
+                      <p className="text-xs font-semibold text-gray-500 mb-1.5">Оценка рисков</p>
+                      <p className="text-sm text-gray-800 whitespace-pre-wrap leading-relaxed">
+                        {parseAISection(viewing.ai_conclusion, 'ОЦЕНКА РИСКОВ')}
+                      </p>
+                    </div>
+                  )}
+                  {viewing.ai_conclusion && parseAISection(viewing.ai_conclusion, 'РЕШЕНИЕ И ОБОСНОВАНИЕ') && (
+                    <div className="p-3 bg-gray-50 rounded-lg border border-gray-100">
+                      <p className="text-xs font-semibold text-gray-500 mb-1.5">Решение и обоснование</p>
+                      <p className="text-sm text-gray-800 whitespace-pre-wrap leading-relaxed">
+                        {parseAISection(viewing.ai_conclusion, 'РЕШЕНИЕ И ОБОСНОВАНИЕ')}
+                      </p>
+                    </div>
+                  )}
+                  {/* Fallback: old records without section markers */}
+                  {viewing.ai_conclusion && !parseAISection(viewing.ai_conclusion, 'ОЦЕНКА РИСКОВ') && !parseAISection(viewing.ai_conclusion, 'РЕШЕНИЕ И ОБОСНОВАНИЕ') && (
+                    <div className="p-3 bg-gray-50 rounded-lg">
+                      <p className="text-sm text-gray-800 whitespace-pre-wrap leading-relaxed">{viewing.ai_conclusion}</p>
+                    </div>
+                  )}
+                  <div className={`p-4 rounded-xl border-2 ${viewing.recommendation === 'Не рекомендуется' ? 'bg-red-50 border-red-200' : 'bg-green-50 border-green-200'}`}>
+                    <p className="text-xs text-gray-500 mb-1">Рекомендация</p>
+                    <p className={`text-xl font-bold ${recColor(viewing.recommendation)}`}>{viewing.recommendation}</p>
+                  </div>
+                  <div className="grid grid-cols-2 gap-3">
+                    <div className="p-3 bg-gray-50 rounded-lg">
+                      <p className="text-[10px] text-gray-400 uppercase tracking-wide">Руководитель СУР</p>
+                      <p className="text-sm font-semibold text-gray-900 mt-1">Сангинова Ф.</p>
+                      <p className="text-xs text-gray-400 mt-2 border-t border-dashed border-gray-300 pt-2">Подпись ________________</p>
+                    </div>
+                    <div className="p-3 bg-gray-50 rounded-lg">
+                      <p className="text-[10px] text-gray-400 uppercase tracking-wide">Менеджер</p>
+                      <p className="text-sm font-semibold text-gray-900 mt-1">{viewing.analyst_name || '—'}</p>
+                      <p className="text-xs text-gray-400 mt-2 border-t border-dashed border-gray-300 pt-2">Подпись ________________</p>
+                    </div>
                   </div>
                 </div>
               </div>
