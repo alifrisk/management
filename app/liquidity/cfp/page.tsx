@@ -1,5 +1,5 @@
 'use client'
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useRef } from 'react'
 import { supabase } from '@/supabase/client'
 import { apiFetch } from '@/lib/api-fetch'
 import { Plus, Eye, Trash2, X, Loader2, ShieldAlert, CheckCircle, Download } from 'lucide-react'
@@ -133,6 +133,10 @@ export default function CfpPage() {
   const [hyDismissed, setHyDismissed] = useState<Record<string, boolean>>({})
   const [nowMs,       setNowMs]       = useState(Date.now())
 
+  // sticky header state
+  const [isStuck, setIsStuck] = useState(false)
+  const sentinelRef = useRef<HTMLDivElement>(null)
+
   // computed statuses
   const s11  = car11 ? statusCar11(parseN(car11)) : null
   const s12  = car12 ? statusCar12(parseN(car12)) : null
@@ -170,6 +174,18 @@ export default function CfpPage() {
   useEffect(() => {
     const id = setInterval(() => setNowMs(Date.now()), 60_000)
     return () => clearInterval(id)
+  }, [])
+
+  // ── Sticky sentinel observer ──────────────────────────────────────────────
+  useEffect(() => {
+    const el = sentinelRef.current
+    if (!el) return
+    const obs = new IntersectionObserver(
+      ([entry]) => setIsStuck(!entry.isIntersecting),
+      { threshold: 0 }
+    )
+    obs.observe(el)
+    return () => obs.disconnect()
   }, [])
 
   // ── GAP cell update ───────────────────────────────────────────────────────
@@ -295,353 +311,370 @@ export default function CfpPage() {
 
   // ── Render ─────────────────────────────────────────────────────────────────
   return (
-    <div className="max-w-5xl mx-auto space-y-6">
+    <div className="max-w-5xl mx-auto">
 
-      {/* Header */}
-      <div>
-        <h1 className="text-xl font-semibold text-gray-900">План финансирования на ЧС (CFP)</h1>
-        <p className="text-sm text-gray-500 mt-0.5">Инструкция №247 НБТ РТ · Contingency Funding Plan</p>
-      </div>
+      {/* Sentinel — triggers sticky shadow when scrolled past */}
+      <div ref={sentinelRef} className="h-px" aria-hidden />
 
-      {/* Half-year NBT alert */}
-      {showHyAlert && (
-        <div className={`flex items-start gap-3 px-4 py-3 rounded-xl border text-sm ${
-          hyInfo.daysLeft <= 7
-            ? 'bg-red-50 border-red-300 text-red-800 animate-pulse'
-            : hyInfo.daysLeft <= 30
-            ? 'bg-orange-50 border-orange-200 text-orange-800'
-            : 'bg-amber-50 border-amber-200 text-amber-800'
-        }`}>
-          <ShieldAlert className={`w-5 h-5 mt-0.5 flex-shrink-0 ${
-            hyInfo.daysLeft <= 7 ? 'text-red-600' : hyInfo.daysLeft <= 30 ? 'text-orange-500' : 'text-amber-600'
-          }`} />
-          <div className="flex-1 min-w-0">
-            <p className="font-semibold">
-              НБТ: CFP за {hyInfo.half === 1 ? 'I' : 'II'} полугодие {hyInfo.year} не сформирован
-            </p>
-            <p className="text-xs mt-0.5 opacity-80">
-              {hyInfo.daysLeft > 0
-                ? `До конца полугодия осталось ${hyInfo.daysLeft} ${hyInfo.daysLeft === 1 ? 'день' : hyInfo.daysLeft < 5 ? 'дня' : 'дней'} · Требование Инструкции №247 НБТ РТ`
-                : 'Срок полугодия истёк — срочно сформируйте CFP-план согласно Инструкции №247 НБТ РТ'}
-            </p>
-          </div>
-          <button onClick={() => dismissHY(hyInfo.key)}
-            className="text-xs underline opacity-60 hover:opacity-100 whitespace-nowrap flex-shrink-0 mt-0.5">
-            Понял, не забуду
-          </button>
-        </div>
-      )}
+      {/* ── STICKY HEADER ────────────────────────────────────────────────────── */}
+      <div className={`sticky top-0 z-30 bg-[#F5F8F6] pb-3 transition-shadow duration-200 ${isStuck ? 'shadow-[0_4px_16px_rgba(0,0,0,0.08)]' : ''}`}>
+        <div className="space-y-3">
 
-      {/* ── HISTORY (collapsible) ────────────────────────────────────────────── */}
-      <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
-        <button
-          onClick={() => setHistoryOpen(prev => !prev)}
-          className="w-full flex items-center justify-between px-6 py-4 border-b border-gray-100 hover:bg-gray-50/60 transition-colors"
-        >
-          <div className="flex items-center gap-3">
-            <h2 className="text-sm font-semibold text-gray-900">История CFP-планов</h2>
-            <span className="text-xs text-gray-400 bg-gray-100 px-2 py-0.5 rounded-full">{reports.length}</span>
-          </div>
-          <svg className={`w-4 h-4 text-gray-400 transition-transform duration-200 ${historyOpen ? 'rotate-180' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-          </svg>
-        </button>
-        {historyOpen && (
-          <div className="overflow-x-auto">
-            <table className="w-full text-sm">
-              <thead>
-                <tr className="bg-gray-50 border-b border-gray-100">
-                  {['Период плана', 'Дата', 'CAR 1.1', 'К2-1', 'Действия'].map(h => (
-                    <th key={h} className="text-left px-4 py-3 text-xs font-medium text-gray-500 uppercase whitespace-nowrap">{h}</th>
-                  ))}
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-gray-50">
-                {loadingList
-                  ? <tr><td colSpan={5} className="text-center py-10"><Loader2 className="w-5 h-5 animate-spin mx-auto text-gray-300" /></td></tr>
-                  : reports.length === 0
-                  ? <tr><td colSpan={5} className="text-center py-10 text-gray-400 text-sm">Нет сохранённых CFP-планов</td></tr>
-                  : reports.map(r => {
-                      const rs11  = r.car11 != null ? statusCar11(r.car11) : null
-                      const rsk21 = r.k21   != null ? statusK21(r.k21)     : null
-                      return (
-                        <tr key={r.id} className="hover:bg-gray-50">
-                          <td className="px-4 py-3 font-medium text-gray-900">{r.plan_period || r.report_name || '—'}</td>
-                          <td className="px-4 py-3 text-xs text-gray-400">
-                            {r.plan_date ? new Date(r.plan_date + 'T00:00:00').toLocaleDateString('ru-RU') : new Date(r.created_at).toLocaleDateString('ru-RU')}
-                          </td>
-                          <td className="px-4 py-3 text-xs">
-                            {rs11 ? <span className="font-medium">{r.car11}% {EWI_EMOJI[rs11]}</span> : <span className="text-gray-300">—</span>}
-                          </td>
-                          <td className="px-4 py-3 text-xs">
-                            {rsk21 ? <span className="font-medium">{r.k21}% {EWI_EMOJI[rsk21]}</span> : <span className="text-gray-300">—</span>}
-                          </td>
-                          <td className="px-4 py-3">
-                            <div className="flex items-center gap-1">
-                              <button onClick={() => setViewing(r)} title="Просмотр"
-                                className="p-1.5 text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors">
-                                <Eye className="w-3.5 h-3.5" />
-                              </button>
-                              <button onClick={() => downloadWord(r)} title="Скачать Word"
-                                className="p-1.5 text-gray-400 hover:text-[#1B8A4C] hover:bg-green-50 rounded-lg transition-colors">
-                                <Download className="w-3.5 h-3.5" />
-                              </button>
-                              <button onClick={() => handleDelete(r.id)} title="Удалить"
-                                className="p-1.5 text-gray-400 hover:text-red-500 hover:bg-red-50 rounded-lg transition-colors">
-                                <Trash2 className="w-3.5 h-3.5" />
-                              </button>
-                            </div>
-                          </td>
-                        </tr>
-                      )
-                    })
-                }
-              </tbody>
-            </table>
-          </div>
-        )}
-      </div>
-
-      {/* ── FORM ─────────────────────────────────────────────────────────────── */}
-      <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-6 space-y-6">
-
-        {/* Period + Date */}
-        <div className="grid grid-cols-2 gap-4">
+          {/* Title */}
           <div>
-            <label className={lbl}>Период плана</label>
-            <input type="text" value={planPeriod} onChange={e => setPlanPeriod(e.target.value)}
-              placeholder="II полугодие 2026" className={inp} />
+            <h1 className="text-xl font-semibold text-gray-900">План финансирования на ЧС (CFP)</h1>
+            <p className="text-sm text-gray-500 mt-0.5">Инструкция №247 НБТ РТ · Contingency Funding Plan</p>
           </div>
-          <div>
-            <label className={lbl}>Дата составления</label>
-            <input type="date" value={planDate} onChange={e => setPlanDate(e.target.value)} className={inp} />
-          </div>
-        </div>
 
-        {/* Normatives */}
-        <div>
-          <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">Нормативы капитала и ликвидности</p>
-          <div className="border border-gray-200 rounded-xl overflow-hidden divide-y divide-gray-100">
-            <NormRow code="CAR 1.1" norm="≥ 12%" value={car11} status={s11}  onChange={setCar11} />
-            <NormRow code="CAR 1.2" norm="≥ 10%" value={car12} status={s12}  onChange={setCar12} />
-            <NormRow code="CAR 1.3" norm="≥ 10%" value={car13} status={s13}  onChange={setCar13} />
-            <NormRow code="К2-1"    norm="≥ 30%" value={k21}   status={sk21} onChange={setK21}   />
-          </div>
-        </div>
-
-        {/* GAP Table */}
-        <div>
-          <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">
-            ГЭП-таблица (млн TJS) · {gapMonthsFull[0]}–{gapMonthsFull[5]}
-          </p>
-          <div className="overflow-x-auto">
-            <table className="w-full text-xs border-collapse">
-              <thead>
-                <tr className="bg-gray-50">
-                  <th className="text-left px-3 py-2 text-gray-600 font-medium border border-gray-200" style={{ minWidth: 200 }}>Статья</th>
-                  {gapMonthsShort.map(m => (
-                    <th key={m} className="px-2 py-2 text-gray-600 font-medium text-center border border-gray-200" style={{ minWidth: 76 }}>{m}</th>
-                  ))}
-                </tr>
-              </thead>
-              <tbody>
-                <tr className="bg-blue-50/60">
-                  <td colSpan={7} className="px-3 py-1.5 text-[11px] font-bold text-blue-700 uppercase tracking-wide border border-gray-200">
-                    Активы
-                  </td>
-                </tr>
-                {GAP_ASSETS.map((name, ri) => (
-                  <tr key={ri} className="border-t border-gray-100">
-                    <td className="px-3 py-1 text-gray-700 border border-gray-200 bg-white">{name}</td>
-                    {Array(6).fill(0).map((_, ci) => (
-                      <td key={ci} className="px-1 py-1 border border-gray-200 bg-white">
-                        <input type="text" inputMode="decimal" value={gapMatrix[ri][ci]}
-                          onChange={e => setGapCell(ri, ci, e.target.value.replace(/[^\d.]/g, ''))}
-                          onFocus={() => { const v = parseN(gapMatrix[ri][ci]); setGapCell(ri, ci, v > 0 ? String(v) : '') }}
-                          onBlur={() => { const v = Math.round(parseN(gapMatrix[ri][ci])); setGapCell(ri, ci, v > 0 ? v.toLocaleString('ru-RU') : '') }}
-                          placeholder="0"
-                          className="w-full px-2 py-1.5 border border-gray-200 rounded text-right text-xs focus:outline-none focus:ring-1 focus:ring-[#1B8A4C] bg-white" />
-                      </td>
-                    ))}
-                  </tr>
-                ))}
-                <tr className="bg-blue-50/40">
-                  <td className="px-3 py-1.5 text-xs font-semibold text-blue-700 border border-gray-200">Итого активы</td>
-                  {assetTotals.map((v, i) => (
-                    <td key={i} className="px-2 py-1.5 text-center text-xs font-bold text-blue-700 border border-gray-200">
-                      {v > 0 ? v.toLocaleString('ru-RU') : '—'}
-                    </td>
-                  ))}
-                </tr>
-                <tr className="bg-red-50/60">
-                  <td colSpan={7} className="px-3 py-1.5 text-[11px] font-bold text-red-700 uppercase tracking-wide border border-gray-200">
-                    Обязательства
-                  </td>
-                </tr>
-                {GAP_LIAB.map((name, ri) => (
-                  <tr key={ri + 3}>
-                    <td className="px-3 py-1 text-gray-700 border border-gray-200 bg-white">{name}</td>
-                    {Array(6).fill(0).map((_, ci) => (
-                      <td key={ci} className="px-1 py-1 border border-gray-200 bg-white">
-                        <input type="text" inputMode="decimal" value={gapMatrix[ri + 3][ci]}
-                          onChange={e => setGapCell(ri + 3, ci, e.target.value.replace(/[^\d.]/g, ''))}
-                          onFocus={() => { const v = parseN(gapMatrix[ri + 3][ci]); setGapCell(ri + 3, ci, v > 0 ? String(v) : '') }}
-                          onBlur={() => { const v = Math.round(parseN(gapMatrix[ri + 3][ci])); setGapCell(ri + 3, ci, v > 0 ? v.toLocaleString('ru-RU') : '') }}
-                          placeholder="0"
-                          className="w-full px-2 py-1.5 border border-gray-200 rounded text-right text-xs focus:outline-none focus:ring-1 focus:ring-[#1B8A4C] bg-white" />
-                      </td>
-                    ))}
-                  </tr>
-                ))}
-                <tr className="bg-red-50/40">
-                  <td className="px-3 py-1.5 text-xs font-semibold text-red-700 border border-gray-200">Итого обязательства</td>
-                  {liabTotals.map((v, i) => (
-                    <td key={i} className="px-2 py-1.5 text-center text-xs font-bold text-red-700 border border-gray-200">
-                      {v > 0 ? v.toLocaleString('ru-RU') : '—'}
-                    </td>
-                  ))}
-                </tr>
-              </tbody>
-            </table>
-          </div>
-        </div>
-
-        {/* Financing Sources */}
-        <div>
-          <div className="flex items-center justify-between mb-2">
-            <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide">Источники финансирования</p>
-            <button onClick={addSource}
-              className="flex items-center gap-1.5 px-3 py-1.5 text-xs bg-[#1B8A4C]/10 text-[#1B8A4C] rounded-lg hover:bg-[#1B8A4C]/20 font-medium transition-colors">
-              <Plus className="w-3.5 h-3.5" /> Добавить строку
-            </button>
-          </div>
-          <div className="flex items-start gap-2 mb-2 px-3 py-2 bg-blue-50 border border-blue-100 rounded-lg">
-            <svg className="w-3.5 h-3.5 text-blue-400 flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
-            <p className="text-[11px] text-blue-600">Пожалуйста, используйте сокращённые названия источников: «МБК», «НБТ», «Кредитная линия», «Депозит» и т.д.</p>
-          </div>
-          <div className="overflow-x-auto">
-            <table className="w-full text-xs border-collapse">
-              <thead>
-                <tr className="bg-gray-50">
-                  {['#', 'Источник', 'Статус', 'Валюта', 'Сумма (млн)', 'Стоимость', 'Срок', ''].map(h => (
-                    <th key={h} className="px-2 py-2 text-left text-gray-500 font-medium whitespace-nowrap border border-gray-200">{h}</th>
-                  ))}
-                </tr>
-              </thead>
-              <tbody>
-                {sources.map((s, idx) => (
-                  <tr key={idx} className="border-t border-gray-100">
-                    <td className="px-2 py-1 text-gray-400 text-center w-6 border border-gray-200 bg-white">{s.priority}</td>
-                    <td className="px-1 py-1 border border-gray-200 bg-white">
-                      <input type="text" value={s.source} onChange={e => updateSource(idx, 'source', e.target.value)}
-                        placeholder="Название источника"
-                        className={`w-full min-w-[150px] px-2 py-1.5 border rounded text-xs focus:outline-none focus:ring-1 bg-white ${/алиф|alif|бонк/i.test(s.source) ? 'border-amber-400 ring-1 ring-amber-300 bg-amber-50' : 'border-gray-200 focus:ring-[#1B8A4C]'}`} />
-                      {/алиф|alif|бонк/i.test(s.source) && (
-                        <p className="text-[10px] text-blue-500 mt-0.5">Используйте сокращение</p>
-                      )}
-                    </td>
-                    <td className="px-1 py-1 border border-gray-200 bg-white">
-                      <select value={s.status} onChange={e => updateSource(idx, 'status', e.target.value)}
-                        className="w-full px-2 py-1.5 border border-gray-200 rounded text-xs focus:outline-none focus:ring-1 focus:ring-[#1B8A4C] bg-white">
-                        <option value="available">Доступен</option>
-                        <option value="conditional">Условный</option>
-                        <option value="unavailable">Недоступен</option>
-                      </select>
-                    </td>
-                    <td className="px-1 py-1 border border-gray-200 bg-white">
-                      <select value={s.currency} onChange={e => updateSource(idx, 'currency', e.target.value)}
-                        className="w-20 px-2 py-1.5 border border-gray-200 rounded text-xs focus:outline-none focus:ring-1 focus:ring-[#1B8A4C] bg-white">
-                        <option value="TJS">TJS</option>
-                        <option value="USD">USD</option>
-                        <option value="EUR">EUR</option>
-                      </select>
-                    </td>
-                    <td className="px-1 py-1 border border-gray-200 bg-white">
-                      <input type="text" inputMode="numeric" value={s.amount}
-                        onChange={e => updateSource(idx, 'amount', e.target.value.replace(/\D/g, ''))}
-                        placeholder="0"
-                        className="w-24 px-2 py-1.5 border border-gray-200 rounded text-right text-xs focus:outline-none focus:ring-1 focus:ring-[#1B8A4C] bg-white" />
-                    </td>
-                    <td className="px-1 py-1 border border-gray-200 bg-white">
-                      <input type="text" value={s.cost} onChange={e => updateSource(idx, 'cost', e.target.value)}
-                        placeholder="8%"
-                        className="w-20 px-2 py-1.5 border border-gray-200 rounded text-xs focus:outline-none focus:ring-1 focus:ring-[#1B8A4C] bg-white" />
-                    </td>
-                    <td className="px-1 py-1 border border-gray-200 bg-white">
-                      <input type="text" value={s.term} onChange={e => updateSource(idx, 'term', e.target.value)}
-                        placeholder="30 дней"
-                        className="w-24 px-2 py-1.5 border border-gray-200 rounded text-xs focus:outline-none focus:ring-1 focus:ring-[#1B8A4C] bg-white" />
-                    </td>
-                    <td className="px-2 py-1 text-center border border-gray-200 bg-white">
-                      <button onClick={() => removeSource(idx)} className="text-gray-300 hover:text-red-500 transition-colors">
-                        <Trash2 className="w-3.5 h-3.5" />
-                      </button>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        </div>
-
-        {/* Liquidity Buffer */}
-        <div>
-          <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-3">Буфер ликвидности (млн TJS)</p>
-          <div className="grid grid-cols-2 gap-4">
-            <div>
-              <label className={lbl}>Денежные средства и эквиваленты</label>
-              <input type="text" inputMode="numeric" value={bufferCashEq}
-                onChange={e => setBufferCashEq(e.target.value.replace(/\D/g, ''))}
-                placeholder="0" className={inp + ' text-right'} />
-            </div>
-            <div>
-              <label className={lbl}>Только денежные средства</label>
-              <input type="text" inputMode="numeric" value={bufferCash}
-                onChange={e => setBufferCash(e.target.value.replace(/\D/g, ''))}
-                placeholder="0" className={inp + ' text-right'} />
-            </div>
-          </div>
-        </div>
-
-        {/* Generate button */}
-        <button onClick={handleGenerate} disabled={generating}
-          className="w-full flex items-center justify-center gap-2 py-3 bg-[#1B8A4C] text-white rounded-xl text-sm font-semibold hover:bg-[#177040] disabled:opacity-50 transition-colors">
-          {generating
-            ? <><Loader2 className="w-4 h-4 animate-spin" /> Генерация CFP...</>
-            : <><ShieldAlert className="w-4 h-4" /> Сгенерировать CFP</>}
-        </button>
-      </div>
-
-      {/* ── Generated Document ──────────────────────────────────────────────── */}
-      {generatedDoc && (
-        <div className="bg-white rounded-2xl border border-[#1B8A4C]/20 shadow-sm overflow-hidden">
-          <div className="px-6 py-4 border-b border-gray-100 bg-green-50/40 space-y-3">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-2">
-                <CheckCircle className="w-5 h-5 text-[#1B8A4C]" />
-                <div>
-                  <p className="text-sm font-semibold text-gray-900">CFP сгенерирован — 6 разделов</p>
-                  <p className="text-[11px] text-gray-500 mt-0.5">Инструкция №247 НБТ РТ</p>
-                </div>
+          {/* Half-year NBT alert */}
+          {showHyAlert && (
+            <div className={`flex items-start gap-3 px-4 py-3 rounded-xl border text-sm ${
+              hyInfo.daysLeft <= 7
+                ? 'bg-red-50 border-red-300 text-red-800 animate-pulse'
+                : hyInfo.daysLeft <= 30
+                ? 'bg-orange-50 border-orange-200 text-orange-800'
+                : 'bg-amber-50 border-amber-200 text-amber-800'
+            }`}>
+              <ShieldAlert className={`w-5 h-5 mt-0.5 flex-shrink-0 ${
+                hyInfo.daysLeft <= 7 ? 'text-red-600' : hyInfo.daysLeft <= 30 ? 'text-orange-500' : 'text-amber-600'
+              }`} />
+              <div className="flex-1 min-w-0">
+                <p className="font-semibold">
+                  НБТ: CFP за {hyInfo.half === 1 ? 'I' : 'II'} полугодие {hyInfo.year} не сформирован
+                </p>
+                <p className="text-xs mt-0.5 opacity-80">
+                  {hyInfo.daysLeft > 0
+                    ? `До конца полугодия осталось ${hyInfo.daysLeft} ${hyInfo.daysLeft === 1 ? 'день' : hyInfo.daysLeft < 5 ? 'дня' : 'дней'} · Требование Инструкции №247 НБТ РТ`
+                    : 'Срок полугодия истёк — срочно сформируйте CFP-план согласно Инструкции №247 НБТ РТ'}
+                </p>
               </div>
-              <button onClick={handleSave} disabled={saving}
-                className="flex items-center gap-2 px-4 py-2 bg-[#1B8A4C] text-white rounded-lg text-sm font-medium hover:bg-[#177040] disabled:opacity-50 transition-colors">
-                {saving
-                  ? <><Loader2 className="w-4 h-4 animate-spin" /> Сохранение...</>
-                  : <><CheckCircle className="w-4 h-4" /> Сохранить CFP</>}
+              <button onClick={() => dismissHY(hyInfo.key)}
+                className="text-xs underline opacity-60 hover:opacity-100 whitespace-nowrap flex-shrink-0 mt-0.5">
+                Понял, не забуду
               </button>
             </div>
-            {error && (
-              <div className="flex items-start gap-2 p-3 bg-red-50 border border-red-200 rounded-lg text-sm text-red-700">
-                <span className="font-medium">Ошибка сохранения:</span> {error}
+          )}
+
+          {/* ── HISTORY (collapsible) ──────────────────────────────────────────── */}
+          <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
+            <button
+              onClick={() => setHistoryOpen(prev => !prev)}
+              className="w-full flex items-center justify-between px-6 py-4 border-b border-gray-100 hover:bg-gray-50/60 transition-colors"
+            >
+              <div className="flex items-center gap-3">
+                <h2 className="text-sm font-semibold text-gray-900">История CFP-планов</h2>
+                <span className="text-xs text-gray-400 bg-gray-100 px-2 py-0.5 rounded-full">{reports.length}</span>
+              </div>
+              <svg className={`w-4 h-4 text-gray-400 transition-transform duration-200 ${historyOpen ? 'rotate-180' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+              </svg>
+            </button>
+            {historyOpen && (
+              <div className="overflow-x-auto">
+                <table className="w-full text-sm">
+                  <thead>
+                    <tr className="bg-gray-50 border-b border-gray-100">
+                      {['Период плана', 'Дата', 'CAR 1.1', 'К2-1', 'Действия'].map(h => (
+                        <th key={h} className="text-left px-4 py-3 text-xs font-medium text-gray-500 uppercase whitespace-nowrap">{h}</th>
+                      ))}
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-gray-50">
+                    {loadingList
+                      ? <tr><td colSpan={5} className="text-center py-10"><Loader2 className="w-5 h-5 animate-spin mx-auto text-gray-300" /></td></tr>
+                      : reports.length === 0
+                      ? <tr><td colSpan={5} className="text-center py-10 text-gray-400 text-sm">Нет сохранённых CFP-планов</td></tr>
+                      : reports.map(r => {
+                          const rs11  = r.car11 != null ? statusCar11(r.car11) : null
+                          const rsk21 = r.k21   != null ? statusK21(r.k21)     : null
+                          return (
+                            <tr key={r.id} className="hover:bg-gray-50">
+                              <td className="px-4 py-3 font-medium text-gray-900">{r.plan_period || r.report_name || '—'}</td>
+                              <td className="px-4 py-3 text-xs text-gray-400">
+                                {r.plan_date ? new Date(r.plan_date + 'T00:00:00').toLocaleDateString('ru-RU') : new Date(r.created_at).toLocaleDateString('ru-RU')}
+                              </td>
+                              <td className="px-4 py-3 text-xs">
+                                {rs11 ? <span className="font-medium">{r.car11}% {EWI_EMOJI[rs11]}</span> : <span className="text-gray-300">—</span>}
+                              </td>
+                              <td className="px-4 py-3 text-xs">
+                                {rsk21 ? <span className="font-medium">{r.k21}% {EWI_EMOJI[rsk21]}</span> : <span className="text-gray-300">—</span>}
+                              </td>
+                              <td className="px-4 py-3">
+                                <div className="flex items-center gap-1">
+                                  <button onClick={() => setViewing(r)} title="Просмотр"
+                                    className="p-1.5 text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors">
+                                    <Eye className="w-3.5 h-3.5" />
+                                  </button>
+                                  <button onClick={() => downloadWord(r)} title="Скачать Word"
+                                    className="p-1.5 text-gray-400 hover:text-[#1B8A4C] hover:bg-green-50 rounded-lg transition-colors">
+                                    <Download className="w-3.5 h-3.5" />
+                                  </button>
+                                  <button onClick={() => handleDelete(r.id)} title="Удалить"
+                                    className="p-1.5 text-gray-400 hover:text-red-500 hover:bg-red-50 rounded-lg transition-colors">
+                                    <Trash2 className="w-3.5 h-3.5" />
+                                  </button>
+                                </div>
+                              </td>
+                            </tr>
+                          )
+                        })
+                    }
+                  </tbody>
+                </table>
               </div>
             )}
           </div>
-          <div className="p-6">
-            <div className="text-sm text-gray-800 whitespace-pre-wrap leading-relaxed">{generatedDoc}</div>
+
+          {/* Period + Date */}
+          <div className="bg-white rounded-2xl border border-gray-100 shadow-sm px-6 py-4">
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <label className={lbl}>Период плана</label>
+                <input type="text" value={planPeriod} onChange={e => setPlanPeriod(e.target.value)}
+                  placeholder="II полугодие 2026" className={inp} />
+              </div>
+              <div>
+                <label className={lbl}>Дата составления</label>
+                <input type="date" value={planDate} onChange={e => setPlanDate(e.target.value)} className={inp} />
+              </div>
+            </div>
           </div>
+
         </div>
-      )}
+      </div>
+
+      {/* ── SCROLLABLE CONTENT ───────────────────────────────────────────────── */}
+      <div className="space-y-6 mt-3">
+
+        {/* ── FORM ─────────────────────────────────────────────────────────────── */}
+        <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-6 space-y-6">
+
+          {/* Normatives */}
+          <div>
+            <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">Нормативы капитала и ликвидности</p>
+            <div className="border border-gray-200 rounded-xl overflow-hidden divide-y divide-gray-100">
+              <NormRow code="CAR 1.1" norm="≥ 12%" value={car11} status={s11}  onChange={setCar11} />
+              <NormRow code="CAR 1.2" norm="≥ 10%" value={car12} status={s12}  onChange={setCar12} />
+              <NormRow code="CAR 1.3" norm="≥ 10%" value={car13} status={s13}  onChange={setCar13} />
+              <NormRow code="К2-1"    norm="≥ 30%" value={k21}   status={sk21} onChange={setK21}   />
+            </div>
+          </div>
+
+          {/* GAP Table */}
+          <div>
+            <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">
+              ГЭП-таблица (млн TJS) · {gapMonthsFull[0]}–{gapMonthsFull[5]}
+            </p>
+            <div className="overflow-x-auto">
+              <table className="w-full text-xs border-collapse">
+                <thead>
+                  <tr className="bg-gray-50">
+                    <th className="text-left px-3 py-2 text-gray-600 font-medium border border-gray-200" style={{ minWidth: 200 }}>Статья</th>
+                    {gapMonthsShort.map(m => (
+                      <th key={m} className="px-2 py-2 text-gray-600 font-medium text-center border border-gray-200" style={{ minWidth: 76 }}>{m}</th>
+                    ))}
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr className="bg-blue-50/60">
+                    <td colSpan={7} className="px-3 py-1.5 text-[11px] font-bold text-blue-700 uppercase tracking-wide border border-gray-200">
+                      Активы
+                    </td>
+                  </tr>
+                  {GAP_ASSETS.map((name, ri) => (
+                    <tr key={ri} className="border-t border-gray-100">
+                      <td className="px-3 py-1 text-gray-700 border border-gray-200 bg-white">{name}</td>
+                      {Array(6).fill(0).map((_, ci) => (
+                        <td key={ci} className="px-1 py-1 border border-gray-200 bg-white">
+                          <input type="text" inputMode="decimal" value={gapMatrix[ri][ci]}
+                            onChange={e => setGapCell(ri, ci, e.target.value.replace(/[^\d.]/g, ''))}
+                            onFocus={() => { const v = parseN(gapMatrix[ri][ci]); setGapCell(ri, ci, v > 0 ? String(v) : '') }}
+                            onBlur={() => { const v = Math.round(parseN(gapMatrix[ri][ci])); setGapCell(ri, ci, v > 0 ? v.toLocaleString('ru-RU') : '') }}
+                            placeholder="0"
+                            className="w-full px-2 py-1.5 border border-gray-200 rounded text-right text-xs focus:outline-none focus:ring-1 focus:ring-[#1B8A4C] bg-white" />
+                        </td>
+                      ))}
+                    </tr>
+                  ))}
+                  <tr className="bg-blue-50/40">
+                    <td className="px-3 py-1.5 text-xs font-semibold text-blue-700 border border-gray-200">Итого активы</td>
+                    {assetTotals.map((v, i) => (
+                      <td key={i} className="px-2 py-1.5 text-center text-xs font-bold text-blue-700 border border-gray-200">
+                        {v > 0 ? v.toLocaleString('ru-RU') : '—'}
+                      </td>
+                    ))}
+                  </tr>
+                  <tr className="bg-red-50/60">
+                    <td colSpan={7} className="px-3 py-1.5 text-[11px] font-bold text-red-700 uppercase tracking-wide border border-gray-200">
+                      Обязательства
+                    </td>
+                  </tr>
+                  {GAP_LIAB.map((name, ri) => (
+                    <tr key={ri + 3}>
+                      <td className="px-3 py-1 text-gray-700 border border-gray-200 bg-white">{name}</td>
+                      {Array(6).fill(0).map((_, ci) => (
+                        <td key={ci} className="px-1 py-1 border border-gray-200 bg-white">
+                          <input type="text" inputMode="decimal" value={gapMatrix[ri + 3][ci]}
+                            onChange={e => setGapCell(ri + 3, ci, e.target.value.replace(/[^\d.]/g, ''))}
+                            onFocus={() => { const v = parseN(gapMatrix[ri + 3][ci]); setGapCell(ri + 3, ci, v > 0 ? String(v) : '') }}
+                            onBlur={() => { const v = Math.round(parseN(gapMatrix[ri + 3][ci])); setGapCell(ri + 3, ci, v > 0 ? v.toLocaleString('ru-RU') : '') }}
+                            placeholder="0"
+                            className="w-full px-2 py-1.5 border border-gray-200 rounded text-right text-xs focus:outline-none focus:ring-1 focus:ring-[#1B8A4C] bg-white" />
+                        </td>
+                      ))}
+                    </tr>
+                  ))}
+                  <tr className="bg-red-50/40">
+                    <td className="px-3 py-1.5 text-xs font-semibold text-red-700 border border-gray-200">Итого обязательства</td>
+                    {liabTotals.map((v, i) => (
+                      <td key={i} className="px-2 py-1.5 text-center text-xs font-bold text-red-700 border border-gray-200">
+                        {v > 0 ? v.toLocaleString('ru-RU') : '—'}
+                      </td>
+                    ))}
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+
+          {/* Financing Sources */}
+          <div>
+            <div className="flex items-center justify-between mb-2">
+              <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide">Источники финансирования</p>
+              <button onClick={addSource}
+                className="flex items-center gap-1.5 px-3 py-1.5 text-xs bg-[#1B8A4C]/10 text-[#1B8A4C] rounded-lg hover:bg-[#1B8A4C]/20 font-medium transition-colors">
+                <Plus className="w-3.5 h-3.5" /> Добавить строку
+              </button>
+            </div>
+            <div className="flex items-start gap-2 mb-2 px-3 py-2 bg-blue-50 border border-blue-100 rounded-lg">
+              <svg className="w-3.5 h-3.5 text-blue-400 flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+              <p className="text-[11px] text-blue-600">Пожалуйста, используйте сокращённые названия источников: «МБК», «НБТ», «Кредитная линия», «Депозит» и т.д.</p>
+            </div>
+            <div className="overflow-x-auto">
+              <table className="w-full text-xs border-collapse">
+                <thead>
+                  <tr className="bg-gray-50">
+                    {['#', 'Источник', 'Статус', 'Валюта', 'Сумма (млн)', 'Стоимость', 'Срок', ''].map(h => (
+                      <th key={h} className="px-2 py-2 text-left text-gray-500 font-medium whitespace-nowrap border border-gray-200">{h}</th>
+                    ))}
+                  </tr>
+                </thead>
+                <tbody>
+                  {sources.map((s, idx) => (
+                    <tr key={idx} className="border-t border-gray-100">
+                      <td className="px-2 py-1 text-gray-400 text-center w-6 border border-gray-200 bg-white">{s.priority}</td>
+                      <td className="px-1 py-1 border border-gray-200 bg-white">
+                        <input type="text" value={s.source} onChange={e => updateSource(idx, 'source', e.target.value)}
+                          placeholder="Название источника"
+                          className={`w-full min-w-[150px] px-2 py-1.5 border rounded text-xs focus:outline-none focus:ring-1 bg-white ${/алиф|alif|бонк/i.test(s.source) ? 'border-amber-400 ring-1 ring-amber-300 bg-amber-50' : 'border-gray-200 focus:ring-[#1B8A4C]'}`} />
+                        {/алиф|alif|бонк/i.test(s.source) && (
+                          <p className="text-[10px] text-blue-500 mt-0.5">Используйте сокращение</p>
+                        )}
+                      </td>
+                      <td className="px-1 py-1 border border-gray-200 bg-white">
+                        <select value={s.status} onChange={e => updateSource(idx, 'status', e.target.value)}
+                          className="w-full px-2 py-1.5 border border-gray-200 rounded text-xs focus:outline-none focus:ring-1 focus:ring-[#1B8A4C] bg-white">
+                          <option value="available">Доступен</option>
+                          <option value="conditional">Условный</option>
+                          <option value="unavailable">Недоступен</option>
+                        </select>
+                      </td>
+                      <td className="px-1 py-1 border border-gray-200 bg-white">
+                        <select value={s.currency} onChange={e => updateSource(idx, 'currency', e.target.value)}
+                          className="w-20 px-2 py-1.5 border border-gray-200 rounded text-xs focus:outline-none focus:ring-1 focus:ring-[#1B8A4C] bg-white">
+                          <option value="TJS">TJS</option>
+                          <option value="USD">USD</option>
+                          <option value="EUR">EUR</option>
+                        </select>
+                      </td>
+                      <td className="px-1 py-1 border border-gray-200 bg-white">
+                        <input type="text" inputMode="numeric" value={s.amount}
+                          onChange={e => updateSource(idx, 'amount', e.target.value.replace(/\D/g, ''))}
+                          placeholder="0"
+                          className="w-24 px-2 py-1.5 border border-gray-200 rounded text-right text-xs focus:outline-none focus:ring-1 focus:ring-[#1B8A4C] bg-white" />
+                      </td>
+                      <td className="px-1 py-1 border border-gray-200 bg-white">
+                        <input type="text" value={s.cost} onChange={e => updateSource(idx, 'cost', e.target.value)}
+                          placeholder="8%"
+                          className="w-20 px-2 py-1.5 border border-gray-200 rounded text-xs focus:outline-none focus:ring-1 focus:ring-[#1B8A4C] bg-white" />
+                      </td>
+                      <td className="px-1 py-1 border border-gray-200 bg-white">
+                        <input type="text" value={s.term} onChange={e => updateSource(idx, 'term', e.target.value)}
+                          placeholder="30 дней"
+                          className="w-24 px-2 py-1.5 border border-gray-200 rounded text-xs focus:outline-none focus:ring-1 focus:ring-[#1B8A4C] bg-white" />
+                      </td>
+                      <td className="px-2 py-1 text-center border border-gray-200 bg-white">
+                        <button onClick={() => removeSource(idx)} className="text-gray-300 hover:text-red-500 transition-colors">
+                          <Trash2 className="w-3.5 h-3.5" />
+                        </button>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+
+          {/* Liquidity Buffer */}
+          <div>
+            <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-3">Буфер ликвидности (млн TJS)</p>
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <label className={lbl}>Денежные средства и эквиваленты</label>
+                <input type="text" inputMode="numeric" value={bufferCashEq}
+                  onChange={e => setBufferCashEq(e.target.value.replace(/\D/g, ''))}
+                  placeholder="0" className={inp + ' text-right'} />
+              </div>
+              <div>
+                <label className={lbl}>Только денежные средства</label>
+                <input type="text" inputMode="numeric" value={bufferCash}
+                  onChange={e => setBufferCash(e.target.value.replace(/\D/g, ''))}
+                  placeholder="0" className={inp + ' text-right'} />
+              </div>
+            </div>
+          </div>
+
+          {/* Generate button */}
+          <button onClick={handleGenerate} disabled={generating}
+            className="w-full flex items-center justify-center gap-2 py-3 bg-[#1B8A4C] text-white rounded-xl text-sm font-semibold hover:bg-[#177040] disabled:opacity-50 transition-colors">
+            {generating
+              ? <><Loader2 className="w-4 h-4 animate-spin" /> Генерация CFP...</>
+              : <><ShieldAlert className="w-4 h-4" /> Сгенерировать CFP</>}
+          </button>
+        </div>
+
+        {/* ── Generated Document ──────────────────────────────────────────────── */}
+        {generatedDoc && (
+          <div className="bg-white rounded-2xl border border-[#1B8A4C]/20 shadow-sm overflow-hidden">
+            <div className="px-6 py-4 border-b border-gray-100 bg-green-50/40 space-y-3">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <CheckCircle className="w-5 h-5 text-[#1B8A4C]" />
+                  <div>
+                    <p className="text-sm font-semibold text-gray-900">CFP сгенерирован — 6 разделов</p>
+                    <p className="text-[11px] text-gray-500 mt-0.5">Инструкция №247 НБТ РТ</p>
+                  </div>
+                </div>
+                <button onClick={handleSave} disabled={saving}
+                  className="flex items-center gap-2 px-4 py-2 bg-[#1B8A4C] text-white rounded-lg text-sm font-medium hover:bg-[#177040] disabled:opacity-50 transition-colors">
+                  {saving
+                    ? <><Loader2 className="w-4 h-4 animate-spin" /> Сохранение...</>
+                    : <><CheckCircle className="w-4 h-4" /> Сохранить CFP</>}
+                </button>
+              </div>
+              {error && (
+                <div className="flex items-start gap-2 p-3 bg-red-50 border border-red-200 rounded-lg text-sm text-red-700">
+                  <span className="font-medium">Ошибка сохранения:</span> {error}
+                </div>
+              )}
+            </div>
+            <div className="p-6">
+              <div className="text-sm text-gray-800 whitespace-pre-wrap leading-relaxed">{generatedDoc}</div>
+            </div>
+          </div>
+        )}
+
+      </div>{/* end scrollable content */}
 
       {/* ── View Modal ──────────────────────────────────────────────────────── */}
       {viewing && (
