@@ -65,6 +65,7 @@ interface CreditConclusion {
   additional_info?: string
   collaterals: Collateral[]
   guarantors?: { name: string; inn: string; relation: string }[]
+  exchange_rate?: number
   sme_sector_portfolio?: number
   bank_total_portfolio?: number
   current_par30_pct?: number
@@ -121,6 +122,7 @@ const EMPTY: Record<string, string> = {
   p1_cf_fx: '', p1_cf_cash_begin: '',
   p2_cf_fx: '', p2_cf_cash_begin: '',
   // Концентрация / Риск-аппетит
+  exchange_rate: '',
   sme_sector_portfolio: '',
   bank_total_portfolio: '',
   ra_conc_limit: '',
@@ -262,6 +264,8 @@ export default function CreditRiskPage() {
 
   // Аннуитет
   const loanAmt = n('loan_amount')
+  const exchangeRate = form.loan_currency !== 'TJS' ? (n('exchange_rate') || 1) : 1
+  const loanAmtTJS = loanAmt * exchangeRate
   const rate = n('interest_rate') / 100 / 12
   const months = n('loan_term_months') || 12
   const monthlyPayment = rate > 0
@@ -283,19 +287,20 @@ export default function CreditRiskPage() {
   const raMsbPar30     = parseFloat(form.ra_msb_par30_limit)    || 0
 
   // Концентрация МСБ в портфеле банка (доля сектора, не одного заёмщика)
+  // loanAmtTJS — сумма кредита, конвертированная в TJS через exchangeRate
   const concSmeNowPct   = smePf > 0 && bankPf > 0 ? (smePf / bankPf) * 100 : 0
-  const concSmeAfterPct = bankPf > 0 ? ((smePf + loanAmt) / bankPf) * 100 : 0
+  const concSmeAfterPct = bankPf > 0 ? ((smePf + loanAmtTJS) / bankPf) * 100 : 0
   const concViolates    = raConc > 0 && concSmeAfterPct > raConc
   // Доля одного заёмщика в МСБ-портфеле (справочно)
-  const borrowerInSmePct = smePf > 0 && loanAmt > 0 ? (loanAmt / smePf) * 100 : 0
+  const borrowerInSmePct = smePf > 0 && loanAmtTJS > 0 ? (loanAmtTJS / smePf) * 100 : 0
 
   // PAR30 по всему портфелю банка
-  const par30Delta    = bankPf > 0 && loanAmt > 0 ? (loanAmt / bankPf) * 100 : 0
+  const par30Delta    = bankPf > 0 && loanAmtTJS > 0 ? (loanAmtTJS / bankPf) * 100 : 0
   const par30After    = curPar30Pct + par30Delta
   const par30Violates = raPar30 > 0 && par30After > raPar30
 
   // PAR30 по портфелю МСБ
-  const par30MsbDelta    = smePf > 0 && loanAmt > 0 ? (loanAmt / smePf) * 100 : 0
+  const par30MsbDelta    = smePf > 0 && loanAmtTJS > 0 ? (loanAmtTJS / smePf) * 100 : 0
   const par30MsbAfter    = curMsbPar30Pct + par30MsbDelta
   const par30MsbViolates = raMsbPar30 > 0 && par30MsbAfter > raMsbPar30
 
@@ -405,6 +410,7 @@ export default function CreditRiskPage() {
       p2_cf_dividends: s(c.p2_cf_dividends), p2_cf_loans_out: s(c.p2_cf_loans_out) || s(c.p2_fin_outflow),
       p2_cf_buyback: s(c.p2_cf_buyback), p2_cf_other_fin_out: s(c.p2_cf_other_fin_out),
       p2_cf_fx: s(c.p2_cf_fx), p2_cf_cash_begin: s(c.p2_cf_cash_begin) || s(c.p2_cash_begin),
+      exchange_rate: c.exchange_rate ? String(c.exchange_rate) : '',
       sme_sector_portfolio: c.sme_sector_portfolio ? String(Math.round(c.sme_sector_portfolio)) : '',
       bank_total_portfolio: c.bank_total_portfolio ? String(Math.round(c.bank_total_portfolio)) : '',
       ra_conc_limit: c.ra_conc_limit ? String(c.ra_conc_limit) : '',
@@ -569,6 +575,7 @@ export default function CreditRiskPage() {
         p2_cf_other_fin_out: n('p2_cf_other_fin_out'), p2_cf_fx: n('p2_cf_fx'), p2_cf_cash_begin: n('p2_cf_cash_begin'),
         p2_cash_end,
         collaterals, guarantors,
+        exchange_rate: form.loan_currency !== 'TJS' ? (n('exchange_rate') || null) : null,
         sme_sector_portfolio:  n('sme_sector_portfolio') || null,
         bank_total_portfolio:  n('bank_total_portfolio') || null,
         ra_conc_limit:         raConc       || null,
@@ -878,12 +885,14 @@ export default function CreditRiskPage() {
                 <div>
                   <p className="text-xs font-bold text-gray-500 uppercase tracking-wide border-b border-gray-100 pb-1 mb-3">4. Концентрация</p>
                   {(() => {
-                    const vSme  = viewing.sme_sector_portfolio  || 0
-                    const vBank = viewing.bank_total_portfolio   || 0
-                    const vLoan = viewing.loan_amount            || 0
+                    const vSme   = viewing.sme_sector_portfolio || 0
+                    const vBank  = viewing.bank_total_portfolio  || 0
+                    const vLoan  = viewing.loan_amount           || 0
+                    const vRate  = viewing.loan_currency !== 'TJS' ? (viewing.exchange_rate || 1) : 1
+                    const vLoanTJS = vLoan * vRate
                     const vLimit = viewing.ra_conc_limit         || 0
                     const vNow   = vSme > 0 && vBank > 0 ? (vSme / vBank) * 100 : 0
-                    const vAfter = vBank > 0 ? ((vSme + vLoan) / vBank) * 100 : 0
+                    const vAfter = vBank > 0 ? ((vSme + vLoanTJS) / vBank) * 100 : 0
                     const vVio   = vLimit > 0 && vAfter > vLimit
                     return (
                       <div className="space-y-2">
@@ -895,7 +904,7 @@ export default function CreditRiskPage() {
                               <p className="text-[10px] text-gray-400 mt-0.5">{new Intl.NumberFormat('ru-RU').format(vSme)} / {new Intl.NumberFormat('ru-RU').format(vBank)} TJS</p>
                             </div>
                           )}
-                          {vAfter > 0 && vLoan > 0 && (
+                          {vAfter > 0 && vLoanTJS > 0 && (
                             <div className={`p-3 rounded-xl border-2 ${vVio ? 'bg-red-50 border-red-300' : 'bg-green-50 border-green-300'}`}>
                               <p className="text-xs text-gray-500 mb-1">Доля МСБ в портфеле (после)</p>
                               <p className={`text-xl font-bold ${vVio ? 'text-red-700' : 'text-green-700'}`}>{vAfter.toFixed(2)}%</p>
@@ -903,8 +912,8 @@ export default function CreditRiskPage() {
                             </div>
                           )}
                         </div>
-                        {vSme > 0 && vLoan > 0 && (
-                          <p className="text-xs text-blue-600 bg-blue-50 px-3 py-2 rounded-lg">Доля заёмщика в МСБ-портфеле (справочно): <span className="font-bold">{(vLoan/vSme*100).toFixed(2)}%</span></p>
+                        {vSme > 0 && vLoanTJS > 0 && (
+                          <p className="text-xs text-blue-600 bg-blue-50 px-3 py-2 rounded-lg">Доля заёмщика в МСБ-портфеле (справочно): <span className="font-bold">{(vLoanTJS/vSme*100).toFixed(2)}%</span></p>
                         )}
                       </div>
                     )
@@ -919,7 +928,8 @@ export default function CreditRiskPage() {
                   <div className="space-y-3">
                     {/* PAR30 МСБ */}
                     {viewing.current_msb_par30_pct != null && viewing.sme_sector_portfolio && viewing.loan_amount ? (() => {
-                      const delta = viewing.loan_amount / viewing.sme_sector_portfolio * 100
+                      const vRate = viewing.loan_currency !== 'TJS' ? (viewing.exchange_rate || 1) : 1
+                      const delta = viewing.loan_amount * vRate / viewing.sme_sector_portfolio * 100
                       const after = (viewing.current_msb_par30_pct || 0) + delta
                       const vio   = viewing.ra_msb_par30_limit && after > viewing.ra_msb_par30_limit
                       return (
@@ -940,7 +950,8 @@ export default function CreditRiskPage() {
                     })() : null}
                     {/* PAR30 общего портфеля */}
                     {viewing.current_par30_pct != null && viewing.bank_total_portfolio && viewing.loan_amount ? (() => {
-                      const delta = viewing.loan_amount / viewing.bank_total_portfolio * 100
+                      const vRate = viewing.loan_currency !== 'TJS' ? (viewing.exchange_rate || 1) : 1
+                      const delta = viewing.loan_amount * vRate / viewing.bank_total_portfolio * 100
                       const after = (viewing.current_par30_pct || 0) + delta
                       const vio   = viewing.ra_par30_limit && after > viewing.ra_par30_limit
                       return (
@@ -1176,7 +1187,23 @@ export default function CreditRiskPage() {
                     </div>
                   )}
 
-                  <div><label className={lbl}>Валюта</label><select value={form.loan_currency} onChange={e => setF('loan_currency', e.target.value)} className={inp}>{CURRENCIES.map(c => <option key={c}>{c}</option>)}</select></div>
+                  <div><label className={lbl}>Валюта</label><select value={form.loan_currency} onChange={e => { setF('loan_currency', e.target.value); setF('exchange_rate', '') }} className={inp}>{CURRENCIES.map(c => <option key={c}>{c}</option>)}</select></div>
+
+                  {form.loan_currency !== 'TJS' && (
+                    <div>
+                      <label className={lbl}>Курс {form.loan_currency}/TJS на дату отчётности *</label>
+                      <input type="text" inputMode="decimal"
+                        value={form.exchange_rate}
+                        onChange={e => setF('exchange_rate', e.target.value.replace(/[^0-9.]/g, ''))}
+                        placeholder="11.50" className={inp} />
+                      <p className="text-xs text-gray-400 mt-1">
+                        Используется для расчёта концентрации и PAR30 в сомони
+                        {form.exchange_rate && loanAmt > 0
+                          ? ` → ${fmt(loanAmtTJS)} TJS`
+                          : ''}
+                      </p>
+                    </div>
+                  )}
 
                   <div><label className={lbl}>Менеджер</label><input type="text" value={form.analyst_name} onChange={e => setF('analyst_name', e.target.value)} placeholder="ФИО" className={inp} /></div>
                   <div className="lg:col-span-2">
@@ -1290,14 +1317,14 @@ export default function CreditRiskPage() {
                           <p className="text-2xl font-bold text-gray-800">{concSmeNowPct.toFixed(2)}%</p>
                           <p className="text-xs text-gray-400 mt-1">{fmt(smePf)} / {fmt(bankPf)} TJS</p>
                         </div>
-                        {loanAmt > 0 && (
+                        {loanAmtTJS > 0 && (
                           <div className={`p-4 rounded-xl border-2 ${concViolates ? 'bg-red-50 border-red-300' : 'bg-green-50 border-green-300'}`}>
                             <p className="text-xs text-gray-500 mb-1">Доля МСБ после выдачи</p>
                             <p className={`text-2xl font-bold ${concViolates ? 'text-red-700' : 'text-green-700'}`}>
                               {concSmeAfterPct.toFixed(2)}%
                             </p>
                             <p className="text-xs text-gray-400 mt-1">
-                              {fmt(smePf + loanAmt)} / {fmt(bankPf)} TJS{raConc > 0 ? ` · лимит: ${raConc}%` : ''}
+                              {fmt(smePf + loanAmtTJS)} / {fmt(bankPf)} TJS{raConc > 0 ? ` · лимит: ${raConc}%` : ''}
                             </p>
                             <div className={`mt-2 inline-flex items-center gap-1 px-2 py-1 rounded-lg text-xs font-bold ${concViolates ? 'bg-red-100 text-red-700' : 'bg-green-100 text-green-700'}`}>
                               {concViolates ? '❌ Нарушает лимит концентрации' : '✅ В пределах лимита'}
@@ -1305,9 +1332,9 @@ export default function CreditRiskPage() {
                           </div>
                         )}
                       </div>
-                      {loanAmt > 0 && smePf > 0 && (
+                      {loanAmtTJS > 0 && smePf > 0 && (
                         <div className="p-3 bg-blue-50 rounded-lg border border-blue-100">
-                          <p className="text-xs text-blue-600">Доля этого заёмщика в МСБ-портфеле (справочно): <span className="font-bold">{borrowerInSmePct.toFixed(2)}%</span> ({fmt(loanAmt)} / {fmt(smePf)} TJS)</p>
+                          <p className="text-xs text-blue-600">Доля этого заёмщика в МСБ-портфеле (справочно): <span className="font-bold">{borrowerInSmePct.toFixed(2)}%</span> ({fmt(loanAmtTJS)} / {fmt(smePf)} TJS)</p>
                         </div>
                       )}
                     </div>
@@ -1344,7 +1371,7 @@ export default function CreditRiskPage() {
                         <p className="text-xs text-gray-400 mt-1">Лимит риск-аппетита по PAR30 для МСБ-портфеля</p>
                       </div>
                     </div>
-                    {smePf > 0 && loanAmt > 0 && (
+                    {smePf > 0 && loanAmtTJS > 0 && (
                       <div className={`mt-3 p-4 rounded-xl border-2 ${par30MsbViolates ? 'bg-red-50 border-red-300' : 'bg-green-50 border-green-300'}`}>
                         <p className="text-xs font-semibold text-gray-600 uppercase tracking-wide mb-3">Влияние на PAR30 МСБ при уходе заёмщика в просрочку</p>
                         <div className="grid grid-cols-3 gap-3 text-xs">
@@ -1393,7 +1420,7 @@ export default function CreditRiskPage() {
                         <p className="text-xs text-gray-400 mt-1">Лимит риск-аппетита по PAR30 для общего портфеля</p>
                       </div>
                     </div>
-                    {bankPf > 0 && loanAmt > 0 && (
+                    {bankPf > 0 && loanAmtTJS > 0 && (
                       <div className={`mt-3 p-4 rounded-xl border-2 ${par30Violates ? 'bg-red-50 border-red-300' : 'bg-green-50 border-green-300'}`}>
                         <p className="text-xs font-semibold text-gray-600 uppercase tracking-wide mb-3">Влияние на PAR30 общего портфеля при уходе заёмщика в просрочку</p>
                         <div className="grid grid-cols-3 gap-3 text-xs">
@@ -1421,7 +1448,7 @@ export default function CreditRiskPage() {
                     )}
                   </div>
 
-                  {(bankPf === 0 || loanAmt === 0) && smePf === 0 && (
+                  {(bankPf === 0 || loanAmtTJS === 0) && smePf === 0 && (
                     <p className="text-xs text-gray-400 text-center py-4">Заполните портфель МСБ и банка на вкладке «Концентрация», сумму линии — на вкладке «Заёмщик»</p>
                   )}
                 </div>
