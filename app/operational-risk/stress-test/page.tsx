@@ -8,8 +8,6 @@ const fmt   = (n: number) => n ? new Intl.NumberFormat('ru-RU').format(Math.roun
 const fmtN  = (v: string) => { const n = v.replace(/\D/g,''); return n ? new Intl.NumberFormat('ru-RU').format(Number(n)) : '' }
 const parseN = (v: string) => Number(v.replace(/\D/g,'')) || 0
 
-const RECOVERY_COLS = [50, 55, 60, 65, 70, 75, 80, 85, 90, 95, 100]
-
 const HORIZONS = [
   { months: 1,  label: '1 месяц'   },
   { months: 3,  label: '3 месяца'  },
@@ -130,6 +128,27 @@ export default function OpStressTest() {
     return Array.from(rows).filter(v => v >= 0).sort((a, b) => a - b)
   })()
 
+  // Dynamic What-If columns (recovery rates)
+  const recoveryCols: number[] = (() => {
+    if (!pess || !cat || !optim) return [50, 55, 60, 65, 70, 75, 80, 85, 90, 95, 100]
+    const rVals = [optim.recoveryRate, pess.recoveryRate, cat.recoveryRate]
+    const minR = Math.min(...rVals)
+    const maxR = Math.max(...rVals)
+    // Extend ±15pp snapped to nearest 5
+    const lo   = Math.max(0,   Math.floor((minR - 15) / 5) * 5)
+    const hi   = Math.min(100, Math.ceil( (maxR + 15) / 5) * 5)
+    const rawStep = (hi - lo) / 10
+    const step    = Math.max(5, Math.round(rawStep / 5) * 5)
+    const cols = new Set<number>()
+    for (let v = lo; v <= hi; v += step) if (v >= 0 && v <= 100) cols.add(v)
+    // Inject exact scenario values (1dp precision, no further rounding)
+    ;[optim.recoveryRate, pess.recoveryRate, cat.recoveryRate].forEach(r => {
+      const v = parseFloat(r.toFixed(1))
+      if (v >= 0 && v <= 100) cols.add(v)
+    })
+    return Array.from(cols).sort((a, b) => a - b)
+  })()
+
   const chartData = optim && pess && cat ? [
     { name: 'В месяц',    'Оптимистичный': Math.round(optim.lossPerMonth), 'Пессимистичный': Math.round(pess.lossPerMonth),  'Катастрофический': Math.round(cat.lossPerMonth)  },
     { name: `На ${H.label}`, 'Оптимистичный': Math.round(tLoss(optim)),       'Пессимистичный': Math.round(tLoss(pess)),        'Катастрофический': Math.round(tLoss(cat))        },
@@ -206,8 +225,8 @@ export default function OpStressTest() {
       rows.push([])
       rows.push(['МОДЕЛЬ 2 — WHAT-IF МАТРИЦА'])
       rows.push([`Базовая прибыль: ${fmt(bp)} TJS`])
-      rows.push(['Ущерб (горизонт) ↓ / Возвратность →', ...RECOVERY_COLS.map(r => `${r}%`)])
-      lossRows.forEach(loss => rows.push([fmt(loss), ...RECOVERY_COLS.map(r => String(Math.round(adjRow(loss, r))))]))
+      rows.push(['Ущерб (горизонт) ↓ / Возвратность →', ...recoveryCols.map(r => Number.isInteger(r) ? `${r}%` : `${r.toFixed(1)}%`)])
+      lossRows.forEach(loss => rows.push([fmt(loss), ...recoveryCols.map(r => String(Math.round(adjRow(loss, r))))]))
     }
     const csv = rows.map(r => r.map(c => `"${String(c).replace(/"/g,'""')}"`).join(',')).join('\n')
     const blob = new Blob(['﻿'+csv], {type:'text/csv;charset=utf-8;'})
@@ -572,11 +591,18 @@ export default function OpStressTest() {
                       <th className="bg-gray-800 text-white px-3 py-2 text-left whitespace-nowrap sticky left-0">
                         Ущерб (TJS) / Возвратность →
                       </th>
-                      {RECOVERY_COLS.map(r => (
-                        <th key={r} className="bg-gray-800 text-white px-3 py-2 text-center whitespace-nowrap">
-                          {r}%
-                        </th>
-                      ))}
+                      {recoveryCols.map(r => {
+                        const isCR = !!cat   && Math.abs(r - cat.recoveryRate)   < 0.05
+                        const isPR = !!pess  && Math.abs(r - pess.recoveryRate)  < 0.05 && !isCR
+                        const isOR = !!optim && Math.abs(r - optim.recoveryRate) < 0.05 && !isCR && !isPR
+                        return (
+                          <th key={r} className={`px-3 py-2 text-center whitespace-nowrap text-white
+                            ${isCR ? 'bg-red-700' : isPR ? 'bg-yellow-600' : isOR ? 'bg-green-700' : 'bg-gray-800'}`}>
+                            {isCR ? '⚠️ ' : isPR ? '📉 ' : isOR ? '📈 ' : ''}
+                            {Number.isInteger(r) ? `${r}%` : `${r.toFixed(1)}%`}
+                          </th>
+                        )
+                      })}
                     </tr>
                   </thead>
                   <tbody>
@@ -596,13 +622,20 @@ export default function OpStressTest() {
                             {isPess  && <span className="ml-1 text-[10px] text-yellow-500">📉</span>}
                             {isOptim && <span className="ml-1 text-[10px] text-green-500">📈</span>}
                           </td>
-                          {RECOVERY_COLS.map(rec => {
-                            const val    = adjRow(loss, rec)
-                            const isNeg  = val < 0
-                            const isLow  = bp > 0 && val >= 0 && val < bp * 0.9
+                          {recoveryCols.map(rec => {
+                            const val         = adjRow(loss, rec)
+                            const isNeg       = val < 0
+                            const isLow       = bp > 0 && val >= 0 && val < bp * 0.9
+                            const isRecCat    = !!cat   && Math.abs(rec - cat.recoveryRate)   < 0.05
+                            const isRecPess   = !!pess  && Math.abs(rec - pess.recoveryRate)  < 0.05 && !isRecCat
+                            const isCatCell   = isCat  && isRecCat
+                            const isPessCell  = isPess && isRecPess
                             return (
-                              <td key={rec} className={`px-2 py-1.5 text-center font-medium whitespace-nowrap
+                              <td key={rec} className={`px-2 py-1.5 text-center whitespace-nowrap
+                                ${isCatCell  ? 'font-extrabold ring-2 ring-inset ring-red-600'    : ''}
+                                ${isPessCell ? 'font-extrabold ring-2 ring-inset ring-yellow-500'  : 'font-medium'}
                                 ${isNeg ? 'text-red-700 bg-red-100' : isLow ? 'text-yellow-700 bg-yellow-50' : 'text-green-700'}`}>
+                                {isCatCell ? '⚠️ ' : isPessCell ? '📉 ' : ''}
                                 {isNeg ? `(${fmt(Math.abs(val))})` : fmt(val)}
                               </td>
                             )
@@ -617,7 +650,7 @@ export default function OpStressTest() {
                 <span className="flex items-center gap-1"><span className="w-3 h-3 bg-green-100 rounded inline-block"/> &gt;90% базовой прибыли</span>
                 <span className="flex items-center gap-1"><span className="w-3 h-3 bg-yellow-100 rounded inline-block"/> 0–90% базовой прибыли</span>
                 <span className="flex items-center gap-1"><span className="w-3 h-3 bg-red-100 rounded inline-block"/> Убыток</span>
-                <span>📈 Оптимистичный · 📉 Пессимистичный · ⚠️ Катастрофический — точные строки из Модели 1</span>
+                <span>📈 Оптимистичный · 📉 Пессимистичный · ⚠️ Катастрофический — точные строки и столбцы из Модели 1 (без округления)</span>
               </div>
             </>
           )}
