@@ -192,9 +192,29 @@ export async function GET() {
       } catch { return null }
     }).filter(Boolean)
 
-    const uralsItem = uralsData.rate !== null
-      ? { id: 'urals', label: 'Нефть Urals', rate: uralsData.rate, change: uralsData.change, change7d: uralsData.change7d, unit: 'USD/bbl' }
-      : null
+    // Urals discount to Brent — historically $1-3 pre-2022, $10-20 post-sanctions.
+    // 2024-2026 average: ≈$15/bbl. Used only when MOEX futures are unavailable.
+    const URALS_DISCOUNT = 15
+    const brentYahoo = yahooMapped.find(c => c?.id === 'brent') ?? null
+
+    const uralsItem = (() => {
+      if (uralsData.rate !== null) {
+        return { id: 'urals', label: 'Нефть Urals', rate: uralsData.rate, change: uralsData.change, change7d: uralsData.change7d, unit: 'USD/bbl', source: 'MOEX' }
+      }
+      if (brentYahoo?.rate != null) {
+        return {
+          id: 'urals',
+          label: 'Нефть Urals',
+          rate: Math.round((brentYahoo.rate - URALS_DISCOUNT) * 100) / 100,
+          change: brentYahoo.change,
+          change7d: brentYahoo.change7d,
+          unit: 'USD/bbl',
+          source: 'est',
+        }
+      }
+      return null
+    })()
+
     const commodities = [
       ...yahooMapped.slice(0, 3),
       uralsItem,

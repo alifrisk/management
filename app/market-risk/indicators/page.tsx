@@ -9,6 +9,7 @@ interface Indicator {
   change: number | null
   change7d?: number | null
   unit: string
+  source?: string
 }
 
 interface IndicatorsData {
@@ -48,8 +49,16 @@ function Card({ item }: { item: Indicator }) {
   const isNeg = item.change !== null && item.change < 0
   return (
     <div className={`rounded-xl border border-gray-100 p-4 shadow-sm ${changeBg(item.change)}`}>
-      <p className="text-xs font-medium text-gray-500 mb-2 truncate">{item.label}</p>
-      <p className="text-xl font-bold text-gray-900 mb-1">
+      <div className="flex items-start justify-between mb-2 gap-1">
+        <p className="text-xs font-medium text-gray-500 truncate">{item.label}</p>
+        {item.source === 'est' && (
+          <span className="flex-shrink-0 text-[9px] font-medium text-amber-600 bg-amber-50 border border-amber-200 rounded px-1 py-0.5 leading-tight" title="Оценка: Brent минус дисконт $15/bbl">≈est</span>
+        )}
+        {item.source === 'MOEX' && (
+          <span className="flex-shrink-0 text-[9px] font-medium text-blue-600 bg-blue-50 border border-blue-200 rounded px-1 py-0.5 leading-tight">MOEX</span>
+        )}
+      </div>
+      <p className="text-xl font-bold text-gray-900 mb-1 mt-0">
         {item.rate !== null ? fmtRate(item.rate, item.unit) : '—'}
         <span className="text-xs font-normal text-gray-400 ml-1">{item.unit}</span>
       </p>
@@ -175,7 +184,7 @@ export default function MarketIndicatorsPage() {
 
       {/* Info footer */}
       <div className="text-xs text-gray-400 flex items-center gap-4 flex-wrap">
-        <span>Источники: CoinGecko · Yahoo Finance · fawazahmed0</span>
+        <span>Источники: Yahoo Finance · CoinGecko · fawazahmed0 · Urals: MOEX FORTS или ≈Brent−$15</span>
         <span>Данные носят информационный характер</span>
         {lastFetch && (
           <span>Данные от: {lastFetch.toLocaleString('ru-RU')}</span>
