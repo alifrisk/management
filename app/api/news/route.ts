@@ -13,36 +13,39 @@ export interface NewsItem {
   summary?: string
 }
 
-const FEEDS: { url: string; source: string; category: NewsCategory }[] = [
-  // ── Tajikistan ────────────────────────────────────────────────────────────
-  { url: 'https://tj.sputniknews.ru/export/rss2/archive/index.xml', source: 'Sputnik TJ',  category: 'tj' },
-  { url: 'https://asiaplustj.info/ru/rss',                          source: 'Asia-Plus',   category: 'tj' },
-  { url: 'https://avesta.tj/feed',                                   source: 'Avesta.tj',   category: 'tj' },
+// financeOnly: true → источник публикует ТОЛЬКО финансовые/деловые новости,
+// фильтрация не нужна — берём все статьи.
+// financeOnly: false → общеновостной источник, применяем строгий фильтр по ЗАГОЛОВКУ.
+const FEEDS: { url: string; source: string; category: NewsCategory; financeOnly: boolean }[] = [
+  // ── Tajikistan (общая пресса — строгий фильтр) ────────────────────────────
+  { url: 'https://tj.sputniknews.ru/export/rss2/archive/index.xml', source: 'Sputnik TJ',  category: 'tj',    financeOnly: false },
+  { url: 'https://asiaplustj.info/ru/rss',                          source: 'Asia-Plus',   category: 'tj',    financeOnly: false },
+  { url: 'https://avesta.tj/feed',                                   source: 'Avesta.tj',   category: 'tj',    financeOnly: false },
   {
     url: 'https://news.google.com/rss/search?q=%D0%A2%D0%B0%D0%B4%D0%B6%D0%B8%D0%BA%D0%B8%D1%81%D1%82%D0%B0%D0%BD+%D1%8D%D0%BA%D0%BE%D0%BD%D0%BE%D0%BC%D0%B8%D0%BA%D0%B0+%D0%B1%D0%B0%D0%BD%D0%BA&hl=ru&gl=TJ&ceid=TJ:ru',
-    source: 'Google TJ', category: 'tj',
+    source: 'Google TJ', category: 'tj', financeOnly: false,
   },
 
   // ── CIS / Russia ──────────────────────────────────────────────────────────
-  { url: 'https://tass.ru/rss/v2.xml',              source: 'ТАСС',        category: 'cis' },
-  { url: 'https://www.kommersant.ru/RSS/news.xml',  source: 'Коммерсантъ', category: 'cis' },
-  { url: 'https://www.interfax.ru/rss.asp',         source: 'Интерфакс',   category: 'cis' },
-  { url: 'https://www.banki.ru/xml/news.rss',       source: 'Banki.ru',    category: 'cis' },
-  { url: 'https://akipress.com/rss/news.rss',       source: 'AKIpress',    category: 'cis' },
-  { url: 'http://www.finmarket.ru/rss/',            source: 'Finmarket',   category: 'cis' },
+  { url: 'https://tass.ru/rss/v2.xml',              source: 'ТАСС',        category: 'cis', financeOnly: false },
+  { url: 'https://www.kommersant.ru/RSS/news.xml',  source: 'Коммерсантъ', category: 'cis', financeOnly: false },
+  { url: 'https://www.interfax.ru/rss.asp',         source: 'Интерфакс',   category: 'cis', financeOnly: false },
+  { url: 'https://www.banki.ru/xml/news.rss',       source: 'Banki.ru',    category: 'cis', financeOnly: true  }, // 100% финансовый
+  { url: 'https://akipress.com/rss/news.rss',       source: 'AKIpress',    category: 'cis', financeOnly: false },
+  { url: 'http://www.finmarket.ru/rss/',            source: 'Finmarket',   category: 'cis', financeOnly: true  }, // 100% финансовый
   {
     url: 'https://news.google.com/rss/search?q=%D1%8D%D0%BA%D0%BE%D0%BD%D0%BE%D0%BC%D0%B8%D0%BA%D0%B0+%D0%B1%D0%B0%D0%BD%D0%BA+%D1%84%D0%B8%D0%BD%D0%B0%D0%BD%D1%81%D1%8B+%D0%A1%D0%9D%D0%93&hl=ru&gl=RU&ceid=RU:ru',
-    source: 'Google CIS', category: 'cis',
+    source: 'Google CIS', category: 'cis', financeOnly: false,
   },
 
-  // ── World ─────────────────────────────────────────────────────────────────
-  { url: 'https://oilprice.com/rss/main',                           source: 'OilPrice.com',   category: 'world' },
-  { url: 'https://www.mining.com/feed/',                            source: 'Mining.com',     category: 'world' },
-  { url: 'https://financialpost.com/feed',                          source: 'Financial Post', category: 'world' },
-  { url: 'https://feeds.marketwatch.com/marketwatch/topstories/',   source: 'MarketWatch',    category: 'world' },
+  // ── World (все специализированные финансовые/товарные) ────────────────────
+  { url: 'https://oilprice.com/rss/main',                           source: 'OilPrice.com',   category: 'world', financeOnly: true },
+  { url: 'https://www.mining.com/feed/',                            source: 'Mining.com',     category: 'world', financeOnly: true },
+  { url: 'https://financialpost.com/feed',                          source: 'Financial Post', category: 'world', financeOnly: true },
+  { url: 'https://feeds.marketwatch.com/marketwatch/topstories/',   source: 'MarketWatch',    category: 'world', financeOnly: true },
 ]
 
-// Named entities — shown unconditionally
+// Named entities — всегда пропускаем (проверяем только заголовок)
 const NAMED_ENTITIES = [
   'jefferson capital holdings',
   'jefferson trust ltd',
@@ -53,73 +56,67 @@ const NAMED_ENTITIES = [
   'alif bank',
 ]
 
-// ── Russian stems (substring match — intentional: covers all morphological forms) ──
-// e.g. 'банк' matches банк / банка / банков / банковский / банкротство
+// ── Русские стемы для поиска в ЗАГОЛОВКЕ ─────────────────────────────────────
+// Намеренно убраны слишком широкие: 'актив' (→ активисты), 'курс' (→ курс лечения),
+// 'санкц' перенесён в более строгий контекст, 'налог' убран (→ налог на сиделок).
 const FINANCE_STEMS_RU = [
-  'банк', 'риск', 'ликвидност', 'ставк', 'инфляци', 'нефт', 'золот', 'биткоин', 'курс',
-  'цб рф', 'нбт', 'нбрк', 'нацбанк', 'капитал', 'кредит', 'экономик', 'финанс', 'рынок', 'инвестиц',
-  'доллар', 'рубл', 'сомони', 'ввп', 'санкц', 'регулятор', 'бюджет', 'долг',
-  'процент', 'актив', 'торгов', 'валют', 'доход', 'прибыл', 'убыт', 'дефицит',
-  'профицит', 'монетарн', 'платёж', 'вклад', 'депозит', 'денеж', 'резерв',
-  'мвф', 'минфин', 'набиуллин', 'акци', 'облигац', 'фондов', 'биржа',
-  'банкрот', 'рефинансирован', 'надзор', 'ипотек', 'микрофинанс',
-  'налог', 'пошлин', 'тариф', 'экспорт', 'импорт', 'трансфер', 'ремитт',
-  'эмитент', 'листинг', 'дивиденд', 'рентабельн', 'платёжеспособн',
-  'эмисси', 'ликвидац', 'реструктуризац', 'нормативы', 'достаточност',
-  'процентн', 'межбанк', 'овернайт', 'репо', 'своп', 'форвард', 'деривати',
-  'торговый баланс', 'платёжный баланс', 'текущий счёт',
+  // Институты и регуляторы
+  'банк', 'нбт', 'нбрк', 'нацбанк', 'цб рф', 'минфин', 'набиуллин', 'мвф',
   'мировой банк', 'азиатский банк', 'центральный банк', 'народный банк',
-  'ключевая ставка', 'учётная ставка', 'базовая ставка',
-  'страхован', 'перестрахован', 'пенсион', 'брокер', 'дилер', 'трейдер',
-  'выручк', 'оборот', 'ликвидность', 'капитализац',
+  // Ставки и кредиты
+  'ставк', 'ключевая ставка', 'учётная ставка', 'базовая ставка',
+  'инфляци', 'кредит', 'ипотек', 'рефинансирован', 'овернайт',
+  // Рынки и инструменты
+  'биржа', 'фондов', 'акци', 'облигац', 'дивиденд', 'листинг', 'эмитент',
+  'репо', 'своп', 'форвард', 'деривати', 'межбанк',
+  // Валюты и курсы (только специфичные)
+  'валют', 'доллар', 'рубл', 'сомони', 'курс валют', 'курс доллар', 'курс рубл',
+  // Макроэкономика
+  'ввп', 'ликвидност', 'ликвидность', 'дефицит бюджет', 'профицит',
+  'торговый баланс', 'платёжный баланс', 'текущий счёт',
+  // Нефть/газ/золото (финансовый аспект)
+  'нефт', 'золот', 'биткоин',
+  // Банковские операции
+  'депозит', 'вклад', 'резерв', 'капитал', 'достаточност',
+  'надзор', 'регулятор', 'нормативы', 'реструктуризац', 'банкрот',
+  'микрофинанс', 'пенсион',
+  // Внешняя торговля (только специфичные)
+  'экспорт', 'импорт', 'пошлин', 'тариф', 'санкц', 'эмбарго',
+  'трансфер', 'ремитт',
+  // Корпоративные финансы
+  'прибыл', 'убыт', 'выручк', 'рентабельн', 'платёжеспособн',
+  'ликвидац', 'эмисси', 'капитализац',
+  // Смешанные
+  'страхован', 'перестрахован', 'брокер', 'финанс',
 ]
 
-// ── English whole-word keywords (word-boundary matched — prevents 'oil' matching 'soil') ──
-// Multi-word phrases use \s+ to handle varying whitespace
+// ── Английские ключевые слова с word-boundary ─────────────────────────────
 const FINANCE_WORDS_EN = [
-  // Institutions & regulators
   'bank', 'banking', 'central bank', 'federal reserve', 'imf', 'world bank',
   'ecb', 'fed', 'opec', 'bis', 'wto', 'treasury',
-  // Core finance
-  'finance', 'financial', 'fintech', 'economy', 'economic', 'economics',
+  'finance', 'financial', 'fintech',
   'monetary', 'fiscal', 'credit', 'lending', 'loan', 'mortgage',
-  // Markets & instruments
   'stock market', 'stock exchange', 'stock price', 'stock index',
   'bond market', 'bond yield', 'bond', 'yield', 'equity',
-  'commodity', 'commodities', 'futures', 'options', 'derivatives',
+  'commodity', 'commodities', 'futures', 'derivatives',
   'forex', 'exchange rate', 'currency', 'devaluation',
-  // Macro
   'gdp', 'inflation', 'deflation', 'stagflation', 'recession',
   'interest rate', 'interest rates', 'rate hike', 'rate cut',
-  'unemployment rate', 'trade balance', 'current account',
-  'fiscal deficit', 'budget deficit', 'debt',
-  // Commodities (specific — avoids false positives from single word)
+  'trade balance', 'current account', 'fiscal deficit', 'budget deficit', 'debt',
   'crude oil', 'oil price', 'oil prices', 'brent', 'wti', 'natural gas', 'lng',
   'gold price', 'gold reserves', 'silver price', 'copper price',
-  // Crypto
-  'bitcoin', 'ethereum', 'cryptocurrency', 'crypto market', 'blockchain', 'defi',
-  // Companies / activity
+  'bitcoin', 'ethereum', 'cryptocurrency', 'crypto market', 'blockchain',
   'investment', 'investor', 'investors', 'venture capital', 'private equity',
-  'ipo', 'merger', 'acquisition', 'takeover', 'valuation',
-  'profit', 'revenue', 'earnings', 'dividend', 'dividends',
-  'bankruptcy', 'insolvency', 'default', 'restructuring',
-  // Trade
-  'tariff', 'trade war', 'trade deal', 'trade deficit', 'export', 'import', 'imports',
-  'sanction', 'sanctions', 'embargo',
-  // Banking operations
-  'deposit', 'asset', 'assets', 'reserve', 'reserves', 'liquidity',
-  'capital adequacy', 'stress test', 'audit', 'rating', 'credit rating',
+  'ipo', 'merger', 'acquisition', 'bankruptcy', 'insolvency', 'default', 'restructuring',
+  'tariff', 'trade war', 'trade deal', 'sanction', 'sanctions', 'embargo',
+  'deposit', 'reserve', 'reserves', 'liquidity', 'capital adequacy', 'stress test',
   'hedge fund', 'mutual fund', 'pension fund', 'sovereign fund',
-  'remittance', 'payment', 'transaction', 'settlement',
-  // Currencies
-  'dollar', 'euro', 'ruble', 'yuan', 'yen', 'somoni',
-  // Energy (financial angle)
+  'remittance', 'dollar', 'euro', 'ruble', 'yuan', 'yen', 'somoni',
   'energy market', 'energy price', 'energy crisis',
-  // Mining (financial angle — source is Mining.com)
-  'mining stock', 'mining sector', 'gold mining', 'copper mining',
+  'gold mining', 'copper mining',
+  'profit', 'revenue', 'earnings', 'dividend', 'dividends',
 ]
 
-// Pre-compile word-boundary patterns once at module load (not per request)
 const FINANCE_EN_PATTERNS: RegExp[] = FINANCE_WORDS_EN.map(kw =>
   new RegExp(
     `\\b${kw.replace(/[.*+?^${}()|[\]\\]/g, '\\$&').replace(/\s+/g, '\\s+')}\\b`,
@@ -127,24 +124,19 @@ const FINANCE_EN_PATTERNS: RegExp[] = FINANCE_WORDS_EN.map(kw =>
   )
 )
 
-// Check title AND description (OR logic)
-function matchesFinance(title: string, description = ''): boolean {
+// Проверяет ТОЛЬКО заголовок (для общеновостных источников).
+// Намеренно НЕ проверяет описание — там слишком много ложных срабатываний:
+// "климатический форум" → описание "инвестиции в зелёную энергетику" → false positive.
+function matchesFinanceTitle(title: string): boolean {
   const t = title.toLowerCase()
-  const d = description.toLowerCase()
 
-  // 1. Russian stems — substring match covers all morphological forms
-  if (FINANCE_STEMS_RU.some(kw => t.includes(kw) || d.includes(kw))) return true
-
-  // 2. English — word-boundary match prevents false positives (oil≠soil, stock≠livestock)
-  if (FINANCE_EN_PATTERNS.some(re => re.test(t) || re.test(d))) return true
-
-  // 3. Named entities (unconditional pass)
-  if (NAMED_ENTITIES.some(e => t.includes(e) || d.includes(e))) return true
+  if (NAMED_ENTITIES.some(e => t.includes(e))) return true
+  if (FINANCE_STEMS_RU.some(kw => t.includes(kw))) return true
+  if (FINANCE_EN_PATTERNS.some(re => re.test(t))) return true
 
   return false
 }
 
-// TJ and CIS sources are shown first within the same hour bucket
 const LANG_PRIORITY: Record<NewsCategory, number> = { tj: 0, cis: 1, world: 2 }
 
 let cache: { items: NewsItem[]; ts: number } | null = null
@@ -164,20 +156,25 @@ export async function GET() {
   const all: NewsItem[] = []
 
   await Promise.allSettled(
-    FEEDS.map(async ({ url, source, category }) => {
+    FEEDS.map(async ({ url, source, category, financeOnly }) => {
       try {
         const feed = await parser.parseURL(url)
         for (const item of feed.items || []) {
           const title = item.title?.trim() || ''
           if (!title) continue
 
-          // Extract description text before filter check so it can be used in matchesFinance
+          // Для общеновостных источников — строгий фильтр по заголовку.
+          // Для финансово-специализированных — пропускаем все статьи.
+          if (!financeOnly) {
+            const passed = matchesFinanceTitle(title)
+            console.log(`[NEWS] ${passed ? 'PASS' : 'SKIP'} [${source}] ${title.slice(0, 100)}`)
+            if (!passed) continue
+          }
+
           const rawDesc: string = (item as unknown as Record<string, unknown>).rawDesc as string || ''
           const descText = rawDesc
             ? rawDesc.replace(/<[^>]+>/g, '').trim().slice(0, 400)
             : (item.contentSnippet || '').slice(0, 400)
-
-          if (!matchesFinance(title, descText)) continue
 
           const iso = item.isoDate || item.pubDate || ''
           all.push({
@@ -193,12 +190,12 @@ export async function GET() {
           })
         }
       } catch {
-        // skip failed feeds silently — does NOT bypass the filter
+        // пропускаем недоступные фиды — фильтр при этом НЕ обходится
       }
     })
   )
 
-  // Deduplicate
+  // Дедупликация
   const seen = new Set<string>()
   const deduped = all.filter(item => {
     const key = item.title.slice(0, 60).toLowerCase()
@@ -207,7 +204,7 @@ export async function GET() {
     return true
   })
 
-  // Sort: newest first; within same hour bucket — TJ then CIS then World
+  // Сортировка: сначала свежие; внутри одного часа — TJ → CIS → World
   deduped.sort((a, b) => {
     const ta = a.isoDate ? new Date(a.isoDate).getTime() : 0
     const tb = b.isoDate ? new Date(b.isoDate).getTime() : 0
