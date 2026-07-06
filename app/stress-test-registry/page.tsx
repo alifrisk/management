@@ -1,7 +1,8 @@
 'use client'
 import { useState, useEffect, useRef } from 'react'
 import { supabase } from '@/supabase/client'
-import { FlaskConical, Search, Filter, X, ChevronDown, Download, Calendar, User, Tag, Eye } from 'lucide-react'
+import { FlaskConical, Search, Filter, X, Download, Calendar, User, Tag, Eye } from 'lucide-react'
+import { labelField, formatFieldValue, FIELD_LABELS } from '@/lib/stress-test-labels'
 
 type RiskType = 'Операционный риск' | 'Кредитный риск' | 'Рыночный риск' | 'Риск ликвидности'
 
@@ -26,6 +27,12 @@ const RISK_COLORS: Record<RiskType, { bg: string; text: string; dot: string }> =
 
 const RISK_TYPES: RiskType[] = ['Операционный риск', 'Кредитный риск', 'Рыночный риск', 'Риск ликвидности']
 
+const SCENARIO_META = {
+  optimistic:   { label: 'Оптимистичный',   icon: '📈', bg: 'bg-green-50',  border: 'border-green-200',  title: 'text-green-700',  val: 'text-green-800' },
+  pessimistic:  { label: 'Пессимистичный',  icon: '📉', bg: 'bg-yellow-50', border: 'border-yellow-200', title: 'text-yellow-700', val: 'text-yellow-800' },
+  catastrophic: { label: 'Катастрофический',icon: '⚠️', bg: 'bg-red-50',    border: 'border-red-200',    title: 'text-red-700',    val: 'text-red-800' },
+}
+
 function formatDate(iso: string) {
   return new Date(iso).toLocaleDateString('ru-RU', { day: '2-digit', month: '2-digit', year: 'numeric' })
 }
@@ -34,93 +41,107 @@ function formatDateTime(iso: string) {
   return new Date(iso).toLocaleString('ru-RU', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' })
 }
 
-// Recursive value renderer — never produces [object Object]
-function renderJsonValue(v: unknown, depth = 0): JSX.Element | null {
-  if (v === null || v === undefined) {
-    return <span className="text-gray-400 italic text-[11px]">—</span>
-  }
-
-  if (typeof v !== 'object') {
-    return <span className="text-xs font-medium text-gray-800">{String(v)}</span>
-  }
-
-  if (Array.isArray(v)) {
-    if (v.length === 0) return <span className="text-gray-400 italic text-[11px]">—</span>
-
-    // Array of plain objects → mini-table
-    if (v.every(item => item !== null && typeof item === 'object' && !Array.isArray(item))) {
-      const cols = Array.from(new Set(v.flatMap(item => Object.keys(item as object))))
-      return (
-        <div className="mt-1.5 overflow-x-auto rounded border border-gray-200">
-          <table className="text-xs border-collapse min-w-full">
-            <thead>
-              <tr className="bg-gray-200">
-                {cols.map(c => (
-                  <th key={c} className="px-2.5 py-1.5 text-left text-[10px] font-semibold text-gray-600 uppercase tracking-wide whitespace-nowrap">{c}</th>
-                ))}
-              </tr>
-            </thead>
-            <tbody>
-              {(v as Record<string, unknown>[]).map((row, i) => (
-                <tr key={i} className={i % 2 === 0 ? 'bg-white' : 'bg-gray-50'}>
-                  {cols.map(c => (
-                    <td key={c} className="px-2.5 py-1.5 text-gray-700 whitespace-nowrap border-t border-gray-100">
-                      {renderJsonValue(row[c], depth + 1)}
-                    </td>
-                  ))}
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      )
-    }
-
-    // Array of primitives / mixed
-    return (
-      <span className="text-xs text-gray-700">
-        {v.map((item, i) => (
-          <span key={i}>{i > 0 ? ', ' : ''}{typeof item === 'object' && item !== null ? JSON.stringify(item) : String(item)}</span>
-        ))}
-      </span>
-    )
-  }
-
-  // Plain object
-  const entries = Object.entries(v as Record<string, unknown>).filter(([, val]) => val !== null && val !== undefined)
+// ── Inputs block: flat key-value with FIELD_LABELS, skip grow_table (renders as note) ──
+function InputsBlock({ data }: { data: Record<string, unknown> }) {
+  const entries = Object.entries(data).filter(([k, v]) => v !== null && v !== undefined)
   if (!entries.length) return null
 
+  const flat = entries.filter(([k]) => k !== 'grow_table')
+  const hasGrowTable = 'grow_table' in data && Array.isArray(data.grow_table)
+
   return (
-    <div className={`space-y-1.5 ${depth > 0 ? 'mt-1 ml-1 pl-2.5 border-l-2 border-gray-200' : ''}`}>
-      {entries.map(([k, val]) => {
-        const isComplex = val !== null && typeof val === 'object'
-        return (
-          <div key={k}>
-            {isComplex ? (
-              <div>
-                <span className="text-[11px] font-semibold text-gray-500">{k}:</span>
-                {renderJsonValue(val, depth + 1)}
-              </div>
-            ) : (
-              <div className="flex gap-2 items-baseline">
-                <span className="text-[11px] text-gray-400 shrink-0 w-40 truncate">{k}</span>
-                <span className="text-xs font-medium text-gray-800 break-all">{String(val)}</span>
-              </div>
-            )}
+    <div>
+      <h4 className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-2">Входные данные</h4>
+      <div className="bg-gray-50 rounded-xl p-3 space-y-1.5">
+        {flat.map(([k, v]) => (
+          <div key={k} className="flex items-baseline gap-2">
+            <span className="text-[11px] text-gray-400 shrink-0 w-48 truncate">{labelField(k)}</span>
+            <span className="text-xs font-medium text-gray-800">{formatFieldValue(k, v)}</span>
           </div>
-        )
-      })}
+        ))}
+        {hasGrowTable && (
+          <div className="mt-1 pt-1.5 border-t border-gray-200">
+            <span className="text-[11px] text-gray-400">{FIELD_LABELS['grow_table']}</span>
+            <span className="ml-2 text-[11px] text-gray-500 italic">таблица прогнозных коэффициентов</span>
+          </div>
+        )}
+      </div>
     </div>
   )
 }
 
-function JsonBlock({ label, data }: { label: string; data: Record<string, unknown> }) {
+// ── Single scenario card ────────────────────────────────────────────────────
+function ScenarioCard({ scenKey, scenData }: { scenKey: string; scenData: Record<string, unknown> }) {
+  const meta = SCENARIO_META[scenKey as keyof typeof SCENARIO_META]
+  if (!meta) return null
+
+  const entries = Object.entries(scenData).filter(([, v]) => v !== null && v !== undefined)
+
+  return (
+    <div className={`rounded-xl border-2 ${meta.border} ${meta.bg} p-3`}>
+      <p className={`text-xs font-bold ${meta.title} mb-2.5`}>{meta.icon} {meta.label}</p>
+      <div className="space-y-1.5">
+        {entries.map(([k, v]) => (
+          <div key={k} className="flex justify-between items-baseline gap-1">
+            <span className="text-[11px] text-gray-500 truncate">{labelField(k)}</span>
+            <span className={`text-xs font-semibold ${meta.val} shrink-0`}>{formatFieldValue(k, v)}</span>
+          </div>
+        ))}
+      </div>
+    </div>
+  )
+}
+
+// ── Results block: scenarios → cards, flat → labeled grid ──────────────────
+function ResultsBlock({ riskType, data }: { riskType: RiskType; data: Record<string, unknown> }) {
   if (!Object.keys(data).length) return null
+
+  const hasScenarios =
+    riskType === 'Кредитный риск' || riskType === 'Операционный риск'
+
+  if (hasScenarios) {
+    const scenKeys: (keyof typeof SCENARIO_META)[] = ['optimistic', 'pessimistic', 'catastrophic']
+    const scenariosPresent = scenKeys.filter(k => k in data && data[k] !== null)
+    const extra = Object.entries(data).filter(([k]) => !scenKeys.includes(k as keyof typeof SCENARIO_META) && data[k] !== null)
+
+    return (
+      <div>
+        <h4 className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-2">Результаты по сценариям</h4>
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5">
+          {scenariosPresent.map(k => (
+            <ScenarioCard
+              key={k}
+              scenKey={k}
+              scenData={data[k] as Record<string, unknown>}
+            />
+          ))}
+        </div>
+        {extra.length > 0 && (
+          <div className="mt-2.5 bg-gray-50 rounded-xl p-3 space-y-1.5">
+            {extra.map(([k, v]) => (
+              <div key={k} className="flex items-baseline gap-2">
+                <span className="text-[11px] text-gray-400 w-48 shrink-0 truncate">{labelField(k)}</span>
+                <span className="text-xs font-medium text-gray-800">{formatFieldValue(k, v)}</span>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+    )
+  }
+
+  // Flat results (market risk, liquidity, etc.)
+  const entries = Object.entries(data).filter(([, v]) => v !== null && v !== undefined)
   return (
     <div>
-      <h4 className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-2">{label}</h4>
-      <div className="bg-gray-50 rounded-lg p-3">
-        {renderJsonValue(data, 0)}
+      <h4 className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-2">Результаты</h4>
+      <div className="bg-gray-50 rounded-xl p-3 grid grid-cols-2 gap-x-4 gap-y-1.5">
+        {entries.map(([k, v]) => (
+          <div key={k} className="flex flex-col">
+            <span className="text-[10px] text-gray-400 uppercase tracking-wide">{labelField(k)}</span>
+            <span className="text-sm font-semibold text-gray-800">{formatFieldValue(k, v)}</span>
+          </div>
+        ))}
       </div>
     </div>
   )
@@ -207,13 +228,13 @@ function DetailModal({ entry, onClose }: { entry: RegistryEntry; onClose: () => 
 
             {/* Inputs */}
             {entry.inputs && Object.keys(entry.inputs).length > 0 && (
-              <JsonBlock label="Входные данные" data={entry.inputs} />
+              <InputsBlock data={entry.inputs} />
             )}
 
             {/* Results */}
             {entry.results && Object.keys(entry.results).length > 0 && (
               <div className="mt-4">
-                <JsonBlock label="Результаты" data={entry.results} />
+                <ResultsBlock riskType={entry.risk_type} data={entry.results} />
               </div>
             )}
 
