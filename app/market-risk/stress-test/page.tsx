@@ -697,7 +697,7 @@ export default function MarketStressTest() {
                         <span className={`font-bold ${sc.text}`}>{fmtNum(inc)} сом.</span>
                       </div>
                       <div className="flex justify-between text-xs">
-                        <span className="text-gray-500">Эффект на П&У:</span>
+                        <span className="text-gray-500">Эффект на чистую прибыль по части операций в иностранной валюте (Dealing Net):</span>
                         <span className={`font-bold ${eff >= 0 ? 'text-green-700' : 'text-red-700'}`}>
                           {eff >= 0 ? '+' : '−'}{fmtNum(Math.abs(eff))}
                         </span>
@@ -718,7 +718,7 @@ export default function MarketStressTest() {
                 <thead>
                   <tr>
                     <th className="bg-gray-800 text-white px-3 py-2 text-left whitespace-nowrap sticky left-0">
-                      Рост ВВП ↓ / Переводы →
+                      Рост ВВП ↓ / Доля перевода в ВВП →
                     </th>
                     {REMIT_COLS.map(c => {
                       const scFlags = [
