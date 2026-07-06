@@ -27,13 +27,9 @@ const FEEDS: { url: string; source: string; category: NewsCategory }[] = [
   { url: 'https://tass.ru/rss/v2.xml',              source: 'ТАСС',        category: 'cis' },
   { url: 'https://www.kommersant.ru/RSS/news.xml',  source: 'Коммерсантъ', category: 'cis' },
   { url: 'https://www.interfax.ru/rss.asp',         source: 'Интерфакс',   category: 'cis' },
-  // Banki.ru — confirmed valid
   { url: 'https://www.banki.ru/xml/news.rss',       source: 'Banki.ru',    category: 'cis' },
-  // AKIpress (Кыргызстан/ЦА) — confirmed valid
   { url: 'https://akipress.com/rss/news.rss',       source: 'AKIpress',    category: 'cis' },
-  // Finmarket.ru — may return 403 on some hosts; silently skipped if so
   { url: 'http://www.finmarket.ru/rss/',            source: 'Finmarket',   category: 'cis' },
-  // Google News CIS economics — covers Fergana/Kursiv/EADaily content via Google index
   {
     url: 'https://news.google.com/rss/search?q=%D1%8D%D0%BA%D0%BE%D0%BD%D0%BE%D0%BC%D0%B8%D0%BA%D0%B0+%D0%B1%D0%B0%D0%BD%D0%BA+%D1%84%D0%B8%D0%BD%D0%B0%D0%BD%D1%81%D1%8B+%D0%A1%D0%9D%D0%93&hl=ru&gl=RU&ceid=RU:ru',
     source: 'Google CIS', category: 'cis',
@@ -46,7 +42,7 @@ const FEEDS: { url: string; source: string; category: NewsCategory }[] = [
   { url: 'https://feeds.marketwatch.com/marketwatch/topstories/',   source: 'MarketWatch',    category: 'world' },
 ]
 
-// Named entities — shown unconditionally (acts as extra trigger alongside finance filter)
+// Named entities — shown unconditionally
 const NAMED_ENTITIES = [
   'jefferson capital holdings',
   'jefferson trust ltd',
@@ -57,35 +53,95 @@ const NAMED_ENTITIES = [
   'alif bank',
 ]
 
-// Strict finance / banking / economics / risk-management keyword list
-const FINANCE_KW = [
-  // Russian
+// ── Russian stems (substring match — intentional: covers all morphological forms) ──
+// e.g. 'банк' matches банк / банка / банков / банковский / банкротство
+const FINANCE_STEMS_RU = [
   'банк', 'риск', 'ликвидност', 'ставк', 'инфляци', 'нефт', 'золот', 'биткоин', 'курс',
-  'цб', 'нбт', 'нбрк', 'нацбанк', 'капитал', 'кредит', 'экономик', 'финанс', 'рынок', 'инвестиц',
+  'цб рф', 'нбт', 'нбрк', 'нацбанк', 'капитал', 'кредит', 'экономик', 'финанс', 'рынок', 'инвестиц',
   'доллар', 'рубл', 'сомони', 'ввп', 'санкц', 'регулятор', 'бюджет', 'долг',
   'процент', 'актив', 'торгов', 'валют', 'доход', 'прибыл', 'убыт', 'дефицит',
   'профицит', 'монетарн', 'платёж', 'вклад', 'депозит', 'денеж', 'резерв',
   'мвф', 'минфин', 'набиуллин', 'акци', 'облигац', 'фондов', 'биржа',
-  'банкрот', 'рефинансирован', 'надзор', 'нормативы', 'ипотек', 'микрофинанс',
+  'банкрот', 'рефинансирован', 'надзор', 'ипотек', 'микрофинанс',
   'налог', 'пошлин', 'тариф', 'экспорт', 'импорт', 'трансфер', 'ремитт',
-  'эмитент', 'листинг', 'ipo', 'дивиденд', 'рентабельн', 'платёжеспособн',
-  // English
-  'bank', 'risk', 'liquidity', 'rate', 'inflation', 'oil', 'gold', 'bitcoin', 'crypto',
-  'fed', 'ecb', 'imf', 'credit', 'finance', 'market', 'economy', 'monetary', 'gdp',
-  'recession', 'trade', 'investment', 'stock', 'mining', 'commodity', 'energy',
-  'currency', 'exchange', 'capital', 'interest', 'deposit', 'asset', 'fund',
-  'profit', 'revenue', 'debt', 'bond', 'yield', 'dollar', 'ruble', 'somoni',
-  'sanction', 'regulator', 'budget', 'deficit', 'surplus', 'payment', 'fiscal',
-  'financial', 'economic', 'treasury', 'central bank', 'reserve', 'equity',
-  'bankruptcy', 'mortgage', 'tax', 'tariff', 'export', 'import', 'remittance',
-  'ipo', 'dividend', 'rating', 'audit',
+  'эмитент', 'листинг', 'дивиденд', 'рентабельн', 'платёжеспособн',
+  'эмисси', 'ликвидац', 'реструктуризац', 'нормативы', 'достаточност',
+  'процентн', 'межбанк', 'овернайт', 'репо', 'своп', 'форвард', 'деривати',
+  'торговый баланс', 'платёжный баланс', 'текущий счёт',
+  'мировой банк', 'азиатский банк', 'центральный банк', 'народный банк',
+  'ключевая ставка', 'учётная ставка', 'базовая ставка',
+  'страхован', 'перестрахован', 'пенсион', 'брокер', 'дилер', 'трейдер',
+  'выручк', 'оборот', 'ликвидность', 'капитализац',
 ]
 
-// Show if: finance keyword match OR named entity mention
-function matchesFinance(title: string): boolean {
-  const lower = title.toLowerCase()
-  return FINANCE_KW.some(kw => lower.includes(kw))
-    || NAMED_ENTITIES.some(e => lower.includes(e))
+// ── English whole-word keywords (word-boundary matched — prevents 'oil' matching 'soil') ──
+// Multi-word phrases use \s+ to handle varying whitespace
+const FINANCE_WORDS_EN = [
+  // Institutions & regulators
+  'bank', 'banking', 'central bank', 'federal reserve', 'imf', 'world bank',
+  'ecb', 'fed', 'opec', 'bis', 'wto', 'treasury',
+  // Core finance
+  'finance', 'financial', 'fintech', 'economy', 'economic', 'economics',
+  'monetary', 'fiscal', 'credit', 'lending', 'loan', 'mortgage',
+  // Markets & instruments
+  'stock market', 'stock exchange', 'stock price', 'stock index',
+  'bond market', 'bond yield', 'bond', 'yield', 'equity',
+  'commodity', 'commodities', 'futures', 'options', 'derivatives',
+  'forex', 'exchange rate', 'currency', 'devaluation',
+  // Macro
+  'gdp', 'inflation', 'deflation', 'stagflation', 'recession',
+  'interest rate', 'interest rates', 'rate hike', 'rate cut',
+  'unemployment rate', 'trade balance', 'current account',
+  'fiscal deficit', 'budget deficit', 'debt',
+  // Commodities (specific — avoids false positives from single word)
+  'crude oil', 'oil price', 'oil prices', 'brent', 'wti', 'natural gas', 'lng',
+  'gold price', 'gold reserves', 'silver price', 'copper price',
+  // Crypto
+  'bitcoin', 'ethereum', 'cryptocurrency', 'crypto market', 'blockchain', 'defi',
+  // Companies / activity
+  'investment', 'investor', 'investors', 'venture capital', 'private equity',
+  'ipo', 'merger', 'acquisition', 'takeover', 'valuation',
+  'profit', 'revenue', 'earnings', 'dividend', 'dividends',
+  'bankruptcy', 'insolvency', 'default', 'restructuring',
+  // Trade
+  'tariff', 'trade war', 'trade deal', 'trade deficit', 'export', 'import', 'imports',
+  'sanction', 'sanctions', 'embargo',
+  // Banking operations
+  'deposit', 'asset', 'assets', 'reserve', 'reserves', 'liquidity',
+  'capital adequacy', 'stress test', 'audit', 'rating', 'credit rating',
+  'hedge fund', 'mutual fund', 'pension fund', 'sovereign fund',
+  'remittance', 'payment', 'transaction', 'settlement',
+  // Currencies
+  'dollar', 'euro', 'ruble', 'yuan', 'yen', 'somoni',
+  // Energy (financial angle)
+  'energy market', 'energy price', 'energy crisis',
+  // Mining (financial angle — source is Mining.com)
+  'mining stock', 'mining sector', 'gold mining', 'copper mining',
+]
+
+// Pre-compile word-boundary patterns once at module load (not per request)
+const FINANCE_EN_PATTERNS: RegExp[] = FINANCE_WORDS_EN.map(kw =>
+  new RegExp(
+    `\\b${kw.replace(/[.*+?^${}()|[\]\\]/g, '\\$&').replace(/\s+/g, '\\s+')}\\b`,
+    'i'
+  )
+)
+
+// Check title AND description (OR logic)
+function matchesFinance(title: string, description = ''): boolean {
+  const t = title.toLowerCase()
+  const d = description.toLowerCase()
+
+  // 1. Russian stems — substring match covers all morphological forms
+  if (FINANCE_STEMS_RU.some(kw => t.includes(kw) || d.includes(kw))) return true
+
+  // 2. English — word-boundary match prevents false positives (oil≠soil, stock≠livestock)
+  if (FINANCE_EN_PATTERNS.some(re => re.test(t) || re.test(d))) return true
+
+  // 3. Named entities (unconditional pass)
+  if (NAMED_ENTITIES.some(e => t.includes(e) || d.includes(e))) return true
+
+  return false
 }
 
 // TJ and CIS sources are shown first within the same hour bucket
@@ -105,7 +161,6 @@ export async function GET() {
     customFields: { item: [['description', 'rawDesc']] },
   })
 
-  // Fresh array every cache rebuild — no accumulation
   const all: NewsItem[] = []
 
   await Promise.allSettled(
@@ -115,12 +170,16 @@ export async function GET() {
         for (const item of feed.items || []) {
           const title = item.title?.trim() || ''
           if (!title) continue
-          if (!matchesFinance(title)) continue
-          const iso = item.isoDate || item.pubDate || ''
+
+          // Extract description text before filter check so it can be used in matchesFinance
           const rawDesc: string = (item as unknown as Record<string, unknown>).rawDesc as string || ''
-          const summary = rawDesc
-            ? rawDesc.replace(/<[^>]+>/g, '').trim().slice(0, 220)
-            : (item.contentSnippet || '').slice(0, 220)
+          const descText = rawDesc
+            ? rawDesc.replace(/<[^>]+>/g, '').trim().slice(0, 400)
+            : (item.contentSnippet || '').slice(0, 400)
+
+          if (!matchesFinance(title, descText)) continue
+
+          const iso = item.isoDate || item.pubDate || ''
           all.push({
             title,
             link: item.link || url,
@@ -130,11 +189,11 @@ export async function GET() {
               : '',
             isoDate: iso,
             category,
-            summary: summary || undefined,
+            summary: descText.slice(0, 220) || undefined,
           })
         }
       } catch {
-        // skip failed feeds silently
+        // skip failed feeds silently — does NOT bypass the filter
       }
     })
   )
@@ -154,9 +213,7 @@ export async function GET() {
     const tb = b.isoDate ? new Date(b.isoDate).getTime() : 0
     const hourA = Math.floor(ta / 3_600_000)
     const hourB = Math.floor(tb / 3_600_000)
-    if (hourA === hourB) {
-      return LANG_PRIORITY[a.category] - LANG_PRIORITY[b.category]
-    }
+    if (hourA === hourB) return LANG_PRIORITY[a.category] - LANG_PRIORITY[b.category]
     return tb - ta
   })
 
