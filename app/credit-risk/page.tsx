@@ -675,7 +675,7 @@ export default function CreditRiskPage() {
   }
 
   const riskColor = (l: string) => l === 'Высокий' ? 'bg-red-100 text-red-800' : l === 'Средний' ? 'bg-yellow-100 text-yellow-800' : 'bg-green-100 text-green-800'
-  const recColor = (r: string) => r?.includes('Отклонить') ? 'text-red-600' : r?.includes('Условно') ? 'text-yellow-600' : 'text-green-600'
+  const recColor = (r: string) => r === 'Не рекомендуется' ? 'text-red-600' : 'text-green-600'
   const inp = "w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#1B8A4C] bg-white"
   const lbl = "block text-xs font-medium text-gray-600 mb-1"
 
@@ -696,12 +696,11 @@ export default function CreditRiskPage() {
           </button>
         </div>
 
-        <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 mt-4">
+        <div className="grid grid-cols-3 gap-3 mt-4">
           {[
-            { label: 'Всего', value: conclusions.length, c: 'text-gray-900' },
-            { label: 'Одобрить', value: conclusions.filter(c => c.recommendation?.includes('Одобрить') && !c.recommendation?.includes('Условно')).length, c: 'text-green-600' },
-            { label: 'Условно', value: conclusions.filter(c => c.recommendation?.includes('Условно')).length, c: 'text-yellow-600' },
-            { label: 'Отклонить', value: conclusions.filter(c => c.recommendation?.includes('Отклонить')).length, c: 'text-red-600' },
+            { label: 'Всего заключений', value: conclusions.length, c: 'text-gray-900' },
+            { label: 'Рекомендуется', value: conclusions.filter(c => c.recommendation === 'Рекомендуется').length, c: 'text-green-600' },
+            { label: 'Не рекомендуется', value: conclusions.filter(c => c.recommendation === 'Не рекомендуется').length, c: 'text-red-600' },
           ].map(s => (
             <div key={s.label} className="bg-white rounded-xl border border-gray-100 p-4 shadow-sm">
               <p className={`text-2xl font-bold ${s.c}`}>{s.value}</p>
@@ -983,7 +982,7 @@ export default function CreditRiskPage() {
               </div>
 
               {/* 7. Рекомендация */}
-              <div className={`p-4 rounded-xl border-2 ${viewing.recommendation?.includes('Отклонить') ? 'bg-red-50 border-red-200' : viewing.recommendation?.includes('Условно') ? 'bg-yellow-50 border-yellow-200' : 'bg-green-50 border-green-200'}`}>
+              <div className={`p-4 rounded-xl border-2 ${viewing.recommendation === 'Не рекомендуется' ? 'bg-red-50 border-red-200' : 'bg-green-50 border-green-200'}`}>
                 <p className="text-xs text-gray-500 mb-1">Рекомендация</p>
                 <p className={`text-xl font-bold ${recColor(viewing.recommendation)}`}>{viewing.recommendation}</p>
               </div>
@@ -1304,7 +1303,7 @@ export default function CreditRiskPage() {
                         value={form.ra_conc_limit}
                         onChange={e => setF('ra_conc_limit', e.target.value.replace(/[^0-9.]/g,''))}
                         placeholder="30.00" className={inp} />
-                      <p className="text-xs text-gray-400 mt-1">Максимально допустимая доля сектора МСБ в общем кредитном портфеле банка</p>
+                      <p className="text-xs text-gray-400 mt-1">Максимально допустимая доля сектора МСБ в общем кредитном портфеле банка · <span className="italic">например, 25%</span></p>
                     </div>
                   </div>
 
@@ -1368,7 +1367,7 @@ export default function CreditRiskPage() {
                           value={form.ra_msb_par30_limit}
                           onChange={e => setF('ra_msb_par30_limit', e.target.value.replace(/[^0-9.]/g,''))}
                           placeholder="7.00" className={inp} />
-                        <p className="text-xs text-gray-400 mt-1">Лимит риск-аппетита по PAR30 для МСБ-портфеля</p>
+                        <p className="text-xs text-gray-400 mt-1">Лимит риск-аппетита по PAR30 для МСБ-портфеля · <span className="italic">например, 2%</span></p>
                       </div>
                     </div>
                     {smePf > 0 && loanAmtTJS > 0 && (
@@ -1417,7 +1416,7 @@ export default function CreditRiskPage() {
                           value={form.ra_par30_limit}
                           onChange={e => setF('ra_par30_limit', e.target.value.replace(/[^0-9.]/g,''))}
                           placeholder="5.00" className={inp} />
-                        <p className="text-xs text-gray-400 mt-1">Лимит риск-аппетита по PAR30 для общего портфеля</p>
+                        <p className="text-xs text-gray-400 mt-1">Лимит риск-аппетита по PAR30 для общего портфеля · <span className="italic">например, 10%</span></p>
                       </div>
                     </div>
                     {bankPf > 0 && loanAmtTJS > 0 && (
