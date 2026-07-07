@@ -137,15 +137,15 @@ export default function MarketStressTest() {
   const [mcResult,    setMcResult]    = useState<ReturnType<typeof runMonteCarlo> | null>(null)
   const [running,     setRunning]     = useState(false)
 
-  // Model 2 inputs
-  const [gdpBase,    setGdpBase]    = useState('173 000 000 000')
-  const [alifShare,  setAlifShare]  = useState('15.04')
-  const [margin,     setMargin]     = useState('1.67')
-  const [baseIncome, setBaseIncome] = useState('83 597 906')
+  // Model 2 — manual inputs
+  const [gdpBase,        setGdpBase]        = useState('173 000 000 000')
+  const [gdpGrowthFcst,  setGdpGrowthFcst]  = useState('7')
+  const [remitShareFcst, setRemitShareFcst] = useState('45')
+  const [alifBudgetVol,  setAlifBudgetVol]  = useState('')
+  const [actualVolH1,    setActualVolH1]    = useState('')
+  const [actualIncomeH1, setActualIncomeH1] = useState('')
 
-  // Model 2 scenario selectors
-  const [optGrowth,  setOptGrowth]  = useState<number>(8)
-  const [optRemit,   setOptRemit]   = useState<number>(55)
+  // Model 2 — scenario selectors (Pessimistic and Catastrophic)
   const [pessGrowth, setPessGrowth] = useState<number>(1)
   const [pessRemit,  setPessRemit]  = useState<number>(25)
   const [catGrowth,  setCatGrowth]  = useState<number>(-3)
@@ -192,13 +192,26 @@ export default function MarketStressTest() {
   }
 
   // ── Model 2 calc ────────────────────────────────────────────────────────────
-  const gdp0     = parseFloat(gdpBase.replace(/\D/g, ''))    || 0
-  const aShare   = parseFloat(alifShare)   || 0
-  const mgn      = parseFloat(margin)      || 0
-  const biVal    = parseFloat(baseIncome.replace(/\D/g, '')) || 0
+  const gdp0        = parseFloat(gdpBase.replace(/\D/g, ''))        || 0
+  const gdpGrowthP  = parseFloat(gdpGrowthFcst)                     || 0
+  const remitShareP = parseFloat(remitShareFcst)                    || 0
+  const alifBudget  = parseFloat(alifBudgetVol.replace(/\D/g, ''))  || 0
+  const actVolH1n   = parseFloat(actualVolH1.replace(/\D/g, ''))    || 0
+  const actIncH1n   = parseFloat(actualIncomeH1.replace(/\D/g, '')) || 0
 
-  const calcIncome = (g: number, r: number) =>
-    gdp0 * (1 + g / 100) * (r / 100) * (aShare / 100) * (mgn / 100)
+  // Computed (auto)
+  const expectedGdp     = gdp0 > 0 ? gdp0 * (1 + gdpGrowthP / 100) : 0
+  const forecastRemitRT = expectedGdp * (remitShareP / 100)
+  const alifSharePct    = forecastRemitRT > 0 ? (alifBudget / forecastRemitRT) * 100 : 0
+  const marginPct       = actVolH1n > 0 ? (actIncH1n / actVolH1n) * 100 : 0
+  const baseIncomeH2    = alifBudget > 0 ? (alifBudget / 2) * (marginPct / 100) : 0
+
+  // Matrix: H2 income for scenario (growth%, remitShare%)
+  const calcIncomeH2 = (g: number, r: number) => {
+    const volRT   = gdp0 * (1 + g / 100) * (r / 100)
+    const volAlif = volRT * (alifSharePct / 100)
+    return (volAlif / 2) * (marginPct / 100)
+  }
 
   // ── Сохранить в реестр ───────────────────────────────────────────────────────
   async function saveToRegistry() {
@@ -256,20 +269,26 @@ export default function MarketStressTest() {
       rows.push(['УКРЕПЛЕНИЕ TJS', 'Вероятность'])
       mcResult.probs.filter(p => p.type === 'apprec').forEach(p => rows.push([p.label, `${p.pct.toFixed(2)}%`]))
     } else if (model === 2) {
-      rows.push(['МАКРОЭКОНОМИКА — Денежные переводы'])
-      rows.push(['ВВП базовый', String(gdp0)])
-      rows.push(['Оптимистичный: рост ВВП', `${optGrowth}%`])
-      rows.push(['Оптимистичный: переводы', `${optRemit}%`])
-      rows.push(['Доля Алиф', `${alifShare}%`])
-      rows.push(['Маржа', `${margin}%`])
+      rows.push(['МАКРОЭКОНОМИКА — Денежные переводы (H2)'])
+      rows.push(['ВВП базовый (TJS)', String(gdp0)])
+      rows.push(['Прогноз роста ВВП', `${gdpGrowthP}%`])
+      rows.push(['Прогноз доля переводов в ВВП', `${remitShareP}%`])
+      rows.push(['Бюджет переводов Алиф (TJS)', String(alifBudget)])
+      rows.push(['Факт. объём переводов H1 (TJS)', String(actVolH1n)])
+      rows.push(['Факт. доход переводов H1 (TJS)', String(actIncH1n)])
       rows.push([])
-      rows.push(['Сценарий', 'Рост ВВП', 'Переводы', 'Доход'])
-      rows.push(['Оптимистичный',    `${optGrowth}%`,  `${optRemit}%`,  String(Math.round(calcIncome(optGrowth,  optRemit)))])
-      rows.push(['Пессимистичный',   `${pessGrowth}%`, `${pessRemit}%`, String(Math.round(calcIncome(pessGrowth, pessRemit)))])
-      rows.push(['Катастрофический', `${catGrowth}%`,  `${catRemit}%`,  String(Math.round(calcIncome(catGrowth,  catRemit)))])
+      rows.push(['Ожидаемый ВВП (TJS)', String(Math.round(expectedGdp))])
+      rows.push(['Прогноз переводов в РТ (TJS)', String(Math.round(forecastRemitRT))])
+      rows.push(['Доля Алиф % (авт.)', `${alifSharePct.toFixed(2)}%`])
+      rows.push(['Маржа доходности % (авт.)', `${marginPct.toFixed(4)}%`])
+      rows.push(['Базовый доход H2 (TJS)', String(Math.round(baseIncomeH2))])
       rows.push([])
-      rows.push(['МАТРИЦА: Рост ВВП ↓ / Доля переводов →', ...REMIT_COLS.map(c => `${c}%`)])
-      GROWTH_ROWS.forEach(g => rows.push([`${g}%`, ...REMIT_COLS.map(r => String(Math.round(calcIncome(g, r))))]))
+      rows.push(['Сценарий', 'Рост ВВП', 'Доля в ВВП', 'Доход H2 (TJS)', 'Эффект FX/Dealing Net (TJS)'])
+      rows.push(['Пессимистичный',   `${pessGrowth}%`, `${pessRemit}%`, String(Math.round(calcIncomeH2(pessGrowth, pessRemit))), String(Math.round(calcIncomeH2(pessGrowth, pessRemit) - baseIncomeH2))])
+      rows.push(['Катастрофический', `${catGrowth}%`,  `${catRemit}%`,  String(Math.round(calcIncomeH2(catGrowth,  catRemit))),  String(Math.round(calcIncomeH2(catGrowth,  catRemit)  - baseIncomeH2))])
+      rows.push([])
+      rows.push(['МАТРИЦА (доход H2): Рост ВВП ↓ / Доля перевода в ВВП →', ...REMIT_COLS.map(c => `${c}%`)])
+      GROWTH_ROWS.forEach(g => rows.push([`${g}%`, ...REMIT_COLS.map(r => String(Math.round(calcIncomeH2(g, r))))]))
     }
     const csv = rows.map(r => r.map(c => `"${c}"`).join(',')).join('\n')
     const blob = new Blob(['\uFEFF' + csv], { type: 'text/csv;charset=utf-8;' })
@@ -627,15 +646,19 @@ export default function MarketStressTest() {
       ════════════════════════════════════ */}
       {model === 2 && (
         <div className="space-y-5">
+
+          {/* Входные данные */}
           <div className={card}>
-            <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-3">Входные данные</p>
-            <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-              {[
-                { l: 'ВВП базовый (сомони)',       v: gdpBase,    s: setGdpBase,    p: '173 000 000 000', fmt: true  },
-                { l: 'Доля Алиф в переводах (%)',  v: alifShare,  s: setAlifShare,  p: '15.04',           fmt: false },
-                { l: 'Маржа доходности (%)',        v: margin,     s: setMargin,     p: '1.67',             fmt: false },
-                { l: 'Базовый доход (сомони)',      v: baseIncome, s: setBaseIncome, p: '83 597 906',       fmt: true  },
-              ].map(f => (
+            <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-3">Входные данные (вводит аналитик)</p>
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+              {([
+                { l: 'ВВП базового периода (TJS)',                     v: gdpBase,        s: setGdpBase,        p: '173 000 000 000', fmt: true  },
+                { l: 'Прогноз роста ВВП (%)',                          v: gdpGrowthFcst,  s: setGdpGrowthFcst,  p: '7',               fmt: false },
+                { l: 'Прогноз доля переводов в ВВП (%)',               v: remitShareFcst, s: setRemitShareFcst, p: '45',              fmt: false },
+                { l: 'Бюджет переводов Алиф на год (TJS)',             v: alifBudgetVol,  s: setAlifBudgetVol,  p: '0',               fmt: true  },
+                { l: 'Факт. объём переводов за H1 (TJS)',              v: actualVolH1,    s: setActualVolH1,    p: '0',               fmt: true  },
+                { l: 'Факт. доход от переводов за H1 (TJS)',           v: actualIncomeH1, s: setActualIncomeH1, p: '0',               fmt: true  },
+              ] as { l: string; v: string; s: (v: string) => void; p: string; fmt: boolean }[]).map(f => (
                 <div key={f.l}>
                   <label className={lbl}>{f.l}</label>
                   <input type="text" value={f.v}
@@ -644,34 +667,71 @@ export default function MarketStressTest() {
                 </div>
               ))}
             </div>
-            {gdp0 > 0 && (
-              <div className="mt-4 grid grid-cols-2 lg:grid-cols-4 gap-3">
+          </div>
+
+          {/* Вычисленные показатели */}
+          {(gdp0 > 0 || alifBudget > 0) && (
+            <div className={card}>
+              <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-3">Вычисленные показатели (автоматически)</p>
+              <div className="grid grid-cols-2 lg:grid-cols-5 gap-3">
                 {[
-                  { l: 'ВВП (оптимистичный)', v: fmtNum(gdp0 * (1 + optGrowth / 100)) + ' TJS' },
-                  { l: 'Переводы в РТ',        v: fmtNum(gdp0 * (1 + optGrowth / 100) * optRemit / 100) + ' TJS' },
-                  { l: 'Переводы Алиф',        v: fmtNum(gdp0 * (1 + optGrowth / 100) * optRemit / 100 * aShare / 100) + ' TJS' },
-                  { l: 'Доход (оптимистичный)', v: fmtNum(calcIncome(optGrowth, optRemit)) + ' TJS' },
+                  { l: 'Ожидаемый ВВП',              v: expectedGdp > 0     ? fmtNum(expectedGdp)     + ' TJS' : '—', c: 'text-gray-800'  },
+                  { l: 'Прогноз переводов в РТ',      v: forecastRemitRT > 0 ? fmtNum(forecastRemitRT) + ' TJS' : '—', c: 'text-gray-800'  },
+                  { l: 'Доля Алиф % (авт.)',          v: alifSharePct > 0    ? alifSharePct.toFixed(2) + '%'    : '—', c: 'text-blue-700'  },
+                  { l: 'Маржа доходности % (авт.)',   v: marginPct > 0       ? marginPct.toFixed(4)    + '%'    : '—', c: 'text-blue-700'  },
+                  { l: 'Базовый доход H2',            v: baseIncomeH2 > 0    ? fmtNum(baseIncomeH2)    + ' TJS' : '—', c: 'text-green-700' },
                 ].map(s => (
-                  <div key={s.l} className="bg-green-50 rounded-lg p-3">
-                    <p className="text-xs text-gray-400">{s.l}</p>
-                    <p className="text-sm font-bold text-green-700">{s.v}</p>
+                  <div key={s.l} className="bg-gray-50 rounded-lg p-3">
+                    <p className="text-[10px] text-gray-400 leading-tight mb-1">{s.l}</p>
+                    <p className={`text-sm font-bold ${s.c}`}>{s.v}</p>
                   </div>
                 ))}
               </div>
-            )}
-          </div>
+            </div>
+          )}
 
           {/* Сценарии */}
           <div className={card}>
             <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-4">Сценарии — выбор параметров</p>
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+
+              {/* Базовый прогноз — read-only */}
+              <div className="rounded-xl border-2 border-blue-200 bg-blue-50 p-4">
+                <p className="text-sm font-bold text-blue-700 mb-3">📊 Базовый прогноз</p>
+                <div className="space-y-1.5 text-xs">
+                  <div className="flex justify-between">
+                    <span className="text-gray-500">Рост ВВП:</span>
+                    <span className="font-semibold text-gray-800">{gdpGrowthP > 0 ? `+${gdpGrowthP}` : gdpGrowthP}%</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-gray-500">Доля переводов в ВВП:</span>
+                    <span className="font-semibold text-gray-800">{remitShareP}%</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-gray-500">Доля Алиф (авт.):</span>
+                    <span className="font-semibold text-gray-800">{alifSharePct > 0 ? alifSharePct.toFixed(2) + '%' : '—'}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-gray-500">Маржа (авт.):</span>
+                    <span className="font-semibold text-gray-800">{marginPct > 0 ? marginPct.toFixed(4) + '%' : '—'}</span>
+                  </div>
+                </div>
+                <div className="mt-3 pt-3 border-t border-blue-200">
+                  <div className="flex justify-between text-xs">
+                    <span className="text-gray-500">Доход H2 (базовый):</span>
+                    <span className="font-bold text-blue-700">{baseIncomeH2 > 0 ? fmtNum(baseIncomeH2) + ' сом.' : '—'}</span>
+                  </div>
+                </div>
+              </div>
+
+              {/* Пессимистичный и Катастрофический */}
               {([
-                { name: '📈 Оптимистичный',    growth: optGrowth,  setGrowth: setOptGrowth,  remit: optRemit,   setRemit: setOptRemit,  border: 'border-green-300',  bg: 'bg-green-50',  text: 'text-green-700'  },
-                { name: '📉 Пессимистичный',   growth: pessGrowth, setGrowth: setPessGrowth, remit: pessRemit,  setRemit: setPessRemit, border: 'border-yellow-300', bg: 'bg-yellow-50', text: 'text-yellow-700' },
-                { name: '⚠️ Катастрофический', growth: catGrowth,  setGrowth: setCatGrowth,  remit: catRemit,   setRemit: setCatRemit,  border: 'border-red-300',    bg: 'bg-red-50',    text: 'text-red-700'    },
+                { name: '📉 Пессимистичный',   growth: pessGrowth, setGrowth: setPessGrowth, remit: pessRemit, setRemit: setPessRemit, border: 'border-yellow-300', bg: 'bg-yellow-50', text: 'text-yellow-700', sep: 'border-yellow-200' },
+                { name: '⚠️ Катастрофический', growth: catGrowth,  setGrowth: setCatGrowth,  remit: catRemit,  setRemit: setCatRemit,  border: 'border-red-300',    bg: 'bg-red-50',    text: 'text-red-700',    sep: 'border-red-200'    },
               ] as const).map(sc => {
-                const inc = calcIncome(sc.growth, sc.remit)
-                const eff = inc - biVal
+                const inc = calcIncomeH2(sc.growth, sc.remit)
+                const eff = inc - baseIncomeH2
+                const hasData = alifSharePct > 0 && marginPct > 0
                 return (
                   <div key={sc.name} className={`rounded-xl border-2 p-4 ${sc.border} ${sc.bg}`}>
                     <p className={`text-sm font-bold mb-3 ${sc.text}`}>{sc.name}</p>
@@ -684,22 +744,24 @@ export default function MarketStressTest() {
                         </select>
                       </div>
                       <div>
-                        <label className="block text-[11px] text-gray-500 mb-1">Денежные переводы (%)</label>
+                        <label className="block text-[11px] text-gray-500 mb-1">Доля перевода в ВВП (%)</label>
                         <select value={sc.remit} onChange={e => sc.setRemit(Number(e.target.value))}
                           className="w-full px-2 py-1.5 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#1B8A4C] bg-white">
                           {REMIT_COLS.map(r => <option key={r} value={r}>{r}%</option>)}
                         </select>
                       </div>
                     </div>
-                    <div className="mt-3 pt-3 border-t border-gray-200 space-y-1">
+                    <div className={`mt-3 pt-3 border-t ${sc.sep} space-y-1.5`}>
                       <div className="flex justify-between text-xs">
-                        <span className="text-gray-500">Ожид. доход:</span>
-                        <span className={`font-bold ${sc.text}`}>{fmtNum(inc)} сом.</span>
+                        <span className="text-gray-500">Доход H2:</span>
+                        <span className={`font-bold ${sc.text}`}>{hasData ? fmtNum(inc) + ' сом.' : '—'}</span>
                       </div>
-                      <div className="flex justify-between text-xs">
-                        <span className="text-gray-500">Эффект на чистую прибыль по части операций в иностранной валюте (Dealing Net):</span>
+                      <div className="text-[10px] text-gray-400 leading-snug">
+                        Эффект на чистую прибыль по части операций в иностранной валюте (FX/Dealing Net):
+                      </div>
+                      <div className="flex justify-end text-xs">
                         <span className={`font-bold ${eff >= 0 ? 'text-green-700' : 'text-red-700'}`}>
-                          {eff >= 0 ? '+' : '−'}{fmtNum(Math.abs(eff))}
+                          {hasData ? (eff >= 0 ? '+' : '−') + fmtNum(Math.abs(eff)) + ' сом.' : '—'}
                         </span>
                       </div>
                     </div>
@@ -711,8 +773,10 @@ export default function MarketStressTest() {
 
           {/* What-If матрица */}
           <div className={card}>
-            <p className="text-base font-semibold text-gray-900 mb-1">What-If матрица</p>
-            <p className="text-xs text-gray-500 mb-4">Ожидаемый доход Алиф от переводов (сомони) · базовый доход: {fmtNum(biVal)} · флаги на пересечении выбранных сценариев</p>
+            <p className="text-base font-semibold text-gray-900 mb-1">What-If матрица — Доход Алиф за H2 (сомони)</p>
+            <p className="text-xs text-gray-500 mb-4">
+              Доля Алиф: {alifSharePct > 0 ? alifSharePct.toFixed(2) + '%' : '—'} (авт.) · Маржа: {marginPct > 0 ? marginPct.toFixed(4) + '%' : '—'} (авт.) · Базовый доход H2: {baseIncomeH2 > 0 ? fmtNum(baseIncomeH2) + ' TJS' : '—'}
+            </p>
             <div className="overflow-x-auto">
               <table className="w-full text-xs border-collapse">
                 <thead>
@@ -722,9 +786,9 @@ export default function MarketStressTest() {
                     </th>
                     {REMIT_COLS.map(c => {
                       const scFlags = [
-                        optRemit  === c ? '📈' : '',
-                        pessRemit === c ? '📉' : '',
-                        catRemit  === c ? '⚠️' : '',
+                        remitShareP === c ? '📊' : '',
+                        pessRemit   === c ? '📉' : '',
+                        catRemit    === c ? '⚠️' : '',
                       ].filter(Boolean)
                       return (
                         <th key={c} className={`px-3 py-2 text-center whitespace-nowrap text-white ${scFlags.length > 0 ? 'bg-[#1B8A4C]' : 'bg-gray-800'}`}>
@@ -737,12 +801,12 @@ export default function MarketStressTest() {
                 </thead>
                 <tbody>
                   {GROWTH_ROWS.map((g, gi) => {
-                    const isOpt  = g === optGrowth
+                    const isBase = g === gdpGrowthP
                     const isPess = g === pessGrowth
                     const isCat  = g === catGrowth
-                    const rowBg  = isCat ? 'bg-red-50' : isPess ? 'bg-yellow-50' : isOpt ? 'bg-green-50' : gi % 2 === 0 ? 'bg-white' : 'bg-gray-50'
+                    const rowBg  = isCat ? 'bg-red-50' : isPess ? 'bg-yellow-50' : isBase ? 'bg-blue-50' : gi % 2 === 0 ? 'bg-white' : 'bg-gray-50'
                     const rowFlags = [
-                      isOpt  ? '📈' : '',
+                      isBase ? '📊' : '',
                       isPess ? '📉' : '',
                       isCat  ? '⚠️' : '',
                     ].filter(Boolean)
@@ -753,24 +817,26 @@ export default function MarketStressTest() {
                           {rowFlags.length > 0 && <span className="ml-1 text-[10px]">{rowFlags.join('')}</span>}
                         </td>
                         {REMIT_COLS.map(r => {
-                          const inc = calcIncome(g, r)
-                          const eff = inc - biVal
-                          const isOptCell  = g === optGrowth  && r === optRemit
-                          const isPessCell = g === pessGrowth && r === pessRemit
-                          const isCatCell  = g === catGrowth  && r === catRemit
+                          const inc = calcIncomeH2(g, r)
+                          const eff = inc - baseIncomeH2
+                          const isBaseCell = g === gdpGrowthP && r === remitShareP
+                          const isPessCell = g === pessGrowth  && r === pessRemit
+                          const isCatCell  = g === catGrowth   && r === catRemit
                           const cellFlags  = [
-                            isOptCell  ? '📈' : '',
+                            isBaseCell ? '📊' : '',
                             isPessCell ? '📉' : '',
                             isCatCell  ? '⚠️' : '',
                           ].filter(Boolean)
-                          const isScCell = cellFlags.length > 0
+                          const isScCell   = cellFlags.length > 0
+                          const hasData    = alifSharePct > 0 && marginPct > 0
                           return (
                             <td key={r} className={`px-2 py-1.5 text-center whitespace-nowrap
                               ${isScCell ? 'font-bold ring-2 ring-inset ring-[#1B8A4C] bg-[#1B8A4C]/10 text-gray-900' :
+                                !hasData ? 'text-gray-300' :
                                 eff < 0 ? 'font-medium text-red-700 bg-red-100' :
-                                eff < biVal * 0.1 ? 'font-medium text-yellow-700' : 'font-medium text-green-700'}`}>
+                                eff < baseIncomeH2 * 0.05 ? 'font-medium text-yellow-700' : 'font-medium text-green-700'}`}>
                               {isScCell && <span className="block text-[10px] leading-none mb-0.5">{cellFlags.join('')}</span>}
-                              {fmtNum(inc)}
+                              {hasData ? fmtNum(inc) : '—'}
                             </td>
                           )
                         })}
@@ -782,10 +848,10 @@ export default function MarketStressTest() {
             </div>
             <div className="mt-3 flex items-center gap-4 flex-wrap text-xs text-gray-500">
               <span className="flex items-center gap-1.5"><span className="inline-block w-3 h-3 ring-2 ring-[#1B8A4C] rounded bg-[#1B8A4C]/10"/> Точка сценария</span>
-              <span className="flex items-center gap-1.5">📈 Оптимистичный</span>
+              <span className="flex items-center gap-1.5">📊 Базовый прогноз</span>
               <span className="flex items-center gap-1.5">📉 Пессимистичный</span>
               <span className="flex items-center gap-1.5">⚠️ Катастрофический</span>
-              <span className="flex items-center gap-1"><span className="w-3 h-3 bg-red-100 rounded"/> Ниже базового</span>
+              <span className="flex items-center gap-1"><span className="w-3 h-3 bg-red-100 rounded"/> Ниже базового дохода H2</span>
             </div>
           </div>
         </div>
