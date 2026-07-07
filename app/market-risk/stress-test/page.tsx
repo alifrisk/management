@@ -703,7 +703,6 @@ export default function MarketStressTest() {
                       <tr className="bg-gray-800 text-white">
                         <th className="px-3 py-2 text-left sticky left-0 bg-gray-800">Месяц</th>
                         <th className="px-3 py-2 text-right">Рег. капитал банка (TJS)</th>
-                        <th className="px-3 py-2 text-right">Курс {currency}/TJS</th>
                       </tr>
                     </thead>
                     <tbody>
@@ -714,12 +713,6 @@ export default function MarketStressTest() {
                             <input type="text" value={regulCapMonthly[mi]}
                               onChange={e => setRegulCapMonthly(updArr(regulCapMonthly, mi, fmtN(e.target.value)))}
                               placeholder="0"
-                              className="w-full px-2 py-1 border border-gray-200 rounded text-right text-xs focus:outline-none focus:ring-1 focus:ring-[#1B8A4C] bg-white" />
-                          </td>
-                          <td className="px-1.5 py-1">
-                            <input type="text" value={spotFxMonthly[mi]}
-                              onChange={e => setSpotFxMonthly(updArr(spotFxMonthly, mi, e.target.value.replace(/[^0-9.]/g,'')))}
-                              placeholder={currency === 'RUB' ? '0.12' : currency === 'EUR' ? '11.90' : '10.90'}
                               className="w-full px-2 py-1 border border-gray-200 rounded text-right text-xs focus:outline-none focus:ring-1 focus:ring-[#1B8A4C] bg-white" />
                           </td>
                         </tr>
