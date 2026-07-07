@@ -76,19 +76,36 @@ const FEEDS: { url: string; source: string; category: NewsCategory; financeOnly:
   { url: 'https://tass.ru/rss/v2.xml',              source: 'ТАСС',        category: 'cis', financeOnly: false },
   { url: 'https://www.kommersant.ru/RSS/news.xml',  source: 'Коммерсантъ', category: 'cis', financeOnly: false },
   { url: 'https://www.interfax.ru/rss.asp',         source: 'Интерфакс',   category: 'cis', financeOnly: false },
-  { url: 'https://www.banki.ru/xml/news.rss',       source: 'Banki.ru',    category: 'cis', financeOnly: true  }, // 100% финансовый
+  { url: 'https://www.banki.ru/xml/news.rss',       source: 'Banki.ru',    category: 'cis', financeOnly: true  },
   { url: 'https://akipress.com/rss/news.rss',       source: 'AKIpress',    category: 'cis', financeOnly: false },
-  { url: 'http://www.finmarket.ru/rss/',            source: 'Finmarket',   category: 'cis', financeOnly: true  }, // 100% финансовый
+  { url: 'http://www.finmarket.ru/rss/',            source: 'Finmarket',   category: 'cis', financeOnly: true  },
   {
     url: 'https://news.google.com/rss/search?q=%D1%8D%D0%BA%D0%BE%D0%BD%D0%BE%D0%BC%D0%B8%D0%BA%D0%B0+%D0%B1%D0%B0%D0%BD%D0%BA+%D1%84%D0%B8%D0%BD%D0%B0%D0%BD%D1%81%D1%8B+%D0%A1%D0%9D%D0%93&hl=ru&gl=RU&ceid=RU:ru',
     source: 'Google CIS', category: 'cis', financeOnly: false,
   },
+
+  // ── CIS / Kazakhstan ──────────────────────────────────────────────────────
+  { url: 'https://kz.kursiv.media/feed/', source: 'Kursiv.kz', category: 'cis', financeOnly: true }, // деловое издание
+
+  // ── CIS / Belarus ─────────────────────────────────────────────────────────
+  { url: 'https://myfin.by/rss', source: 'Myfin.by', category: 'cis', financeOnly: true }, // финансовый портал
+
+  // ── CIS / Uzbekistan ──────────────────────────────────────────────────────
+  { url: 'https://www.gazeta.uz/ru/rss/', source: 'Gazeta.uz', category: 'cis', financeOnly: false },
+  { url: 'https://kun.uz/rss/',           source: 'Kun.uz',    category: 'cis', financeOnly: false },
 
   // ── World (все специализированные финансовые/товарные) ────────────────────
   { url: 'https://oilprice.com/rss/main',                           source: 'OilPrice.com',   category: 'world', financeOnly: true },
   { url: 'https://www.mining.com/feed/',                            source: 'Mining.com',     category: 'world', financeOnly: true },
   { url: 'https://financialpost.com/feed',                          source: 'Financial Post', category: 'world', financeOnly: true },
   { url: 'https://feeds.marketwatch.com/marketwatch/topstories/',   source: 'MarketWatch',    category: 'world', financeOnly: true },
+
+  // ── World / Georgia ───────────────────────────────────────────────────────
+  { url: 'https://civil.ge/feed', source: 'Civil.ge', category: 'world', financeOnly: false },
+
+  // ── World / Turkey ────────────────────────────────────────────────────────
+  { url: 'https://www.dailysabah.com/rss/economy',   source: 'Daily Sabah',  category: 'world', financeOnly: true  }, // экономический раздел
+  { url: 'https://www.hurriyetdailynews.com/rss',    source: 'Hurriyet DN',  category: 'world', financeOnly: false },
 ]
 
 // Named entities — всегда пропускаем (проверяем только заголовок)

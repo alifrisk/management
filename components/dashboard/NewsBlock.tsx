@@ -242,7 +242,7 @@ export default function NewsBlock() {
       {all.length > 0 && (
         <div className="px-5 py-2.5 border-t border-gray-50 bg-gray-50/50 rounded-b-2xl">
           <p className="text-[10px] text-gray-400">
-            Источники: Sputnik TJ · Asia-Plus · Avesta.tj · ТАСС · Коммерсантъ · Интерфакс · OilPrice.com · Mining.com · Financial Post · MarketWatch
+            Источники: Sputnik TJ · Asia-Plus · Avesta.tj · ТАСС · Коммерсантъ · Интерфакс · Banki.ru · Finmarket · AKIpress · Kursiv.kz · Myfin.by · Gazeta.uz · Kun.uz · Civil.ge · Daily Sabah · Hurriyet DN · OilPrice.com · Mining.com · Financial Post · MarketWatch
           </p>
         </div>
       )}
