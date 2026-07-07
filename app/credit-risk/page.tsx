@@ -74,6 +74,27 @@ interface CreditConclusion {
   ra_par30_limit?: number
   ra_msb_par30_limit?: number
   ai_conclusion: string; recommendation: string; risk_level: string; created_at: string
+  financial_data?: { coefficients?: FinCoeff } | null
+}
+
+interface FinCoeff {
+  p1_label?: string; p2_label?: string
+  net_rev_p1?: number | null; net_rev_p2?: number | null
+  net_profit_p1?: number | null; net_profit_p2?: number | null
+  ctl_p1?: number | null; ctl_p2?: number | null
+  kbl_p1?: number | null; kbl_p2?: number | null
+  roa_p1?: number | null; roa_p2?: number | null
+  roe_p1?: number | null; roe_p2?: number | null
+  kfin_p1?: number | null; kfin_p2?: number | null
+  op_cf_p1?: number | null; op_cf_p2?: number | null
+}
+
+const EMPTY_COEFF: Record<string, string> = {
+  p1_label: '', p2_label: '',
+  net_rev_p1: '', net_rev_p2: '', net_profit_p1: '', net_profit_p2: '',
+  ctl_p1: '', ctl_p2: '', kbl_p1: '', kbl_p2: '',
+  roa_p1: '', roa_p2: '', roe_p1: '', roe_p2: '',
+  kfin_p1: '', kfin_p2: '', op_cf_p1: '', op_cf_p2: '',
 }
 
 const CONCLUSION_TYPES = [
@@ -177,6 +198,10 @@ export default function CreditRiskPage() {
   const [imageFiles, setImageFiles] = useState<File[]>([])
   const [extracting, setExtracting] = useState(false)
   const [extractMsg, setExtractMsg] = useState<string | null>(null)
+  const [coeffForm, setCoeffForm] = useState<Record<string, string>>(EMPTY_COEFF)
+  const [coeffImgFiles, setCoeffImgFiles] = useState<File[]>([])
+  const [extractingCoeff, setExtractingCoeff] = useState(false)
+  const [coeffMsg, setCoeffMsg] = useState<string | null>(null)
 
   const fetch_ = useCallback(async () => {
     setLoading(true)
@@ -422,6 +447,19 @@ export default function CreditRiskPage() {
     })
     setCollaterals(c.collaterals?.length ? c.collaterals.map(col => ({ ...col, address: col.address || '' })) : [{ type: 'Недвижимость', description: '', address: '', value: 0 }])
     setGuarantors(c.guarantors || [])
+    const sc = (v: number | null | undefined) => (v !== null && v !== undefined) ? String(v) : ''
+    const cc = c.financial_data?.coefficients
+    setCoeffForm(cc ? {
+      p1_label: cc.p1_label || '', p2_label: cc.p2_label || '',
+      net_rev_p1: sc(cc.net_rev_p1), net_rev_p2: sc(cc.net_rev_p2),
+      net_profit_p1: sc(cc.net_profit_p1), net_profit_p2: sc(cc.net_profit_p2),
+      ctl_p1: sc(cc.ctl_p1), ctl_p2: sc(cc.ctl_p2),
+      kbl_p1: sc(cc.kbl_p1), kbl_p2: sc(cc.kbl_p2),
+      roa_p1: sc(cc.roa_p1), roa_p2: sc(cc.roa_p2),
+      roe_p1: sc(cc.roe_p1), roe_p2: sc(cc.roe_p2),
+      kfin_p1: sc(cc.kfin_p1), kfin_p2: sc(cc.kfin_p2),
+      op_cf_p1: sc(cc.op_cf_p1), op_cf_p2: sc(cc.op_cf_p2),
+    } : EMPTY_COEFF)
     setEditingId(c.id)
     setEditingNumber(c.conclusion_number || null)
     setTab(1)
@@ -444,6 +482,9 @@ export default function CreditRiskPage() {
     setImageFiles([])
     setExtractMsg(null)
     setError(null)
+    setCoeffForm(EMPTY_COEFF)
+    setCoeffImgFiles([])
+    setCoeffMsg(null)
   }
 
   async function handleGenerate() {
@@ -586,6 +627,22 @@ export default function CreditRiskPage() {
         additional_info: form.additional_info || null,
         ai_conclusion: data.conclusion,
         recommendation: data.recommendation, risk_level: data.risk_level,
+        financial_data: (() => {
+          const pf = (v: string) => v !== '' ? parseFloat(v) : null
+          const hasAny = Object.entries(coeffForm).some(([k, v]) => !k.includes('label') && v !== '')
+          if (!hasAny) return undefined
+          return { coefficients: {
+            p1_label: coeffForm.p1_label, p2_label: coeffForm.p2_label,
+            net_rev_p1: pf(coeffForm.net_rev_p1), net_rev_p2: pf(coeffForm.net_rev_p2),
+            net_profit_p1: pf(coeffForm.net_profit_p1), net_profit_p2: pf(coeffForm.net_profit_p2),
+            ctl_p1: pf(coeffForm.ctl_p1), ctl_p2: pf(coeffForm.ctl_p2),
+            kbl_p1: pf(coeffForm.kbl_p1), kbl_p2: pf(coeffForm.kbl_p2),
+            roa_p1: pf(coeffForm.roa_p1), roa_p2: pf(coeffForm.roa_p2),
+            roe_p1: pf(coeffForm.roe_p1), roe_p2: pf(coeffForm.roe_p2),
+            kfin_p1: pf(coeffForm.kfin_p1), kfin_p2: pf(coeffForm.kfin_p2),
+            op_cf_p1: pf(coeffForm.op_cf_p1), op_cf_p2: pf(coeffForm.op_cf_p2),
+          }}
+        })(),
       }
 
       if (editingId) {
@@ -651,6 +708,35 @@ export default function CreditRiskPage() {
     } catch (err: unknown) {
       setExtractMsg('Ошибка: ' + (err instanceof Error ? err.message : String(err)))
     } finally { setExtracting(false) }
+  }
+
+  async function handleExtractCoeffs() {
+    if (coeffImgFiles.length === 0) return
+    setExtractingCoeff(true); setCoeffMsg(null)
+    try {
+      const file = coeffImgFiles[0]
+      const base64 = await new Promise<string>((resolve, reject) => {
+        const reader = new FileReader()
+        reader.onload = e => resolve((e.target?.result as string).split(',')[1])
+        reader.onerror = reject
+        reader.readAsDataURL(file)
+      })
+      const res = await apiFetch('/api/extract-from-image', {
+        method: 'POST',
+        body: JSON.stringify({ imageBase64: base64, mimeType: file.type, module: 'credit_coeff' }),
+      })
+      const data = await res.json()
+      if (data.error) throw new Error(data.error)
+      const merged: Record<string, string> = { ...coeffForm }
+      for (const [k, v] of Object.entries(data.data)) {
+        if (v !== null && v !== undefined) merged[k] = String(v)
+      }
+      setCoeffForm(merged)
+      setCoeffImgFiles([])
+      setCoeffMsg('Коэффициенты извлечены. Проверьте и при необходимости исправьте.')
+    } catch (err: unknown) {
+      setCoeffMsg('Ошибка: ' + (err instanceof Error ? err.message : String(err)))
+    } finally { setExtractingCoeff(false) }
   }
 
   async function downloadWord(c: CreditConclusion) {
@@ -867,6 +953,44 @@ export default function CreditRiskPage() {
 
               {/* 3. Финансовые коэффициенты */}
               {(() => {
+                const cc = viewing.financial_data?.coefficients
+                const fmtN = (v: number | null | undefined) => (v !== null && v !== undefined) ? new Intl.NumberFormat('ru-RU').format(Math.round(v)) : '—'
+                const fmtR = (v: number | null | undefined) => (v !== null && v !== undefined) ? v.toFixed(2) : '—'
+                const fmtP = (v: number | null | undefined) => (v !== null && v !== undefined) ? v.toFixed(1) + '%' : '—'
+                const ok = (v: number | null | undefined, cond: boolean) => v !== null && v !== undefined ? (cond ? <span className="text-green-600 font-bold">✓</span> : <span className="text-red-500 font-bold">✗</span>) : <span className="text-gray-300">—</span>
+
+                if (cc) {
+                  // Прямо введённые/извлечённые коэффициенты
+                  const p1 = cc.p1_label || 'П1'; const p2 = cc.p2_label || 'П2'
+                  const rows: { label: string; v1: string; v2: string; norm: string; okEl: React.ReactNode }[] = [
+                    { label: 'Чистая выручка, TJS', v1: fmtN(cc.net_rev_p1), v2: fmtN(cc.net_rev_p2), norm: '—', okEl: <span className="text-gray-300">—</span> },
+                    { label: 'Чистая прибыль, TJS', v1: fmtN(cc.net_profit_p1), v2: fmtN(cc.net_profit_p2), norm: '>0', okEl: ok(cc.net_profit_p2, (cc.net_profit_p2 ?? 0) > 0) },
+                    { label: 'Ктл (текущая ликвидность)', v1: fmtR(cc.ctl_p1), v2: fmtR(cc.ctl_p2), norm: '>2.0', okEl: ok(cc.ctl_p2, (cc.ctl_p2 ?? 0) > 2.0) },
+                    { label: 'Кбл (быстрая ликвидность)', v1: fmtR(cc.kbl_p1), v2: fmtR(cc.kbl_p2), norm: '>1.0', okEl: ok(cc.kbl_p2, (cc.kbl_p2 ?? 0) > 1.0) },
+                    { label: 'ROA (%)', v1: fmtP(cc.roa_p1), v2: fmtP(cc.roa_p2), norm: '>6%', okEl: ok(cc.roa_p2, (cc.roa_p2 ?? 0) > 6) },
+                    { label: 'ROE (%)', v1: fmtP(cc.roe_p1), v2: fmtP(cc.roe_p2), norm: '>20%', okEl: ok(cc.roe_p2, (cc.roe_p2 ?? 0) > 20) },
+                    { label: 'Кфин (леверидж)', v1: fmtR(cc.kfin_p1), v2: fmtR(cc.kfin_p2), norm: '≤0.5', okEl: ok(cc.kfin_p2, (cc.kfin_p2 ?? 1) <= 0.5) },
+                    { label: 'Опер. ден. поток, TJS', v1: fmtN(cc.op_cf_p1), v2: fmtN(cc.op_cf_p2), norm: '>0', okEl: ok(cc.op_cf_p2, (cc.op_cf_p2 ?? 0) > 0) },
+                  ].filter(r => r.v1 !== '—' || r.v2 !== '—')
+                  if (!rows.length) return null
+                  return (
+                    <div>
+                      <p className="text-xs font-bold text-gray-500 uppercase tracking-wide border-b border-gray-100 pb-1 mb-3">3. Финансовые коэффициенты</p>
+                      <div className="overflow-hidden rounded-lg border border-gray-200">
+                        <table className="w-full text-xs">
+                          <thead><tr className="bg-gray-50 text-gray-500"><th className="text-left px-3 py-1.5 font-medium">Показатель</th><th className="text-center px-2 py-1.5">{p1}</th><th className="text-center px-2 py-1.5">{p2}</th><th className="text-center px-2 py-1.5">Норма</th><th className="text-center px-2 py-1.5">Статус</th></tr></thead>
+                          <tbody className="divide-y divide-gray-100">
+                            {rows.map((r, i) => (
+                              <tr key={i}><td className="px-3 py-1.5 text-gray-600">{r.label}</td><td className="text-center px-2 py-1.5">{r.v1}</td><td className="text-center px-2 py-1.5 font-medium">{r.v2}</td><td className="text-center px-2 py-1.5 text-gray-400">{r.norm}</td><td className="text-center px-2 py-1.5">{r.okEl}</td></tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      </div>
+                    </div>
+                  )
+                }
+
+                // Фолбэк: вычисленные из данных баланса
                 const vca = (viewing.p1_cash_desk||0)+(viewing.p1_cash_bank||0)+(viewing.p1_st_invest||0)+(viewing.p1_trade_rec||0)+(viewing.p1_other_rec||0)+(viewing.p1_founder_rec||0)+(viewing.p1_inventory||0)+(viewing.p1_prepaid||0)+(viewing.p1_nca_sale||0) || (viewing.p1_cash||0)+(viewing.p1_receivables||0)+(viewing.p1_inventory||0)
                 const v2ca = (viewing.p2_cash_desk||0)+(viewing.p2_cash_bank||0)+(viewing.p2_st_invest||0)+(viewing.p2_trade_rec||0)+(viewing.p2_other_rec||0)+(viewing.p2_founder_rec||0)+(viewing.p2_inventory||0)+(viewing.p2_prepaid||0)+(viewing.p2_nca_sale||0) || (viewing.p2_cash||0)+(viewing.p2_receivables||0)+(viewing.p2_inventory||0)
                 const vnca = (viewing.p1_ppe||0)+(viewing.p1_nat_res||0)+(viewing.p1_intangibles||0)+(viewing.p1_bio_assets||0)+(viewing.p1_invest_prop||0)+(viewing.p1_lt_invest||0)+(viewing.p1_def_tax_asset||0)+(viewing.p1_lt_rec||0) || (viewing.p1_fixed_assets||0)+(viewing.p1_other_assets||0)
@@ -1322,6 +1446,79 @@ export default function CreditRiskPage() {
                       </table>
                     </div>
                   )}
+                </div>
+              )}
+
+              {/* Tab 2b: Таблица коэффициентов (прямой ввод / скрин) */}
+              {tab === 2 && (
+                <div className="space-y-4 border-t border-gray-100 pt-4 mt-2">
+                  <div className="p-3 bg-green-50 border border-green-100 rounded-lg">
+                    <p className="text-xs text-green-700 font-medium">Финансовые коэффициенты — прямой ввод или из скрина таблицы</p>
+                    <p className="text-xs text-green-600 mt-0.5">Заполните вручную или загрузите скриншот готовой таблицы коэффициентов. Эти данные появятся в заключении и Word-файле.</p>
+                  </div>
+
+                  {/* Скрин-загрузчик */}
+                  <div className="flex items-center gap-2">
+                    <label className="flex-1 cursor-pointer">
+                      <div className={`border-2 border-dashed rounded-lg p-2.5 text-center text-xs transition-colors ${coeffImgFiles.length > 0 ? 'border-green-400 bg-green-50 text-green-700' : 'border-gray-200 hover:border-green-400 text-gray-400'}`}>
+                        {coeffImgFiles.length > 0 ? `📎 ${coeffImgFiles[0].name}` : 'Загрузить скриншот таблицы коэффициентов'}
+                      </div>
+                      <input type="file" accept="image/*" className="hidden" onChange={e => setCoeffImgFiles(e.target.files ? [e.target.files[0]] : [])} />
+                    </label>
+                    <button onClick={handleExtractCoeffs} disabled={coeffImgFiles.length === 0 || extractingCoeff}
+                      className="px-3 py-2 bg-[#1B8A4C] text-white rounded-lg text-xs font-medium disabled:opacity-40 whitespace-nowrap">
+                      {extractingCoeff ? 'Извлечение...' : 'Извлечь'}
+                    </button>
+                  </div>
+                  {coeffMsg && <p className={`text-xs px-2 py-1 rounded ${coeffMsg.startsWith('Ошибка') ? 'bg-red-50 text-red-600' : 'bg-green-50 text-green-700'}`}>{coeffMsg}</p>}
+
+                  {/* Редактируемая таблица */}
+                  <div className="overflow-x-auto">
+                    <table className="w-full text-xs border-collapse">
+                      <thead>
+                        <tr className="bg-[#1B8A4C] text-white">
+                          <th className="text-left px-2 py-1.5 font-medium">Показатель</th>
+                          <th className="text-center px-2 py-1.5 font-medium">
+                            <input type="text" value={coeffForm.p1_label} onChange={e => setCoeffForm(p => ({ ...p, p1_label: e.target.value }))}
+                              placeholder="П1 (период)" className="w-24 px-1 py-0.5 bg-white/20 placeholder-white/60 text-white text-center text-xs border-b border-white/40 focus:outline-none" />
+                          </th>
+                          <th className="text-center px-2 py-1.5 font-medium">
+                            <input type="text" value={coeffForm.p2_label} onChange={e => setCoeffForm(p => ({ ...p, p2_label: e.target.value }))}
+                              placeholder="П2 (период)" className="w-24 px-1 py-0.5 bg-white/20 placeholder-white/60 text-white text-center text-xs border-b border-white/40 focus:outline-none" />
+                          </th>
+                          <th className="text-center px-2 py-1.5 font-medium">Норма</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-gray-100">
+                        {([
+                          { key: 'net_rev',    label: 'Чистая выручка, TJS', norm: '—',    isAmt: true },
+                          { key: 'net_profit', label: 'Чистая прибыль, TJS', norm: '>0',   isAmt: true },
+                          { key: 'ctl',        label: 'Ктл (текущая ликвидность)', norm: '>2.0',  isAmt: false },
+                          { key: 'kbl',        label: 'Кбл (быстрая ликвидность)', norm: '>1.0',  isAmt: false },
+                          { key: 'roa',        label: 'ROA (%)',              norm: '>6%',  isAmt: false },
+                          { key: 'roe',        label: 'ROE (%)',              norm: '>20%', isAmt: false },
+                          { key: 'kfin',       label: 'Кфин (леверидж)',      norm: '≤0.5', isAmt: false },
+                          { key: 'op_cf',      label: 'Опер. ден. поток, TJS', norm: '>0', isAmt: true },
+                        ] as { key: string; label: string; norm: string; isAmt: boolean }[]).map((row, i) => (
+                          <tr key={row.key} className={i % 2 === 0 ? 'bg-white' : 'bg-gray-50'}>
+                            <td className="px-2 py-1 text-gray-700 font-medium">{row.label}</td>
+                            {(['p1', 'p2'] as const).map(p => (
+                              <td key={p} className="px-1 py-0.5">
+                                <input type="text" inputMode="decimal"
+                                  value={coeffForm[`${row.key}_${p}`]}
+                                  onChange={e => setCoeffForm(prev => ({ ...prev, [`${row.key}_${p}`]: e.target.value }))}
+                                  placeholder="—"
+                                  className="w-full px-1.5 py-0.5 border border-gray-200 rounded text-right text-xs focus:outline-none focus:ring-1 focus:ring-[#1B8A4C] bg-white" />
+                              </td>
+                            ))}
+                            <td className="px-2 py-1 text-center text-gray-400">{row.norm}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                  <button onClick={() => { setCoeffForm(EMPTY_COEFF); setCoeffMsg(null) }}
+                    className="text-xs text-gray-400 hover:text-red-500">Очистить коэффициенты</button>
                 </div>
               )}
 

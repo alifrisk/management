@@ -292,6 +292,55 @@ export async function POST(request: Request) {
           // ── 3. ФИНАНСОВЫЕ КОЭФФИЦИЕНТЫ ──
           sectionHead('3', 'КЛЮЧЕВЫЕ ФИНАНСОВЫЕ КОЭФФИЦИЕНТЫ'),
           (() => {
+            // Если есть прямо введённые коэффициенты — используем их
+            const cc = (c.financial_data as { coefficients?: Record<string, number | null | string> } | null)?.coefficients
+            if (cc) {
+              const p1 = (cc.p1_label as string) || 'П1'
+              const p2 = (cc.p2_label as string) || 'П2'
+              const rv2 = (v: unknown) => (v !== null && v !== undefined) ? Number(v).toFixed(2) : '—'
+              const pv2 = (v: unknown) => (v !== null && v !== undefined) ? Number(v).toFixed(1) + '%' : '—'
+              const fv2 = (v: unknown) => (v !== null && v !== undefined) ? new Intl.NumberFormat('ru-RU').format(Math.round(Number(v))) : '—'
+const rows2: [string, string, string, string, boolean][] = [
+                ['Чистая выручка, TJS', fv2(cc.net_rev_p1), fv2(cc.net_rev_p2), '—', true],
+                ['Чистая прибыль, TJS', fv2(cc.net_profit_p1), fv2(cc.net_profit_p2), '>0', (cc.net_profit_p2 as number ?? 0) > 0],
+                ['Коэффициент текущей ликвидности (Ктл)', rv2(cc.ctl_p1), rv2(cc.ctl_p2), '>2.0 (>200%)', (cc.ctl_p2 as number ?? 0) > 2.0],
+                ['Коэффициент быстрой ликвидности (Кбл)', rv2(cc.kbl_p1), rv2(cc.kbl_p2), '>1.0 (>100%)', (cc.kbl_p2 as number ?? 0) > 1.0],
+                ['Рентабельность активов (ROA)', pv2(cc.roa_p1), pv2(cc.roa_p2), '>6%', (cc.roa_p2 as number ?? 0) > 6],
+                ['Рентабельность собственных средств (ROE)', pv2(cc.roe_p1), pv2(cc.roe_p2), '>20%', (cc.roe_p2 as number ?? 0) > 20],
+                ['Коэффициент финансирования (Кфин)', rv2(cc.kfin_p1), rv2(cc.kfin_p2), '≤0.5', (cc.kfin_p2 as number ?? 1) <= 0.5],
+                ['Операционный ден. поток, TJS', fv2(cc.op_cf_p1), fv2(cc.op_cf_p2), '>0', (cc.op_cf_p2 as number ?? 0) > 0],
+              ].filter(r => r[1] !== '—' || r[2] !== '—') as [string, string, string, string, boolean][]
+              return new Table({
+                width: { size: 9354, type: WidthType.DXA },
+                columnWidths: [2800, 1200, 1300, 1400, 1300, 1354],
+                rows: [
+                  new TableRow({ children: [
+                    cell('Наименование показателя', { green: true, bold: true, size: 18 }),
+                    cell(p1, { green: true, bold: true, center: true, size: 16 }),
+                    cell(p2, { green: true, bold: true, center: true, size: 16 }),
+                    cell('Рек. норма', { green: true, bold: true, center: true, size: 18 }),
+                    cell('Соответствует', { green: true, bold: true, center: true, size: 16 }),
+                    cell('Обозн.', { green: true, bold: true, center: true, size: 18 }),
+                  ]}),
+                  ...rows2.map(([label, v1, v2, norm, meets]) => new TableRow({ children: [
+                    cell(label, { size: 18 }),
+                    cell(v1, { center: true, size: 18 }),
+                    cell(v2, { center: true, size: 18, bold: true }),
+                    cell(norm, { center: true, size: 18, color: '555555' }),
+                    new TableCell({
+                      borders,
+                      verticalAlign: VerticalAlign.CENTER,
+                      shading: norm !== '—' && meets ? { fill: 'E8F4E8', type: ShadingType.CLEAR } : undefined,
+                      margins: { top: 60, bottom: 60, left: 120, right: 120 },
+                      children: [new Paragraph({ alignment: AlignmentType.CENTER, children: [new TextRun({ text: norm === '—' ? '—' : meets ? 'Да' : 'Нет', size: 18, bold: norm !== '—' && meets, color: norm === '—' ? '555555' : meets ? '1B8A4C' : '000000', font: 'Times New Roman' })] })]
+                    }),
+                    cell('', { center: true, size: 18 }),
+                  ]}))
+                ]
+              })
+            }
+          })() ||
+          (() => {
             const p1inv = c.p1_inventory || 0
             const p2inv = c.p2_inventory || 0
             const rv = (v: number) => isFinite(v) && !isNaN(v) ? v.toFixed(2) : '—'
