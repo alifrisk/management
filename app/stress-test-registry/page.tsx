@@ -1,7 +1,7 @@
 'use client'
 import { useState, useEffect, useRef } from 'react'
 import { supabase } from '@/supabase/client'
-import { FlaskConical, Search, Filter, X, Download, Calendar, User, Tag, Eye } from 'lucide-react'
+import { FlaskConical, Search, Filter, X, Download, Calendar, User, Tag, Eye, Trash2 } from 'lucide-react'
 import { labelField, formatFieldValue, FIELD_LABELS } from '@/lib/stress-test-labels'
 
 type RiskType = 'Операционный риск' | 'Кредитный риск' | 'Рыночный риск' | 'Риск ликвидности'
@@ -258,6 +258,7 @@ export default function StressTestRegistryPage() {
   const [entries, setEntries] = useState<RegistryEntry[]>([])
   const [loading, setLoading] = useState(true)
   const [selected, setSelected] = useState<RegistryEntry | null>(null)
+  const [deletingId, setDeletingId] = useState<string | null>(null)
 
   const [filterRisk, setFilterRisk] = useState<string>('')
   const [filterFrom, setFilterFrom] = useState('')
@@ -289,6 +290,20 @@ export default function StressTestRegistryPage() {
 
   function clearFilters() {
     setFilterRisk(''); setFilterFrom(''); setFilterTo(''); setFilterAnalyst('')
+  }
+
+  async function handleDelete(e: React.MouseEvent, id: string) {
+    e.stopPropagation()
+    if (!window.confirm('Удалить запись из реестра? Это действие необратимо.')) return
+    setDeletingId(id)
+    const { error } = await supabase.from('stress_test_registry').delete().eq('id', id)
+    if (error) {
+      alert('Ошибка удаления: ' + error.message)
+    } else {
+      setEntries(prev => prev.filter(e => e.id !== id))
+      if (selected?.id === id) setSelected(null)
+    }
+    setDeletingId(null)
   }
 
   const counts: Record<string, number> = {}
@@ -415,9 +430,18 @@ export default function StressTestRegistryPage() {
                       </span>
                     </td>
                     <td className="px-4 py-3 text-right">
-                      <button className="flex items-center gap-1 text-xs text-gray-400 group-hover:text-[#1B8A4C] transition-colors ml-auto">
-                        <Eye className="w-3.5 h-3.5" /> Детали
-                      </button>
+                      <div className="flex items-center justify-end gap-2">
+                        <button className="flex items-center gap-1 text-xs text-gray-400 group-hover:text-[#1B8A4C] transition-colors">
+                          <Eye className="w-3.5 h-3.5" /> Детали
+                        </button>
+                        <button
+                          onClick={e => handleDelete(e, entry.id)}
+                          disabled={deletingId === entry.id}
+                          className="flex items-center gap-1 text-xs text-gray-300 hover:text-red-500 transition-colors disabled:opacity-40"
+                          title="Удалить запись">
+                          <Trash2 className="w-3.5 h-3.5" />
+                        </button>
+                      </div>
                     </td>
                   </tr>
                 )
