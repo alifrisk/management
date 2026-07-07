@@ -79,22 +79,26 @@ interface CreditConclusion {
 
 interface FinCoeff {
   p1_label?: string; p2_label?: string
+  // backward-compat (старые записи — не отображаются в форме)
   net_rev_p1?: number | null; net_rev_p2?: number | null
   net_profit_p1?: number | null; net_profit_p2?: number | null
+  op_cf_p1?: number | null; op_cf_p2?: number | null
+  // активные поля
   ctl_p1?: number | null; ctl_p2?: number | null
   kbl_p1?: number | null; kbl_p2?: number | null
   roa_p1?: number | null; roa_p2?: number | null
   roe_p1?: number | null; roe_p2?: number | null
   kfin_p1?: number | null; kfin_p2?: number | null
-  op_cf_p1?: number | null; op_cf_p2?: number | null
+  dscr_p1?: number | null; dscr_p2?: number | null
+  coll_cov_p1?: number | null; coll_cov_p2?: number | null
 }
 
 const EMPTY_COEFF: Record<string, string> = {
   p1_label: '', p2_label: '',
-  net_rev_p1: '', net_rev_p2: '', net_profit_p1: '', net_profit_p2: '',
   ctl_p1: '', ctl_p2: '', kbl_p1: '', kbl_p2: '',
   roa_p1: '', roa_p2: '', roe_p1: '', roe_p2: '',
-  kfin_p1: '', kfin_p2: '', op_cf_p1: '', op_cf_p2: '',
+  kfin_p1: '', kfin_p2: '',
+  dscr_p1: '', dscr_p2: '', coll_cov_p1: '', coll_cov_p2: '',
 }
 
 const CONCLUSION_TYPES = [
@@ -451,14 +455,13 @@ export default function CreditRiskPage() {
     const cc = c.financial_data?.coefficients
     setCoeffForm(cc ? {
       p1_label: cc.p1_label || '', p2_label: cc.p2_label || '',
-      net_rev_p1: sc(cc.net_rev_p1), net_rev_p2: sc(cc.net_rev_p2),
-      net_profit_p1: sc(cc.net_profit_p1), net_profit_p2: sc(cc.net_profit_p2),
       ctl_p1: sc(cc.ctl_p1), ctl_p2: sc(cc.ctl_p2),
       kbl_p1: sc(cc.kbl_p1), kbl_p2: sc(cc.kbl_p2),
       roa_p1: sc(cc.roa_p1), roa_p2: sc(cc.roa_p2),
       roe_p1: sc(cc.roe_p1), roe_p2: sc(cc.roe_p2),
       kfin_p1: sc(cc.kfin_p1), kfin_p2: sc(cc.kfin_p2),
-      op_cf_p1: sc(cc.op_cf_p1), op_cf_p2: sc(cc.op_cf_p2),
+      dscr_p1: sc(cc.dscr_p1), dscr_p2: sc(cc.dscr_p2),
+      coll_cov_p1: sc(cc.coll_cov_p1), coll_cov_p2: sc(cc.coll_cov_p2),
     } : EMPTY_COEFF)
     setEditingId(c.id)
     setEditingNumber(c.conclusion_number || null)
@@ -629,18 +632,18 @@ export default function CreditRiskPage() {
         recommendation: data.recommendation, risk_level: data.risk_level,
         financial_data: (() => {
           const pf = (v: string) => v !== '' ? parseFloat(v) : null
-          const hasAny = Object.entries(coeffForm).some(([k, v]) => !k.includes('label') && v !== '')
+          const keys = ['ctl', 'kbl', 'roa', 'roe', 'kfin', 'dscr', 'coll_cov']
+          const hasAny = keys.some(k => coeffForm[`${k}_p1`] !== '' || coeffForm[`${k}_p2`] !== '')
           if (!hasAny) return undefined
           return { coefficients: {
             p1_label: coeffForm.p1_label, p2_label: coeffForm.p2_label,
-            net_rev_p1: pf(coeffForm.net_rev_p1), net_rev_p2: pf(coeffForm.net_rev_p2),
-            net_profit_p1: pf(coeffForm.net_profit_p1), net_profit_p2: pf(coeffForm.net_profit_p2),
             ctl_p1: pf(coeffForm.ctl_p1), ctl_p2: pf(coeffForm.ctl_p2),
             kbl_p1: pf(coeffForm.kbl_p1), kbl_p2: pf(coeffForm.kbl_p2),
             roa_p1: pf(coeffForm.roa_p1), roa_p2: pf(coeffForm.roa_p2),
             roe_p1: pf(coeffForm.roe_p1), roe_p2: pf(coeffForm.roe_p2),
             kfin_p1: pf(coeffForm.kfin_p1), kfin_p2: pf(coeffForm.kfin_p2),
-            op_cf_p1: pf(coeffForm.op_cf_p1), op_cf_p2: pf(coeffForm.op_cf_p2),
+            dscr_p1: pf(coeffForm.dscr_p1), dscr_p2: pf(coeffForm.dscr_p2),
+            coll_cov_p1: pf(coeffForm.coll_cov_p1), coll_cov_p2: pf(coeffForm.coll_cov_p2),
           }}
         })(),
       }
@@ -954,40 +957,71 @@ export default function CreditRiskPage() {
               {/* 3. Финансовые коэффициенты */}
               {(() => {
                 const cc = viewing.financial_data?.coefficients
-                const fmtN = (v: number | null | undefined) => (v !== null && v !== undefined) ? new Intl.NumberFormat('ru-RU').format(Math.round(v)) : '—'
                 const fmtR = (v: number | null | undefined) => (v !== null && v !== undefined) ? v.toFixed(2) : '—'
                 const fmtP = (v: number | null | undefined) => (v !== null && v !== undefined) ? v.toFixed(1) + '%' : '—'
-                const ok = (v: number | null | undefined, cond: boolean) => v !== null && v !== undefined ? (cond ? <span className="text-green-600 font-bold">✓</span> : <span className="text-red-500 font-bold">✗</span>) : <span className="text-gray-300">—</span>
+                const ok = (v: number | null | undefined, cond: boolean) => v !== null && v !== undefined
+                  ? (cond ? <span className="text-green-600 font-bold">✓</span> : <span className="text-red-500 font-bold">✗</span>)
+                  : <span className="text-gray-300">—</span>
 
                 if (cc) {
-                  // Прямо введённые/извлечённые коэффициенты
-                  const p1 = cc.p1_label || 'П1'; const p2 = cc.p2_label || 'П2'
-                  const rows: { label: string; v1: string; v2: string; norm: string; okEl: React.ReactNode }[] = [
-                    { label: 'Чистая выручка, TJS', v1: fmtN(cc.net_rev_p1), v2: fmtN(cc.net_rev_p2), norm: '—', okEl: <span className="text-gray-300">—</span> },
-                    { label: 'Чистая прибыль, TJS', v1: fmtN(cc.net_profit_p1), v2: fmtN(cc.net_profit_p2), norm: '>0', okEl: ok(cc.net_profit_p2, (cc.net_profit_p2 ?? 0) > 0) },
-                    { label: 'Ктл (текущая ликвидность)', v1: fmtR(cc.ctl_p1), v2: fmtR(cc.ctl_p2), norm: '>2.0', okEl: ok(cc.ctl_p2, (cc.ctl_p2 ?? 0) > 2.0) },
-                    { label: 'Кбл (быстрая ликвидность)', v1: fmtR(cc.kbl_p1), v2: fmtR(cc.kbl_p2), norm: '>1.0', okEl: ok(cc.kbl_p2, (cc.kbl_p2 ?? 0) > 1.0) },
-                    { label: 'ROA (%)', v1: fmtP(cc.roa_p1), v2: fmtP(cc.roa_p2), norm: '>6%', okEl: ok(cc.roa_p2, (cc.roa_p2 ?? 0) > 6) },
-                    { label: 'ROE (%)', v1: fmtP(cc.roe_p1), v2: fmtP(cc.roe_p2), norm: '>20%', okEl: ok(cc.roe_p2, (cc.roe_p2 ?? 0) > 20) },
-                    { label: 'Кфин (леверидж)', v1: fmtR(cc.kfin_p1), v2: fmtR(cc.kfin_p2), norm: '≤0.5', okEl: ok(cc.kfin_p2, (cc.kfin_p2 ?? 1) <= 0.5) },
-                    { label: 'Опер. ден. поток, TJS', v1: fmtN(cc.op_cf_p1), v2: fmtN(cc.op_cf_p2), norm: '>0', okEl: ok(cc.op_cf_p2, (cc.op_cf_p2 ?? 0) > 0) },
-                  ].filter(r => r.v1 !== '—' || r.v2 !== '—')
-                  if (!rows.length) return null
-                  return (
-                    <div>
-                      <p className="text-xs font-bold text-gray-500 uppercase tracking-wide border-b border-gray-100 pb-1 mb-3">3. Финансовые коэффициенты</p>
-                      <div className="overflow-hidden rounded-lg border border-gray-200">
-                        <table className="w-full text-xs">
-                          <thead><tr className="bg-gray-50 text-gray-500"><th className="text-left px-3 py-1.5 font-medium">Показатель</th><th className="text-center px-2 py-1.5">{p1}</th><th className="text-center px-2 py-1.5">{p2}</th><th className="text-center px-2 py-1.5">Норма</th><th className="text-center px-2 py-1.5">Статус</th></tr></thead>
-                          <tbody className="divide-y divide-gray-100">
-                            {rows.map((r, i) => (
-                              <tr key={i}><td className="px-3 py-1.5 text-gray-600">{r.label}</td><td className="text-center px-2 py-1.5">{r.v1}</td><td className="text-center px-2 py-1.5 font-medium">{r.v2}</td><td className="text-center px-2 py-1.5 text-gray-400">{r.norm}</td><td className="text-center px-2 py-1.5">{r.okEl}</td></tr>
-                            ))}
-                          </tbody>
-                        </table>
+                  const hasAny = (['ctl','kbl','roa','roe','kfin','dscr','coll_cov'] as const)
+                    .some(k => cc[`${k}_p2` as keyof typeof cc] != null || cc[`${k}_p1` as keyof typeof cc] != null)
+                  if (hasAny) {
+                    const p1 = cc.p1_label || 'П1'; const p2 = cc.p2_label || 'П2'
+                    const groups = [
+                      { cat: 'Показатели ликвидности', rows: [
+                        { label: 'Коэффициент текущей ликвидности (Ктл)', v1: fmtR(cc.ctl_p1), v2: fmtR(cc.ctl_p2), norm: '>2.0 (>200%)', okEl: ok(cc.ctl_p2, (cc.ctl_p2 ?? 0) > 2.0), oboz: 'Оборотные активы / КО' },
+                        { label: 'Коэффициент быстрой ликвидности (Кбл)', v1: fmtR(cc.kbl_p1), v2: fmtR(cc.kbl_p2), norm: '>1.0 (>100%)', okEl: ok(cc.kbl_p2, (cc.kbl_p2 ?? 0) > 1.0), oboz: '(Ден.ср. + Деб.) / КО' },
+                      ]},
+                      { cat: 'Показатели рентабельности', rows: [
+                        { label: 'Рентабельность активов (ROA)', v1: fmtP(cc.roa_p1), v2: fmtP(cc.roa_p2), norm: '>6%', okEl: ok(cc.roa_p2, (cc.roa_p2 ?? 0) > 6), oboz: 'Прибыль / Активы × 100%' },
+                        { label: 'Рентабельность собственных средств (ROE)', v1: fmtP(cc.roe_p1), v2: fmtP(cc.roe_p2), norm: '>20%', okEl: ok(cc.roe_p2, (cc.roe_p2 ?? 0) > 20), oboz: 'Прибыль / СК × 100%' },
+                      ]},
+                      { cat: 'Показатели финансовой устойчивости', rows: [
+                        { label: 'Коэффициент финансирования/левериджа (Кфин)', v1: fmtR(cc.kfin_p1), v2: fmtR(cc.kfin_p2), norm: '>0.5', okEl: ok(cc.kfin_p2, (cc.kfin_p2 ?? 0) > 0.5), oboz: 'СК / Заёмный капитал' },
+                      ]},
+                      { cat: 'Показатели кредитоспособности', rows: [
+                        { label: 'Коэффициент покрытия долга (DSCR)', v1: fmtR(cc.dscr_p1), v2: fmtR(cc.dscr_p2), norm: '>1.0', okEl: ok(cc.dscr_p2, (cc.dscr_p2 ?? 0) > 1.0), oboz: 'Опер. поток / Долг. сервис' },
+                        { label: 'Коэффициент покрытия залогом', v1: fmtP(cc.coll_cov_p1), v2: fmtP(cc.coll_cov_p2), norm: '>120%', okEl: ok(cc.coll_cov_p2, (cc.coll_cov_p2 ?? 0) > 120), oboz: 'Залог / Кредит × 100%' },
+                      ]},
+                    ]
+                    return (
+                      <div>
+                        <p className="text-xs font-bold text-gray-500 uppercase tracking-wide border-b border-gray-100 pb-1 mb-3">3. Финансовые коэффициенты</p>
+                        <div className="overflow-hidden rounded-lg border border-gray-200">
+                          <table className="w-full text-xs">
+                            <thead>
+                              <tr className="bg-gray-50 text-gray-500 text-[11px]">
+                                <th className="text-left px-3 py-1.5 font-medium">Показатель</th>
+                                <th className="text-center px-2 py-1.5">{p1}</th>
+                                <th className="text-center px-2 py-1.5">{p2}</th>
+                                <th className="text-center px-2 py-1.5">Норма</th>
+                                <th className="text-center px-2 py-1.5">Статус</th>
+                                <th className="text-center px-2 py-1.5 hidden sm:table-cell">Обозначение</th>
+                              </tr>
+                            </thead>
+                            <tbody className="divide-y divide-gray-100">
+                              {groups.flatMap(g => [
+                                <tr key={g.cat} className="bg-gray-100">
+                                  <td colSpan={6} className="px-3 py-1 text-[10px] font-bold text-gray-500 uppercase tracking-wide">{g.cat}</td>
+                                </tr>,
+                                ...g.rows.filter(r => r.v1 !== '—' || r.v2 !== '—').map((r, i) => (
+                                  <tr key={r.label} className={i % 2 === 0 ? 'bg-white' : 'bg-gray-50/50'}>
+                                    <td className="px-3 py-1.5 text-gray-600">{r.label}</td>
+                                    <td className="text-center px-2 py-1.5 text-gray-500">{r.v1}</td>
+                                    <td className="text-center px-2 py-1.5 font-medium">{r.v2}</td>
+                                    <td className="text-center px-2 py-1.5 text-gray-400 text-[11px]">{r.norm}</td>
+                                    <td className="text-center px-2 py-1.5">{r.okEl}</td>
+                                    <td className="text-center px-2 py-1.5 text-gray-400 text-[10px] hidden sm:table-cell">{r.oboz}</td>
+                                  </tr>
+                                )),
+                              ])}
+                            </tbody>
+                          </table>
+                        </div>
                       </div>
-                    </div>
-                  )
+                    )
+                  }
                 }
 
                 // Фолбэк: вычисленные из данных баланса
@@ -1491,29 +1525,41 @@ export default function CreditRiskPage() {
                       </thead>
                       <tbody className="divide-y divide-gray-100">
                         {([
-                          { key: 'net_rev',    label: 'Чистая выручка, TJS', norm: '—',    isAmt: true },
-                          { key: 'net_profit', label: 'Чистая прибыль, TJS', norm: '>0',   isAmt: true },
-                          { key: 'ctl',        label: 'Ктл (текущая ликвидность)', norm: '>2.0',  isAmt: false },
-                          { key: 'kbl',        label: 'Кбл (быстрая ликвидность)', norm: '>1.0',  isAmt: false },
-                          { key: 'roa',        label: 'ROA (%)',              norm: '>6%',  isAmt: false },
-                          { key: 'roe',        label: 'ROE (%)',              norm: '>20%', isAmt: false },
-                          { key: 'kfin',       label: 'Кфин (леверидж)',      norm: '≤0.5', isAmt: false },
-                          { key: 'op_cf',      label: 'Опер. ден. поток, TJS', norm: '>0', isAmt: true },
-                        ] as { key: string; label: string; norm: string; isAmt: boolean }[]).map((row, i) => (
-                          <tr key={row.key} className={i % 2 === 0 ? 'bg-white' : 'bg-gray-50'}>
-                            <td className="px-2 py-1 text-gray-700 font-medium">{row.label}</td>
-                            {(['p1', 'p2'] as const).map(p => (
-                              <td key={p} className="px-1 py-0.5">
-                                <input type="text" inputMode="decimal"
-                                  value={coeffForm[`${row.key}_${p}`]}
-                                  onChange={e => setCoeffForm(prev => ({ ...prev, [`${row.key}_${p}`]: e.target.value }))}
-                                  placeholder="—"
-                                  className="w-full px-1.5 py-0.5 border border-gray-200 rounded text-right text-xs focus:outline-none focus:ring-1 focus:ring-[#1B8A4C] bg-white" />
-                              </td>
-                            ))}
-                            <td className="px-2 py-1 text-center text-gray-400">{row.norm}</td>
-                          </tr>
-                        ))}
+                          { cat: 'Показатели ликвидности', rows: [
+                            { key: 'ctl', label: 'Коэффициент текущей ликвидности (Ктл)', norm: '>2.0 (>200%)' },
+                            { key: 'kbl', label: 'Коэффициент быстрой ликвидности (Кбл)', norm: '>1.0 (>100%)' },
+                          ]},
+                          { cat: 'Показатели рентабельности', rows: [
+                            { key: 'roa', label: 'Рентабельность активов (ROA), %', norm: '>6' },
+                            { key: 'roe', label: 'Рентабельность собственных средств (ROE), %', norm: '>20' },
+                          ]},
+                          { cat: 'Показатели финансовой устойчивости', rows: [
+                            { key: 'kfin', label: 'Коэффициент финансирования/левериджа (Кфин)', norm: '>0.5' },
+                          ]},
+                          { cat: 'Показатели кредитоспособности', rows: [
+                            { key: 'dscr', label: 'Коэффициент покрытия долга (DSCR)', norm: '>1.0' },
+                            { key: 'coll_cov', label: 'Коэффициент покрытия залогом, %', norm: '>120' },
+                          ]},
+                        ] as { cat: string; rows: { key: string; label: string; norm: string }[] }[]).flatMap(g => [
+                          <tr key={g.cat} className="bg-gray-100 border-t border-gray-200">
+                            <td colSpan={4} className="px-2 py-1 text-[10px] font-bold text-gray-500 uppercase tracking-wide">{g.cat}</td>
+                          </tr>,
+                          ...g.rows.map((row, i) => (
+                            <tr key={row.key} className={i % 2 === 0 ? 'bg-white' : 'bg-gray-50'}>
+                              <td className="px-2 py-1 text-gray-700">{row.label}</td>
+                              {(['p1', 'p2'] as const).map(p => (
+                                <td key={p} className="px-1 py-0.5">
+                                  <input type="text" inputMode="decimal"
+                                    value={coeffForm[`${row.key}_${p}`] ?? ''}
+                                    onChange={e => setCoeffForm(prev => ({ ...prev, [`${row.key}_${p}`]: e.target.value }))}
+                                    placeholder="—"
+                                    className="w-full px-1.5 py-0.5 border border-gray-200 rounded text-right text-xs focus:outline-none focus:ring-1 focus:ring-[#1B8A4C] bg-white" />
+                                </td>
+                              ))}
+                              <td className="px-2 py-1 text-center text-gray-400">{row.norm}</td>
+                            </tr>
+                          )),
+                        ])}
                       </tbody>
                     </table>
                   </div>

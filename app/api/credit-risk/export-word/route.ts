@@ -294,51 +294,59 @@ export async function POST(request: Request) {
           (() => {
             // Если есть прямо введённые коэффициенты — используем их
             const cc = (c.financial_data as { coefficients?: Record<string, number | null | string> } | null)?.coefficients
-            if (cc) {
-              const p1 = (cc.p1_label as string) || 'П1'
-              const p2 = (cc.p2_label as string) || 'П2'
-              const rv2 = (v: unknown) => (v !== null && v !== undefined) ? Number(v).toFixed(2) : '—'
-              const pv2 = (v: unknown) => (v !== null && v !== undefined) ? Number(v).toFixed(1) + '%' : '—'
-              const fv2 = (v: unknown) => (v !== null && v !== undefined) ? new Intl.NumberFormat('ru-RU').format(Math.round(Number(v))) : '—'
-const rows2: [string, string, string, string, boolean][] = [
-                ['Чистая выручка, TJS', fv2(cc.net_rev_p1), fv2(cc.net_rev_p2), '—', true],
-                ['Чистая прибыль, TJS', fv2(cc.net_profit_p1), fv2(cc.net_profit_p2), '>0', (cc.net_profit_p2 as number ?? 0) > 0],
-                ['Коэффициент текущей ликвидности (Ктл)', rv2(cc.ctl_p1), rv2(cc.ctl_p2), '>2.0 (>200%)', (cc.ctl_p2 as number ?? 0) > 2.0],
-                ['Коэффициент быстрой ликвидности (Кбл)', rv2(cc.kbl_p1), rv2(cc.kbl_p2), '>1.0 (>100%)', (cc.kbl_p2 as number ?? 0) > 1.0],
-                ['Рентабельность активов (ROA)', pv2(cc.roa_p1), pv2(cc.roa_p2), '>6%', (cc.roa_p2 as number ?? 0) > 6],
-                ['Рентабельность собственных средств (ROE)', pv2(cc.roe_p1), pv2(cc.roe_p2), '>20%', (cc.roe_p2 as number ?? 0) > 20],
-                ['Коэффициент финансирования (Кфин)', rv2(cc.kfin_p1), rv2(cc.kfin_p2), '≤0.5', (cc.kfin_p2 as number ?? 1) <= 0.5],
-                ['Операционный ден. поток, TJS', fv2(cc.op_cf_p1), fv2(cc.op_cf_p2), '>0', (cc.op_cf_p2 as number ?? 0) > 0],
-              ].filter(r => r[1] !== '—' || r[2] !== '—') as [string, string, string, string, boolean][]
-              return new Table({
-                width: { size: 9354, type: WidthType.DXA },
-                columnWidths: [2800, 1200, 1300, 1400, 1300, 1354],
-                rows: [
-                  new TableRow({ children: [
-                    cell('Наименование показателя', { green: true, bold: true, size: 18 }),
-                    cell(p1, { green: true, bold: true, center: true, size: 16 }),
-                    cell(p2, { green: true, bold: true, center: true, size: 16 }),
-                    cell('Рек. норма', { green: true, bold: true, center: true, size: 18 }),
-                    cell('Соответствует', { green: true, bold: true, center: true, size: 16 }),
-                    cell('Обозн.', { green: true, bold: true, center: true, size: 18 }),
-                  ]}),
-                  ...rows2.map(([label, v1, v2, norm, meets]) => new TableRow({ children: [
-                    cell(label, { size: 18 }),
-                    cell(v1, { center: true, size: 18 }),
-                    cell(v2, { center: true, size: 18, bold: true }),
-                    cell(norm, { center: true, size: 18, color: '555555' }),
-                    new TableCell({
-                      borders,
-                      verticalAlign: VerticalAlign.CENTER,
-                      shading: norm !== '—' && meets ? { fill: 'E8F4E8', type: ShadingType.CLEAR } : undefined,
-                      margins: { top: 60, bottom: 60, left: 120, right: 120 },
-                      children: [new Paragraph({ alignment: AlignmentType.CENTER, children: [new TextRun({ text: norm === '—' ? '—' : meets ? 'Да' : 'Нет', size: 18, bold: norm !== '—' && meets, color: norm === '—' ? '555555' : meets ? '1B8A4C' : '000000', font: 'Times New Roman' })] })]
-                    }),
-                    cell('', { center: true, size: 18 }),
-                  ]}))
-                ]
-              })
-            }
+            if (!cc) return undefined
+            const rv2 = (v: unknown) => (v !== null && v !== undefined) ? Number(v).toFixed(2) : '—'
+            const pv2 = (v: unknown) => (v !== null && v !== undefined) ? Number(v).toFixed(1) + '%' : '—'
+            const p1lbl = (cc.p1_label as string) || 'П1'
+            const p2lbl = (cc.p2_label as string) || 'П2'
+            const grp2 = (title: string) => new TableRow({ children: [new TableCell({
+              borders, columnSpan: 6,
+              shading: { fill: 'F0F0F0', type: ShadingType.CLEAR },
+              margins: { top: 60, bottom: 60, left: 120, right: 120 },
+              children: [new Paragraph({ children: [new TextRun({ text: title, size: 20, bold: true, color: '000000', font: 'Times New Roman' })] })]
+            })] })
+            const row2 = (name: string, v1: string, v2: string, norm: string, meets: boolean, sym: string) => new TableRow({ children: [
+              cell(name, { size: 18 }),
+              cell(v1, { center: true, size: 18 }),
+              cell(v2, { center: true, size: 18, bold: true }),
+              cell(norm, { center: true, size: 18, color: '555555' }),
+              new TableCell({
+                borders, verticalAlign: VerticalAlign.CENTER,
+                shading: meets ? { fill: 'E8F4E8', type: ShadingType.CLEAR } : undefined,
+                margins: { top: 60, bottom: 60, left: 120, right: 120 },
+                children: [new Paragraph({ alignment: AlignmentType.CENTER, children: [new TextRun({ text: meets ? 'Да' : 'Нет', size: 18, bold: meets, color: meets ? '1B8A4C' : '000000', font: 'Times New Roman' })] })]
+              }),
+              cell(sym, { center: true, size: 18, color: '555555' }),
+            ]})
+            const hasAny = ['ctl','kbl','roa','roe','kfin','dscr','coll_cov']
+              .some(k => cc[`${k}_p2`] != null || cc[`${k}_p1`] != null)
+            if (!hasAny) return undefined
+            const n2 = (k: string) => cc[k] as number | null | undefined
+            return new Table({
+              width: { size: 9354, type: WidthType.DXA },
+              columnWidths: [2800, 1100, 1200, 1400, 1300, 1554],
+              rows: [
+                new TableRow({ children: [
+                  cell('Наименование показателя', { green: true, bold: true, size: 18 }),
+                  cell(p1lbl, { green: true, bold: true, center: true, size: 16 }),
+                  cell(p2lbl, { green: true, bold: true, center: true, size: 16 }),
+                  cell('Рек. норма', { green: true, bold: true, center: true, size: 18 }),
+                  cell('Соответствует', { green: true, bold: true, center: true, size: 16 }),
+                  cell('Обозн.', { green: true, bold: true, center: true, size: 18 }),
+                ]}),
+                grp2('ПОКАЗАТЕЛИ ЛИКВИДНОСТИ'),
+                row2('Коэффициент текущей ликвидности', rv2(n2('ctl_p1')), rv2(n2('ctl_p2')), '>2.0 (>200%)', (n2('ctl_p2') ?? 0) > 2.0, 'Ктл'),
+                row2('Коэффициент быстрой ликвидности', rv2(n2('kbl_p1')), rv2(n2('kbl_p2')), '>1.0 (>100%)', (n2('kbl_p2') ?? 0) > 1.0, 'Кбл'),
+                grp2('ПОКАЗАТЕЛИ РЕНТАБЕЛЬНОСТИ'),
+                row2('Рентабельность активов (ROA)', pv2(n2('roa_p1')), pv2(n2('roa_p2')), '>6%', (n2('roa_p2') ?? 0) > 6, 'ROA'),
+                row2('Рентабельность собственных средств (ROE)', pv2(n2('roe_p1')), pv2(n2('roe_p2')), '>20%', (n2('roe_p2') ?? 0) > 20, 'ROE'),
+                grp2('ПОКАЗАТЕЛИ ФИНАНСОВОЙ УСТОЙЧИВОСТИ'),
+                row2('Коэффициент финансирования/левериджа', rv2(n2('kfin_p1')), rv2(n2('kfin_p2')), '>0.5', (n2('kfin_p2') ?? 0) > 0.5, 'Кфин'),
+                grp2('ПОКАЗАТЕЛИ КРЕДИТОСПОСОБНОСТИ'),
+                row2('Коэффициент покрытия долга (DSCR)', rv2(n2('dscr_p1')), rv2(n2('dscr_p2')), '>1.0', (n2('dscr_p2') ?? 0) > 1.0, 'DSC'),
+                row2('Коэффициент покрытия залогом', pv2(n2('coll_cov_p1')), pv2(n2('coll_cov_p2')), '>120%', (n2('coll_cov_p2') ?? 0) > 120, 'Кзал'),
+              ]
+            })
           })() ||
           (() => {
             const p1inv = c.p1_inventory || 0
@@ -408,7 +416,7 @@ const rows2: [string, string, string, string, boolean][] = [
                 row('Рентабельность активов (ROA)', pv(roa1), pv(roa2), '>6%', isFinite(roa2) && roa2 > 6, 'ROA'),
                 row('Рентабельность собственных средств (ROE)', pv(roe1), pv(roe2), '>20%', isFinite(roe2) && roe2 > 20, 'ROE'),
                 grp('ПОКАЗАТЕЛИ ФИНАНСОВОЙ УСТОЙЧИВОСТИ'),
-                row('Коэффициент финансирования (леверидж)', rv(fin1), rv(fin2), '≤0.5', isFinite(fin2) && fin2 <= 0.5, 'Кфин'),
+                row('Коэффициент финансирования/левериджа', rv(fin1), rv(fin2), '>0.5', isFinite(fin2) && fin2 > 0.5, 'Кфин'),
                 grp('ПОКАЗАТЕЛИ КРЕДИТОСПОСОБНОСТИ'),
                 row('Коэффициент покрытия долга (DSC)', rv(dsc1), rv(dsc2), '>1.0', isFinite(dsc2) && dsc2 > 1.0, 'DSC'),
                 row('Коэффициент покрытия залогом', '—', pv(cov), '>120%', isFinite(cov) && cov > 120, 'Кзал'),
