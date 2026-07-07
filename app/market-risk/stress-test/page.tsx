@@ -102,6 +102,11 @@ const HORIZONS = [
 
 const MONTH_LABELS = ['Янв','Фев','Мар','Апр','Май','Июн','Июл','Авг','Сен','Окт','Ноя','Дек']
 
+const OFP_PERIOD_IDX: Record<string, number[]> = {
+  Q1: [0,1,2], Q2: [3,4,5], Q3: [6,7,8], Q4: [9,10,11],
+  H1: [0,1,2,3,4,5], H2: [6,7,8,9,10,11],
+}
+
 // ── Component ─────────────────────────────────────────────────────────────────
 export default function MarketStressTest() {
   const [model, setModel] = useState<1 | 2>(1)
@@ -154,12 +159,15 @@ export default function MarketStressTest() {
   const [catRemit,   setCatRemit]   = useState<number>(10)
 
   // OFP — открытая валютная позиция
-  const [ofpMonths,       setOfpMonths]       = useState(6)
+  const [ofpPeriod,       setOfpPeriod]       = useState<'Q1'|'Q2'|'Q3'|'Q4'|'H1'|'H2'|'custom'>('H1')
+  const [ofpMonths,       setOfpMonths]       = useState(3)
   const [posLimitPct,     setPosLimitPct]     = useState('8')
   const [regulCapMonthly, setRegulCapMonthly] = useState<string[]>(Array(12).fill(''))
-  const [spotUsdMonthly,  setSpotUsdMonthly]  = useState<string[]>(Array(12).fill(''))
-  const [spotRubMonthly,  setSpotRubMonthly]  = useState<string[]>(Array(12).fill(''))
+  const [spotFxMonthly,   setSpotFxMonthly]   = useState<string[]>(Array(12).fill(''))
   const updArr = (arr: string[], idx: number, val: string): string[] => { const copy = [...arr]; copy[idx] = val; return copy }
+  const ofpMonthIdxs = ofpPeriod === 'custom'
+    ? Array.from({length: ofpMonths}, (_, i) => i)
+    : (OFP_PERIOD_IDX[ofpPeriod] ?? [0,1,2,3,4,5])
 
   const inp  = "w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#1B8A4C] bg-white text-right"
   const lbl  = "block text-xs font-medium text-gray-600 mb-1"
@@ -643,60 +651,75 @@ export default function MarketStressTest() {
 
               {/* ── Эффект на прибыль через открытую валютную позицию ── */}
               <div className={card}>
-                <p className="text-base font-semibold text-gray-900 mb-1">💹 Эффект на прибыль через открытую валютную позицию</p>
-                <p className="text-xs text-gray-500 mb-4">
-                  Волатильность из Монте Карло (исторический VaR): пессимистичный — <span className="font-semibold text-yellow-700">VaR95 = {mcResult.histVar95}%</span> · катастрофический — <span className="font-semibold text-red-700">VaR99 = {mcResult.histVar99}%</span>
-                </p>
 
-                {/* Конфигурация */}
-                <div className="grid grid-cols-2 lg:grid-cols-3 gap-4 mb-5">
-                  <div>
-                    <label className={lbl}>Горизонт прогноза (месяцев)</label>
-                    <select value={ofpMonths} onChange={e => setOfpMonths(Number(e.target.value))}
-                      className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#1B8A4C] bg-white">
-                      {[1,2,3,4,5,6,7,8,9,10,11,12].map(m => <option key={m} value={m}>{m} мес.</option>)}
-                    </select>
+                {/* ═══ Sticky config header ═══ */}
+                <div className="sticky top-0 z-20 bg-white -mx-5 -mt-5 px-5 pt-5 pb-4 border-b border-gray-100 mb-5 rounded-t-xl">
+                  <p className="text-base font-semibold text-gray-900 mb-0.5">💹 Эффект на прибыль через открытую валютную позицию</p>
+                  <p className="text-xs text-gray-500 mb-3">
+                    CVaR из Монте Карло · пессимистичный: <span className="font-semibold text-yellow-700">CVaR95 = {mcResult.cvar95}%</span> · катастрофический: <span className="font-semibold text-red-700">CVaR99 = {mcResult.cvar99}%</span> · валюта симуляции: <span className="font-semibold text-gray-800">{currency}/TJS</span>
+                  </p>
+
+                  {/* Выбор периода */}
+                  <div className="flex flex-wrap items-center gap-2 mb-3">
+                    <span className="text-xs text-gray-500 mr-1">Период:</span>
+                    {(['Q1','Q2','Q3','Q4','H1','H2','custom'] as const).map(p => (
+                      <button key={p} onClick={() => setOfpPeriod(p)}
+                        className={`px-3 py-1.5 rounded-lg text-xs font-semibold border transition-all
+                          ${ofpPeriod === p
+                            ? 'bg-[#1B8A4C] text-white border-[#1B8A4C] shadow-sm'
+                            : 'bg-white text-gray-600 border-gray-200 hover:border-[#1B8A4C] hover:text-[#1B8A4C]'}`}>
+                        {p === 'custom' ? 'Произвольный' : p}
+                      </button>
+                    ))}
                   </div>
-                  <div>
-                    <label className={lbl}>Лимит открытой позиции (%, дефолт ±8)</label>
-                    <input type="text" value={posLimitPct}
-                      onChange={e => setPosLimitPct(e.target.value.replace(/[^0-9.]/g,''))}
-                      placeholder="8" className={inp} />
+
+                  <div className="flex flex-wrap items-end gap-4">
+                    {ofpPeriod === 'custom' && (
+                      <div>
+                        <label className={lbl}>Количество месяцев</label>
+                        <select value={ofpMonths} onChange={e => setOfpMonths(Number(e.target.value))}
+                          className="px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#1B8A4C] bg-white">
+                          {[1,2,3,4,5,6,7,8,9,10,11,12].map(m => <option key={m} value={m}>{m} мес.</option>)}
+                        </select>
+                      </div>
+                    )}
+                    <div>
+                      <label className={lbl}>Лимит открытой позиции (±%, дефолт 8)</label>
+                      <input type="text" value={posLimitPct}
+                        onChange={e => setPosLimitPct(e.target.value.replace(/[^0-9.]/g,''))}
+                        placeholder="8"
+                        className="w-32 px-3 py-2 border border-gray-200 rounded-lg text-sm text-right focus:outline-none focus:ring-2 focus:ring-[#1B8A4C] bg-white" />
+                    </div>
                   </div>
                 </div>
 
                 {/* Помесячные входные данные */}
-                <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">Помесячные входные данные</p>
+                <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">
+                  Помесячные входные данные · {ofpPeriod === 'custom' ? `${ofpMonths} мес.` : ofpPeriod}
+                </p>
                 <div className="overflow-x-auto mb-6">
                   <table className="w-full text-xs border-collapse">
                     <thead>
                       <tr className="bg-gray-800 text-white">
                         <th className="px-3 py-2 text-left sticky left-0 bg-gray-800">Месяц</th>
                         <th className="px-3 py-2 text-right">Рег. капитал банка (TJS)</th>
-                        <th className="px-3 py-2 text-right">Курс USD/TJS</th>
-                        <th className="px-3 py-2 text-right">Курс RUB/TJS</th>
+                        <th className="px-3 py-2 text-right">Курс {currency}/TJS</th>
                       </tr>
                     </thead>
                     <tbody>
-                      {Array.from({length: ofpMonths}, (_, i) => (
-                        <tr key={i} className={i % 2 === 0 ? 'bg-white' : 'bg-gray-50'}>
-                          <td className="px-3 py-1 font-semibold text-gray-700 sticky left-0 bg-inherit">{MONTH_LABELS[i]}</td>
+                      {ofpMonthIdxs.map((mi, rowIdx) => (
+                        <tr key={mi} className={rowIdx % 2 === 0 ? 'bg-white' : 'bg-gray-50'}>
+                          <td className="px-3 py-1 font-semibold text-gray-700 sticky left-0 bg-inherit">{MONTH_LABELS[mi]}</td>
                           <td className="px-1.5 py-1">
-                            <input type="text" value={regulCapMonthly[i]}
-                              onChange={e => setRegulCapMonthly(updArr(regulCapMonthly, i, fmtN(e.target.value)))}
+                            <input type="text" value={regulCapMonthly[mi]}
+                              onChange={e => setRegulCapMonthly(updArr(regulCapMonthly, mi, fmtN(e.target.value)))}
                               placeholder="0"
                               className="w-full px-2 py-1 border border-gray-200 rounded text-right text-xs focus:outline-none focus:ring-1 focus:ring-[#1B8A4C] bg-white" />
                           </td>
                           <td className="px-1.5 py-1">
-                            <input type="text" value={spotUsdMonthly[i]}
-                              onChange={e => setSpotUsdMonthly(updArr(spotUsdMonthly, i, e.target.value.replace(/[^0-9.]/g,'')))}
-                              placeholder="10.90"
-                              className="w-full px-2 py-1 border border-gray-200 rounded text-right text-xs focus:outline-none focus:ring-1 focus:ring-[#1B8A4C] bg-white" />
-                          </td>
-                          <td className="px-1.5 py-1">
-                            <input type="text" value={spotRubMonthly[i]}
-                              onChange={e => setSpotRubMonthly(updArr(spotRubMonthly, i, e.target.value.replace(/[^0-9.]/g,'')))}
-                              placeholder="0.12"
+                            <input type="text" value={spotFxMonthly[mi]}
+                              onChange={e => setSpotFxMonthly(updArr(spotFxMonthly, mi, e.target.value.replace(/[^0-9.]/g,'')))}
+                              placeholder={currency === 'RUB' ? '0.12' : currency === 'EUR' ? '11.90' : '10.90'}
                               className="w-full px-2 py-1 border border-gray-200 rounded text-right text-xs focus:outline-none focus:ring-1 focus:ring-[#1B8A4C] bg-white" />
                           </td>
                         </tr>
@@ -708,26 +731,27 @@ export default function MarketStressTest() {
                 {/* Сценарные таблицы */}
                 <div className="space-y-5">
                   {[
-                    { label: 'Сценарий 1 — Пессимистичный', varPct: mcResult.histVar95, hdrBg: 'bg-yellow-600', border: 'border-yellow-200' },
-                    { label: 'Сценарий 2 — Катастрофический', varPct: mcResult.histVar99, hdrBg: 'bg-red-700',   border: 'border-red-200'    },
+                    { label: 'Сценарий 1 — Пессимистичный',   cvarPct: mcResult.cvar95, hdrBg: 'bg-yellow-600', border: 'border-yellow-200', tag: 'CVaR95' },
+                    { label: 'Сценарий 2 — Катастрофический', cvarPct: mcResult.cvar99, hdrBg: 'bg-red-700',    border: 'border-red-200',    tag: 'CVaR99' },
                   ].map(sc => {
                     const posLim = parseFloat(posLimitPct) || 0
                     let totalShort = 0, totalLong = 0
-                    const rows = Array.from({length: ofpMonths}, (_, i) => {
-                      const rc      = parseFloat(regulCapMonthly[i].replace(/\D/g,'')) || 0
+                    const rows = ofpMonthIdxs.map(mi => {
+                      const rc      = parseFloat(regulCapMonthly[mi].replace(/\D/g,'')) || 0
                       const openPos = rc * posLim / 100
-                      const sPnL    = -(openPos * sc.varPct / 100)
-                      const lPnL    =  (openPos * sc.varPct / 100)
+                      const sPnL    = -(openPos * sc.cvarPct / 100)
+                      const lPnL    =  (openPos * sc.cvarPct / 100)
                       totalShort   += sPnL
                       totalLong    += lPnL
-                      return { i, rc, openPos, sPnL, lPnL }
+                      return { mi, rc, openPos, sPnL, lPnL }
                     })
-                    const hasData = rows.some(r => r.openPos > 0)
+                    const hasData     = rows.some(r => r.openPos > 0)
+                    const periodLabel = ofpPeriod === 'custom' ? `${ofpMonths} мес.` : ofpPeriod
                     return (
                       <div key={sc.label} className={`rounded-xl border ${sc.border} overflow-hidden`}>
                         <div className={`${sc.hdrBg} text-white px-4 py-2.5 flex items-center justify-between`}>
                           <p className="text-sm font-bold">{sc.label}</p>
-                          <p className="text-xs opacity-90">FX шок: ±{sc.varPct}% · Лимит позиции: ±{posLimitPct || '8'}%</p>
+                          <p className="text-xs opacity-90">{sc.tag} = ±{sc.cvarPct}% · {currency}/TJS · {periodLabel}</p>
                         </div>
                         <div className="overflow-x-auto">
                           <table className="w-full text-xs border-collapse">
@@ -736,18 +760,18 @@ export default function MarketStressTest() {
                                 <th className="px-3 py-2 text-left sticky left-0 bg-gray-100">Месяц</th>
                                 <th className="px-3 py-2 text-right">Рег. капитал (TJS)</th>
                                 <th className="px-3 py-2 text-right">Откр. позиция (TJS)</th>
-                                <th className="px-3 py-2 text-right">FX шок %</th>
+                                <th className="px-3 py-2 text-right">FX шок ({sc.tag}) %</th>
                                 <th className="px-3 py-2 text-right">P&amp;L если SHORT (TJS)</th>
                                 <th className="px-3 py-2 text-right">P&amp;L если LONG (TJS)</th>
                               </tr>
                             </thead>
                             <tbody className="divide-y divide-gray-100">
-                              {rows.map(row => (
-                                <tr key={row.i} className={row.i % 2 === 0 ? 'bg-white' : 'bg-gray-50'}>
-                                  <td className="px-3 py-1.5 font-semibold text-gray-700 sticky left-0 bg-inherit">{MONTH_LABELS[row.i]}</td>
+                              {rows.map((row, rowIdx) => (
+                                <tr key={row.mi} className={rowIdx % 2 === 0 ? 'bg-white' : 'bg-gray-50'}>
+                                  <td className="px-3 py-1.5 font-semibold text-gray-700 sticky left-0 bg-inherit">{MONTH_LABELS[row.mi]}</td>
                                   <td className="px-3 py-1.5 text-right text-gray-600">{row.rc > 0 ? fmtNum(row.rc) : '—'}</td>
                                   <td className="px-3 py-1.5 text-right font-medium text-gray-800">{row.openPos > 0 ? fmtNum(row.openPos) : '—'}</td>
-                                  <td className="px-3 py-1.5 text-right text-gray-500">{sc.varPct}%</td>
+                                  <td className="px-3 py-1.5 text-right text-gray-500">{sc.cvarPct}%</td>
                                   <td className="px-3 py-1.5 text-right font-semibold text-red-600">{row.openPos > 0 ? `−${fmtNum(Math.abs(row.sPnL))}` : '—'}</td>
                                   <td className="px-3 py-1.5 text-right font-semibold text-green-600">{row.openPos > 0 ? `+${fmtNum(row.lPnL)}` : '—'}</td>
                                 </tr>
@@ -756,7 +780,7 @@ export default function MarketStressTest() {
                             <tfoot>
                               <tr className="bg-gray-800 text-white font-bold text-[11px]">
                                 <td className="px-3 py-2.5 sticky left-0 bg-gray-800" colSpan={4}>
-                                  Total Effect — {hasData ? `горизонт ${ofpMonths} мес.` : 'введите регулятивный капитал'}
+                                  Total Effect — {hasData ? periodLabel : 'введите регулятивный капитал'}
                                 </td>
                                 <td className="px-3 py-2.5 text-right text-red-300">{hasData ? `−${fmtNum(Math.abs(totalShort))}` : '—'}</td>
                                 <td className="px-3 py-2.5 text-right text-green-300">{hasData ? `+${fmtNum(totalLong)}` : '—'}</td>
@@ -769,7 +793,7 @@ export default function MarketStressTest() {
                   })}
                 </div>
                 <p className="mt-3 text-[10px] text-gray-400 leading-relaxed">
-                  Открытая позиция = Рег. капитал × Лимит%. P&amp;L SHORT = −Позиция × FX шок% (убыток при девальвации TJS на короткой позиции в инвалюте). P&amp;L LONG = +Позиция × FX шок% (прибыль при длинной позиции). Курсы USD/RUB — информационно.
+                  Открытая позиция = Рег. капитал × Лимит%. P&amp;L SHORT = −Позиция × CVaR шок% (убыток при девальвации TJS на короткой позиции). P&amp;L LONG = +Позиция × CVaR шок% (прибыль при длинной позиции). CVaR точнее VaR — учитывает среднее по хвосту. Курс {currency}/TJS — информационно.
                 </p>
               </div>
             </>
