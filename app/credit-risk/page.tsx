@@ -3,7 +3,7 @@
 import { useState, useEffect, useCallback } from 'react'
 import { supabase } from '@/supabase/client'
 import { apiFetch } from '@/lib/api-fetch'
-import { Plus, Download, Eye, Trash2, X, Loader2, CheckCircle2, AlertCircle, Filter, Edit2 } from 'lucide-react'
+import { Plus, Download, Eye, Trash2, X, Loader2, CheckCircle2, AlertCircle, Filter, Edit2, FileText } from 'lucide-react'
 
 interface Collateral { type: string; description: string; address?: string; value: number }
 
