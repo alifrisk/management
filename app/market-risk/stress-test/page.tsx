@@ -145,9 +145,9 @@ export default function MarketStressTest() {
   const [running,     setRunning]     = useState(false)
 
   // Model 2 — manual inputs
-  const [gdpBase,        setGdpBase]        = useState('173 000 000 000')
-  const [gdpGrowthFcst,  setGdpGrowthFcst]  = useState('7')
-  const [remitShareFcst, setRemitShareFcst] = useState('45')
+  const [gdpBase,        setGdpBase]        = useState('')
+  const [gdpGrowthFcst,  setGdpGrowthFcst]  = useState('')
+  const [remitShareFcst, setRemitShareFcst] = useState('')
   const [alifBudgetVol,  setAlifBudgetVol]  = useState('')
   const [actualVolH1,    setActualVolH1]    = useState('')
   const [actualIncomeH1, setActualIncomeH1] = useState('')
@@ -815,48 +815,52 @@ export default function MarketStressTest() {
       {model === 2 && (
         <div className="space-y-5">
 
-          {/* Входные данные */}
-          <div className={card}>
-            <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-3">Входные данные (вводит аналитик)</p>
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-              {([
-                { l: 'ВВП базового периода (TJS)',                     v: gdpBase,        s: setGdpBase,        p: '173 000 000 000', fmt: true  },
-                { l: 'Прогноз роста ВВП (%)',                          v: gdpGrowthFcst,  s: setGdpGrowthFcst,  p: '7',               fmt: false },
-                { l: 'Прогноз доля переводов в ВВП (%)',               v: remitShareFcst, s: setRemitShareFcst, p: '45',              fmt: false },
-                { l: 'Бюджет переводов Алиф на год (TJS)',             v: alifBudgetVol,  s: setAlifBudgetVol,  p: '0',               fmt: true  },
-                { l: 'Факт. объём переводов за отчётный период (TJS)',  v: actualVolH1,    s: setActualVolH1,    p: '0',               fmt: true  },
-                { l: 'Факт. доход от переводов за отчётный период (TJS)', v: actualIncomeH1, s: setActualIncomeH1, p: '0',            fmt: true  },
-              ] as { l: string; v: string; s: (v: string) => void; p: string; fmt: boolean }[]).map(f => (
-                <div key={f.l}>
-                  <label className={lbl}>{f.l}</label>
-                  <input type="text" value={f.v}
-                    onChange={e => f.s(f.fmt ? fmtN(e.target.value) : e.target.value)}
-                    placeholder={f.p} className={inp} />
-                </div>
-              ))}
-            </div>
-          </div>
+          {/* ═══ Sticky: Входные данные + Вычисленные показатели ═══ */}
+          <div className="sticky top-0 z-20 space-y-3 bg-[#F5F8F6] pb-2 shadow-[0_4px_8px_-2px_rgba(0,0,0,0.08)]">
 
-          {/* Вычисленные показатели */}
-          {(gdp0 > 0 || alifBudget > 0) && (
+            {/* Входные данные */}
             <div className={card}>
-              <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-3">Вычисленные показатели (автоматически)</p>
-              <div className="grid grid-cols-2 lg:grid-cols-5 gap-3">
-                {[
-                  { l: 'Ожидаемый ВВП',              v: expectedGdp > 0     ? fmtNum(expectedGdp)     + ' TJS' : '—', c: 'text-gray-800'  },
-                  { l: 'Прогноз переводов в РТ',      v: forecastRemitRT > 0 ? fmtNum(forecastRemitRT) + ' TJS' : '—', c: 'text-gray-800'  },
-                  { l: 'Доля Алиф % (авт.)',          v: alifSharePct > 0    ? alifSharePct.toFixed(2) + '%'    : '—', c: 'text-blue-700'  },
-                  { l: 'Маржа доходности % (авт.)',   v: marginPct > 0       ? marginPct.toFixed(4)    + '%'    : '—', c: 'text-blue-700'  },
-                  { l: 'Прогнозный доход (ост. период)', v: baseIncomeH2 > 0  ? fmtNum(baseIncomeH2)    + ' TJS' : '—', c: 'text-green-700' },
-                ].map(s => (
-                  <div key={s.l} className="bg-gray-50 rounded-lg p-3">
-                    <p className="text-[10px] text-gray-400 leading-tight mb-1">{s.l}</p>
-                    <p className={`text-sm font-bold ${s.c}`}>{s.v}</p>
+              <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-3">Входные данные (вводит аналитик)</p>
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+                {([
+                  { l: 'ВВП базового периода (TJS)',                        v: gdpBase,        s: setGdpBase,        p: 'напр. 173 000 000 000', fmt: true  },
+                  { l: 'Прогноз роста ВВП (%)',                             v: gdpGrowthFcst,  s: setGdpGrowthFcst,  p: 'напр. 7',               fmt: false },
+                  { l: 'Прогноз доля переводов в ВВП (%)',                  v: remitShareFcst, s: setRemitShareFcst, p: 'напр. 45',              fmt: false },
+                  { l: 'Бюджет переводов Алиф на год (TJS)',                v: alifBudgetVol,  s: setAlifBudgetVol,  p: 'напр. 10 000 000 000',  fmt: true  },
+                  { l: 'Факт. объём переводов за отчётный период (TJS)',    v: actualVolH1,    s: setActualVolH1,    p: 'напр. 5 000 000 000',   fmt: true  },
+                  { l: 'Факт. доход от переводов за отчётный период (TJS)', v: actualIncomeH1, s: setActualIncomeH1, p: 'напр. 81 000 000',      fmt: true  },
+                ] as { l: string; v: string; s: (v: string) => void; p: string; fmt: boolean }[]).map(f => (
+                  <div key={f.l}>
+                    <label className={lbl}>{f.l}</label>
+                    <input type="text" value={f.v}
+                      onChange={e => f.s(f.fmt ? fmtN(e.target.value) : e.target.value)}
+                      placeholder={f.p} className={inp} />
                   </div>
                 ))}
               </div>
             </div>
-          )}
+
+            {/* Вычисленные показатели */}
+            {(gdp0 > 0 || alifBudget > 0) && (
+              <div className={card}>
+                <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-3">Вычисленные показатели (автоматически)</p>
+                <div className="grid grid-cols-2 lg:grid-cols-5 gap-3">
+                  {[
+                    { l: 'Ожидаемый ВВП',                 v: expectedGdp > 0     ? fmtNum(expectedGdp)     + ' TJS' : '—', c: 'text-gray-800'  },
+                    { l: 'Прогноз переводов в РТ',         v: forecastRemitRT > 0 ? fmtNum(forecastRemitRT) + ' TJS' : '—', c: 'text-gray-800'  },
+                    { l: 'Доля Алиф % (авт.)',             v: alifSharePct > 0    ? alifSharePct.toFixed(2) + '%'    : '—', c: 'text-blue-700'  },
+                    { l: 'Маржа доходности % (авт.)',      v: marginPct > 0       ? marginPct.toFixed(4)    + '%'    : '—', c: 'text-blue-700'  },
+                    { l: 'Прогнозный доход (ост. период)', v: baseIncomeH2 > 0    ? fmtNum(baseIncomeH2)    + ' TJS' : '—', c: 'text-green-700' },
+                  ].map(s => (
+                    <div key={s.l} className="bg-gray-50 rounded-lg p-3">
+                      <p className="text-[10px] text-gray-400 leading-tight mb-1">{s.l}</p>
+                      <p className={`text-sm font-bold ${s.c}`}>{s.v}</p>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+          </div>
 
           {/* Сценарии */}
           <div className={card}>
