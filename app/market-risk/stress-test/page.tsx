@@ -738,12 +738,14 @@ export default function MarketStressTest() {
                     { label: 'Сценарий 2 — Катастрофический', cvarPct: mcResult.cvar99, hdrBg: 'bg-red-700',    border: 'border-red-200',    tag: 'CVaR99' },
                   ].map(sc => {
                     const posLim = parseFloat(posLimitPct) || 0
+                    const N = ofpMonthIdxs.length || 1
+                    const cvarPerMonth = sc.cvarPct / N
                     let totalShort = 0, totalLong = 0
                     const rows = ofpMonthIdxs.map(mi => {
                       const rc      = parseFloat(regulCapMonthly[mi].replace(/\D/g,'')) || 0
                       const openPos = rc * posLim / 100
-                      const sPnL    = -(openPos * sc.cvarPct / 100)
-                      const lPnL    =  (openPos * sc.cvarPct / 100)
+                      const sPnL    = -(openPos * cvarPerMonth / 100)
+                      const lPnL    =  (openPos * cvarPerMonth / 100)
                       totalShort   += sPnL
                       totalLong    += lPnL
                       return { mi, rc, openPos, sPnL, lPnL }
@@ -754,7 +756,7 @@ export default function MarketStressTest() {
                       <div key={sc.label} className={`rounded-xl border ${sc.border} overflow-hidden`}>
                         <div className={`${sc.hdrBg} text-white px-4 py-2.5 flex items-center justify-between`}>
                           <p className="text-sm font-bold">{sc.label}</p>
-                          <p className="text-xs opacity-90">{sc.tag} = ±{sc.cvarPct}% · {currency}/TJS · {periodLabel}</p>
+                          <p className="text-xs opacity-90">{sc.tag} = ±{sc.cvarPct}% за горизонт · {currency}/TJS · {periodLabel}</p>
                         </div>
                         <div className="overflow-x-auto">
                           <table className="w-full text-xs border-collapse">
@@ -774,7 +776,7 @@ export default function MarketStressTest() {
                                   <td className="px-3 py-1.5 font-semibold text-gray-700 sticky left-0 bg-inherit">{MONTH_LABELS[row.mi]}</td>
                                   <td className="px-3 py-1.5 text-right text-gray-600">{row.rc > 0 ? fmtNum(row.rc) : '—'}</td>
                                   <td className="px-3 py-1.5 text-right font-medium text-gray-800">{row.openPos > 0 ? fmtNum(row.openPos) : '—'}</td>
-                                  <td className="px-3 py-1.5 text-right text-gray-500">{sc.cvarPct}%</td>
+                                  <td className="px-3 py-1.5 text-right text-gray-500">{cvarPerMonth.toFixed(2)}%</td>
                                   <td className="px-3 py-1.5 text-right font-semibold text-red-600">{row.openPos > 0 ? `−${fmtNum(Math.abs(row.sPnL))}` : '—'}</td>
                                   <td className="px-3 py-1.5 text-right font-semibold text-green-600">{row.openPos > 0 ? `+${fmtNum(row.lPnL)}` : '—'}</td>
                                 </tr>
@@ -796,7 +798,7 @@ export default function MarketStressTest() {
                   })}
                 </div>
                 <p className="mt-3 text-[10px] text-gray-400 leading-relaxed">
-                  Открытая позиция = Рег. капитал × Лимит%. P&amp;L SHORT = −Позиция × CVaR шок% (убыток при девальвации TJS на короткой позиции). P&amp;L LONG = +Позиция × CVaR шок% (прибыль при длинной позиции). CVaR точнее VaR — учитывает среднее по хвосту. Курс {currency}/TJS — информационно.
+                  Открытая позиция = Рег. капитал × Лимит%. CVaR — кумулятивный шок за весь горизонт, распределён равномерно по месяцам (CVaR / N мес.) так что сумма Total Effect = Позиция × CVaR один раз. P&amp;L SHORT — убыток при девальвации TJS (короткая позиция). P&amp;L LONG — прибыль при длинной позиции. CVaR точнее VaR — учитывает среднее по хвосту.
                 </p>
               </div>
             </>
