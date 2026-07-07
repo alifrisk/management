@@ -322,6 +322,17 @@ export async function POST(request: Request) {
               .some(k => cc[`${k}_p2`] != null || cc[`${k}_p1`] != null)
             if (!hasAny) return undefined
             const n2 = (k: string) => cc[k] as number | null | undefined
+            const DEF_NORMS: Record<string, string> = {
+              ctl: '>2.0 (>200%)', kbl: '>1.0 (>100%)',
+              roa: '>6%', roe: '>20%',
+              kfin: '>0.5', dscr: '>1.0', coll_cov: '>120%',
+            }
+            const nrm = (k: string) => (cc[`${k}_norm`] as string) || DEF_NORMS[k]
+            const chk = (k: string, v: number | null | undefined) => {
+              const s = nrm(k); const m = s.match(/([<>])\s*([\d.]+)/)
+              if (!m || v == null) return false
+              return m[1] === '>' ? v > parseFloat(m[2]) : v < parseFloat(m[2])
+            }
             return new Table({
               width: { size: 9354, type: WidthType.DXA },
               columnWidths: [2800, 1100, 1200, 1400, 1300, 1554],
@@ -335,16 +346,16 @@ export async function POST(request: Request) {
                   cell('Обозн.', { green: true, bold: true, center: true, size: 18 }),
                 ]}),
                 grp2('ПОКАЗАТЕЛИ ЛИКВИДНОСТИ'),
-                row2('Коэффициент текущей ликвидности', rv2(n2('ctl_p1')), rv2(n2('ctl_p2')), '>2.0 (>200%)', (n2('ctl_p2') ?? 0) > 2.0, 'Ктл'),
-                row2('Коэффициент быстрой ликвидности', rv2(n2('kbl_p1')), rv2(n2('kbl_p2')), '>1.0 (>100%)', (n2('kbl_p2') ?? 0) > 1.0, 'Кбл'),
+                row2('Коэффициент текущей ликвидности', rv2(n2('ctl_p1')), rv2(n2('ctl_p2')), nrm('ctl'), chk('ctl', n2('ctl_p2')), 'Ктл'),
+                row2('Коэффициент быстрой ликвидности', rv2(n2('kbl_p1')), rv2(n2('kbl_p2')), nrm('kbl'), chk('kbl', n2('kbl_p2')), 'Кбл'),
                 grp2('ПОКАЗАТЕЛИ РЕНТАБЕЛЬНОСТИ'),
-                row2('Рентабельность активов (ROA)', pv2(n2('roa_p1')), pv2(n2('roa_p2')), '>6%', (n2('roa_p2') ?? 0) > 6, 'ROA'),
-                row2('Рентабельность собственных средств (ROE)', pv2(n2('roe_p1')), pv2(n2('roe_p2')), '>20%', (n2('roe_p2') ?? 0) > 20, 'ROE'),
+                row2('Рентабельность активов (ROA)', pv2(n2('roa_p1')), pv2(n2('roa_p2')), nrm('roa'), chk('roa', n2('roa_p2')), 'ROA'),
+                row2('Рентабельность собственных средств (ROE)', pv2(n2('roe_p1')), pv2(n2('roe_p2')), nrm('roe'), chk('roe', n2('roe_p2')), 'ROE'),
                 grp2('ПОКАЗАТЕЛИ ФИНАНСОВОЙ УСТОЙЧИВОСТИ'),
-                row2('Коэффициент финансирования/левериджа', rv2(n2('kfin_p1')), rv2(n2('kfin_p2')), '>0.5', (n2('kfin_p2') ?? 0) > 0.5, 'Кфин'),
+                row2('Коэффициент финансирования/левериджа', rv2(n2('kfin_p1')), rv2(n2('kfin_p2')), nrm('kfin'), chk('kfin', n2('kfin_p2')), 'Кфин'),
                 grp2('ПОКАЗАТЕЛИ КРЕДИТОСПОСОБНОСТИ'),
-                row2('Коэффициент покрытия долга (DSCR)', rv2(n2('dscr_p1')), rv2(n2('dscr_p2')), '>1.0', (n2('dscr_p2') ?? 0) > 1.0, 'DSC'),
-                row2('Коэффициент покрытия залогом', pv2(n2('coll_cov_p1')), pv2(n2('coll_cov_p2')), '>120%', (n2('coll_cov_p2') ?? 0) > 120, 'Кзал'),
+                row2('Коэффициент покрытия долга (DSCR)', rv2(n2('dscr_p1')), rv2(n2('dscr_p2')), nrm('dscr'), chk('dscr', n2('dscr_p2')), 'DSC'),
+                row2('Коэффициент покрытия залогом', pv2(n2('coll_cov_p1')), pv2(n2('coll_cov_p2')), nrm('coll_cov'), chk('coll_cov', n2('coll_cov_p2')), 'Кзал'),
               ]
             })
           })() ||
