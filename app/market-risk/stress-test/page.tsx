@@ -214,7 +214,9 @@ export default function MarketStressTest() {
   const forecastRemitRT = expectedGdp * (remitShareP / 100)
   const alifSharePct    = forecastRemitRT > 0 ? (alifBudget / forecastRemitRT) * 100 : 0
   const marginPct       = actVolH1n > 0 ? (actIncH1n / actVolH1n) * 100 : 0
-  const baseIncomeH2    = alifBudget > 0 ? (alifBudget / 2) * (marginPct / 100) : 0
+  const baseIncomeH2    = (forecastRemitRT > 0 && alifSharePct > 0 && marginPct > 0)
+    ? (forecastRemitRT * (alifSharePct / 100) / 2) * (marginPct / 100)
+    : 0
 
   // Matrix: H2 income for scenario (growth%, remitShare%)
   const calcIncomeH2 = (g: number, r: number) => {
@@ -279,21 +281,21 @@ export default function MarketStressTest() {
       rows.push(['УКРЕПЛЕНИЕ TJS', 'Вероятность'])
       mcResult.probs.filter(p => p.type === 'apprec').forEach(p => rows.push([p.label, `${p.pct.toFixed(2)}%`]))
     } else if (model === 2) {
-      rows.push(['МАКРОЭКОНОМИКА — Денежные переводы (H2)'])
+      rows.push(['МАКРОЭКОНОМИКА — Денежные переводы (прогноз)'])
       rows.push(['ВВП базовый (TJS)', String(gdp0)])
       rows.push(['Прогноз роста ВВП', `${gdpGrowthP}%`])
       rows.push(['Прогноз доля переводов в ВВП', `${remitShareP}%`])
       rows.push(['Бюджет переводов Алиф (TJS)', String(alifBudget)])
-      rows.push(['Факт. объём переводов H1 (TJS)', String(actVolH1n)])
-      rows.push(['Факт. доход переводов H1 (TJS)', String(actIncH1n)])
+      rows.push(['Факт. объём переводов за отчётный период (TJS)', String(actVolH1n)])
+      rows.push(['Факт. доход от переводов за отчётный период (TJS)', String(actIncH1n)])
       rows.push([])
       rows.push(['Ожидаемый ВВП (TJS)', String(Math.round(expectedGdp))])
       rows.push(['Прогноз переводов в РТ (TJS)', String(Math.round(forecastRemitRT))])
       rows.push(['Доля Алиф % (авт.)', `${alifSharePct.toFixed(2)}%`])
       rows.push(['Маржа доходности % (авт.)', `${marginPct.toFixed(4)}%`])
-      rows.push(['Базовый доход H2 (TJS)', String(Math.round(baseIncomeH2))])
+      rows.push(['Прогнозный доход за оставшийся период (TJS)', String(Math.round(baseIncomeH2))])
       rows.push([])
-      rows.push(['Сценарий', 'Рост ВВП', 'Доля в ВВП', 'Доход H2 (TJS)', 'Эффект FX/Dealing Net (TJS)'])
+      rows.push(['Сценарий', 'Рост ВВП', 'Доля в ВВП', 'Прогнозный доход (TJS)', 'Эффект FX/Dealing Net (TJS)'])
       rows.push(['Пессимистичный',   `${pessGrowth}%`, `${pessRemit}%`, String(Math.round(calcIncomeH2(pessGrowth, pessRemit))), String(Math.round(calcIncomeH2(pessGrowth, pessRemit) - baseIncomeH2))])
       rows.push(['Катастрофический', `${catGrowth}%`,  `${catRemit}%`,  String(Math.round(calcIncomeH2(catGrowth,  catRemit))),  String(Math.round(calcIncomeH2(catGrowth,  catRemit)  - baseIncomeH2))])
       rows.push([])
@@ -798,8 +800,8 @@ export default function MarketStressTest() {
                 { l: 'Прогноз роста ВВП (%)',                          v: gdpGrowthFcst,  s: setGdpGrowthFcst,  p: '7',               fmt: false },
                 { l: 'Прогноз доля переводов в ВВП (%)',               v: remitShareFcst, s: setRemitShareFcst, p: '45',              fmt: false },
                 { l: 'Бюджет переводов Алиф на год (TJS)',             v: alifBudgetVol,  s: setAlifBudgetVol,  p: '0',               fmt: true  },
-                { l: 'Факт. объём переводов за H1 (TJS)',              v: actualVolH1,    s: setActualVolH1,    p: '0',               fmt: true  },
-                { l: 'Факт. доход от переводов за H1 (TJS)',           v: actualIncomeH1, s: setActualIncomeH1, p: '0',               fmt: true  },
+                { l: 'Факт. объём переводов за отчётный период (TJS)',  v: actualVolH1,    s: setActualVolH1,    p: '0',               fmt: true  },
+                { l: 'Факт. доход от переводов за отчётный период (TJS)', v: actualIncomeH1, s: setActualIncomeH1, p: '0',            fmt: true  },
               ] as { l: string; v: string; s: (v: string) => void; p: string; fmt: boolean }[]).map(f => (
                 <div key={f.l}>
                   <label className={lbl}>{f.l}</label>
@@ -821,7 +823,7 @@ export default function MarketStressTest() {
                   { l: 'Прогноз переводов в РТ',      v: forecastRemitRT > 0 ? fmtNum(forecastRemitRT) + ' TJS' : '—', c: 'text-gray-800'  },
                   { l: 'Доля Алиф % (авт.)',          v: alifSharePct > 0    ? alifSharePct.toFixed(2) + '%'    : '—', c: 'text-blue-700'  },
                   { l: 'Маржа доходности % (авт.)',   v: marginPct > 0       ? marginPct.toFixed(4)    + '%'    : '—', c: 'text-blue-700'  },
-                  { l: 'Базовый доход H2',            v: baseIncomeH2 > 0    ? fmtNum(baseIncomeH2)    + ' TJS' : '—', c: 'text-green-700' },
+                  { l: 'Прогнозный доход (ост. период)', v: baseIncomeH2 > 0  ? fmtNum(baseIncomeH2)    + ' TJS' : '—', c: 'text-green-700' },
                 ].map(s => (
                   <div key={s.l} className="bg-gray-50 rounded-lg p-3">
                     <p className="text-[10px] text-gray-400 leading-tight mb-1">{s.l}</p>
@@ -860,7 +862,7 @@ export default function MarketStressTest() {
                 </div>
                 <div className="mt-3 pt-3 border-t border-blue-200">
                   <div className="flex justify-between text-xs">
-                    <span className="text-gray-500">Доход H2 (базовый):</span>
+                    <span className="text-gray-500">Прогнозный доход:</span>
                     <span className="font-bold text-blue-700">{baseIncomeH2 > 0 ? fmtNum(baseIncomeH2) + ' сом.' : '—'}</span>
                   </div>
                 </div>
@@ -895,7 +897,7 @@ export default function MarketStressTest() {
                     </div>
                     <div className={`mt-3 pt-3 border-t ${sc.sep} space-y-1.5`}>
                       <div className="flex justify-between text-xs">
-                        <span className="text-gray-500">Доход H2:</span>
+                        <span className="text-gray-500">Прогнозный доход:</span>
                         <span className={`font-bold ${sc.text}`}>{hasData ? fmtNum(inc) + ' сом.' : '—'}</span>
                       </div>
                       <div className="text-[10px] text-gray-400 leading-snug">
@@ -915,9 +917,9 @@ export default function MarketStressTest() {
 
           {/* What-If матрица */}
           <div className={card}>
-            <p className="text-base font-semibold text-gray-900 mb-1">What-If матрица — Доход Алиф за H2 (сомони)</p>
+            <p className="text-base font-semibold text-gray-900 mb-1">What-If матрица — Прогнозный доход Алиф (сомони)</p>
             <p className="text-xs text-gray-500 mb-4">
-              Доля Алиф: {alifSharePct > 0 ? alifSharePct.toFixed(2) + '%' : '—'} (авт.) · Маржа: {marginPct > 0 ? marginPct.toFixed(4) + '%' : '—'} (авт.) · Базовый доход H2: {baseIncomeH2 > 0 ? fmtNum(baseIncomeH2) + ' TJS' : '—'}
+              Доля Алиф: {alifSharePct > 0 ? alifSharePct.toFixed(2) + '%' : '—'} (авт.) · Маржа: {marginPct > 0 ? marginPct.toFixed(4) + '%' : '—'} (авт.) · Прогнозный доход: {baseIncomeH2 > 0 ? fmtNum(baseIncomeH2) + ' TJS' : '—'}
             </p>
             <div className="overflow-x-auto">
               <table className="w-full text-xs border-collapse">
