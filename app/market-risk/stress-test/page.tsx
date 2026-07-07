@@ -703,20 +703,30 @@ export default function MarketStressTest() {
                       <tr className="bg-gray-800 text-white">
                         <th className="px-3 py-2 text-left sticky left-0 bg-gray-800">Месяц</th>
                         <th className="px-3 py-2 text-right">Рег. капитал банка (TJS)</th>
+                        <th className="px-3 py-2 text-right">Прогнозный курс {currency}/TJS</th>
                       </tr>
                     </thead>
                     <tbody>
-                      {ofpMonthIdxs.map((mi, rowIdx) => (
-                        <tr key={mi} className={rowIdx % 2 === 0 ? 'bg-white' : 'bg-gray-50'}>
-                          <td className="px-3 py-1 font-semibold text-gray-700 sticky left-0 bg-inherit">{MONTH_LABELS[mi]}</td>
-                          <td className="px-1.5 py-1">
-                            <input type="text" value={regulCapMonthly[mi]}
-                              onChange={e => setRegulCapMonthly(updArr(regulCapMonthly, mi, fmtN(e.target.value)))}
-                              placeholder="0"
-                              className="w-full px-2 py-1 border border-gray-200 rounded text-right text-xs focus:outline-none focus:ring-1 focus:ring-[#1B8A4C] bg-white" />
-                          </td>
-                        </tr>
-                      ))}
+                      {ofpMonthIdxs.map((mi, rowIdx) => {
+                        const dailyDrift = parseFloat(mean)
+                        const forecastRate = (nbtStats && !isNaN(dailyDrift))
+                          ? nbtStats.current * Math.pow(1 + dailyDrift / 100, (rowIdx + 1) * 30)
+                          : null
+                        return (
+                          <tr key={mi} className={rowIdx % 2 === 0 ? 'bg-white' : 'bg-gray-50'}>
+                            <td className="px-3 py-1 font-semibold text-gray-700 sticky left-0 bg-inherit">{MONTH_LABELS[mi]}</td>
+                            <td className="px-1.5 py-1">
+                              <input type="text" value={regulCapMonthly[mi]}
+                                onChange={e => setRegulCapMonthly(updArr(regulCapMonthly, mi, fmtN(e.target.value)))}
+                                placeholder="0"
+                                className="w-full px-2 py-1 border border-gray-200 rounded text-right text-xs focus:outline-none focus:ring-1 focus:ring-[#1B8A4C] bg-white" />
+                            </td>
+                            <td className="px-3 py-1 text-right font-mono text-gray-700">
+                              {forecastRate !== null ? forecastRate.toFixed(4) : <span className="text-gray-300">—</span>}
+                            </td>
+                          </tr>
+                        )
+                      })}
                     </tbody>
                   </table>
                 </div>
