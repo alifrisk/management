@@ -3,7 +3,7 @@
 import { useState, useEffect, useCallback } from 'react'
 import { supabase } from '@/supabase/client'
 import { apiFetch } from '@/lib/api-fetch'
-import { Plus, FileText, Download, Eye, Trash2, X, Loader2, CheckCircle2, AlertCircle, Filter, Upload, Edit2 } from 'lucide-react'
+import { Plus, Download, Eye, Trash2, X, Loader2, CheckCircle2, AlertCircle, Filter, Edit2 } from 'lucide-react'
 
 interface Collateral { type: string; description: string; address?: string; value: number }
 
@@ -198,14 +198,7 @@ export default function CreditRiskPage() {
   const [tab, setTab] = useState(1)
   const [filterYear, setFilterYear] = useState('')
   const [filterMonth, setFilterMonth] = useState('')
-  const [inputMode, setInputMode] = useState<'manual' | 'image'>('manual')
-  const [imageFiles, setImageFiles] = useState<File[]>([])
-  const [extracting, setExtracting] = useState(false)
-  const [extractMsg, setExtractMsg] = useState<string | null>(null)
   const [coeffForm, setCoeffForm] = useState<Record<string, string>>(EMPTY_COEFF)
-  const [coeffImgFiles, setCoeffImgFiles] = useState<File[]>([])
-  const [extractingCoeff, setExtractingCoeff] = useState(false)
-  const [coeffMsg, setCoeffMsg] = useState<string | null>(null)
 
   const fetch_ = useCallback(async () => {
     setLoading(true)
@@ -466,9 +459,6 @@ export default function CreditRiskPage() {
     setEditingId(c.id)
     setEditingNumber(c.conclusion_number || null)
     setTab(1)
-    setInputMode('manual')
-    setImageFiles([])
-    setExtractMsg(null)
     setError(null)
     setShowModal(true)
   }
@@ -481,13 +471,8 @@ export default function CreditRiskPage() {
     setEditingId(null)
     setEditingNumber(null)
     setTab(1)
-    setInputMode('manual')
-    setImageFiles([])
-    setExtractMsg(null)
     setError(null)
     setCoeffForm(EMPTY_COEFF)
-    setCoeffImgFiles([])
-    setCoeffMsg(null)
   }
 
   async function handleGenerate() {
@@ -676,70 +661,6 @@ export default function CreditRiskPage() {
     } catch (err: unknown) {
       setError('Ошибка: ' + (err instanceof Error ? err.message : String(err)))
     } finally { setGenerating(false) }
-  }
-
-  async function handleExtract() {
-    if (imageFiles.length === 0) return
-    setExtracting(true); setExtractMsg(null)
-    try {
-      let merged: Record<string, string> = {}
-      for (let i = 0; i < imageFiles.length; i++) {
-        const file = imageFiles[i]
-        const base64 = await new Promise<string>((resolve, reject) => {
-          const reader = new FileReader()
-          reader.onload = e => resolve((e.target?.result as string).split(',')[1])
-          reader.onerror = reject
-          reader.readAsDataURL(file)
-        })
-        const res = await apiFetch('/api/extract-from-image', {
-          method: 'POST',
-          body: JSON.stringify({ imageBase64: base64, mimeType: file.type, module: 'credit' }),
-        })
-        const data = await res.json()
-        if (data.error) throw new Error(`Файл ${i + 1}: ${data.error}`)
-        const STRING_KEYS = ['p1_label', 'p2_label']
-        for (const [k, v] of Object.entries(data.data)) {
-          if (v !== null && v !== undefined && v !== 0) {
-            merged[k] = STRING_KEYS.includes(k) ? String(v) : String(Math.round(Number(v)))
-          }
-        }
-      }
-      setForm(prev => ({ ...prev, ...merged }))
-      setInputMode('manual')
-      setImageFiles([])
-      setExtractMsg(`Данные извлечены из ${imageFiles.length > 1 ? `${imageFiles.length} скриншотов` : 'скриншота'}. Проверьте и при необходимости исправьте.`)
-    } catch (err: unknown) {
-      setExtractMsg('Ошибка: ' + (err instanceof Error ? err.message : String(err)))
-    } finally { setExtracting(false) }
-  }
-
-  async function handleExtractCoeffs() {
-    if (coeffImgFiles.length === 0) return
-    setExtractingCoeff(true); setCoeffMsg(null)
-    try {
-      const file = coeffImgFiles[0]
-      const base64 = await new Promise<string>((resolve, reject) => {
-        const reader = new FileReader()
-        reader.onload = e => resolve((e.target?.result as string).split(',')[1])
-        reader.onerror = reject
-        reader.readAsDataURL(file)
-      })
-      const res = await apiFetch('/api/extract-from-image', {
-        method: 'POST',
-        body: JSON.stringify({ imageBase64: base64, mimeType: file.type, module: 'credit_coeff' }),
-      })
-      const data = await res.json()
-      if (data.error) throw new Error(data.error)
-      const merged: Record<string, string> = { ...coeffForm }
-      for (const [k, v] of Object.entries(data.data)) {
-        if (v !== null && v !== undefined) merged[k] = String(v)
-      }
-      setCoeffForm(merged)
-      setCoeffImgFiles([])
-      setCoeffMsg('Коэффициенты извлечены. Проверьте и при необходимости исправьте.')
-    } catch (err: unknown) {
-      setCoeffMsg('Ошибка: ' + (err instanceof Error ? err.message : String(err)))
-    } finally { setExtractingCoeff(false) }
   }
 
   async function downloadWord(c: CreditConclusion) {
@@ -1242,20 +1163,6 @@ export default function CreditRiskPage() {
               <button onClick={closeModal} className="text-gray-400 hover:text-gray-600"><X className="w-5 h-5" /></button>
             </div>
 
-            {/* Mode switcher */}
-            <div className="flex border-b border-gray-100 px-2 gap-0">
-              <button onClick={() => { setInputMode('manual'); setExtractMsg(null) }}
-                className={`px-4 py-2.5 text-xs font-semibold border-b-2 transition-colors flex items-center gap-1.5 ${inputMode === 'manual' ? 'border-[#1B8A4C] text-[#1B8A4C]' : 'border-transparent text-gray-400 hover:text-gray-600'}`}>
-                <FileText className="w-3.5 h-3.5" /> Ввести вручную
-              </button>
-              <button onClick={() => { setInputMode('image'); setExtractMsg(null) }}
-                className={`px-4 py-2.5 text-xs font-semibold border-b-2 transition-colors flex items-center gap-1.5 ${inputMode === 'image' ? 'border-[#1B8A4C] text-[#1B8A4C]' : 'border-transparent text-gray-400 hover:text-gray-600'}`}>
-                <Upload className="w-3.5 h-3.5" /> Загрузить скрин
-              </button>
-            </div>
-
-            {/* Tabs — only in manual mode */}
-            {inputMode === 'manual' && (
             <div className="flex border-b border-gray-100 px-2">
               {[{n:1,t:'Заёмщик'},{n:2,t:'Фин. коэф.'},{n:3,t:'Залог'},{n:4,t:'Концентрация'},{n:5,t:'Риск-аппетит'},{n:6,t:'Дополнение'}].map(({n:tn,t}) => (
                 <button key={tn} onClick={() => setTab(tn)}
@@ -1264,61 +1171,8 @@ export default function CreditRiskPage() {
                 </button>
               ))}
             </div>
-            )}
 
             <div className="flex-1 overflow-y-auto p-5">
-              {/* Image upload zone */}
-              {inputMode === 'image' && (
-                <div className="space-y-4">
-                  <p className="text-sm text-gray-600">Загрузите один или несколько скриншотов финансовой отчётности — баланс, ОПУ, кеш-флоу. AI извлечёт данные из всех изображений и заполнит форму.</p>
-                  <label className="block cursor-pointer">
-                    <div className={`border-2 border-dashed rounded-xl p-8 text-center transition-colors ${imageFiles.length > 0 ? 'border-[#1B8A4C] bg-green-50' : 'border-gray-200 hover:border-[#1B8A4C] hover:bg-gray-50'}`}>
-                      {imageFiles.length > 0 ? (
-                        <div className="space-y-3">
-                          <CheckCircle2 className="w-10 h-10 text-green-500 mx-auto" />
-                          <p className="text-sm font-medium text-gray-800">
-                            {imageFiles.length === 1 ? imageFiles[0].name : `${imageFiles.length} файла выбрано`}
-                          </p>
-                          <div className="flex flex-wrap gap-2 justify-center">
-                            {imageFiles.map((f, i) => (
-                              <span key={i} className="inline-flex items-center gap-1 px-2 py-1 bg-white border border-green-200 rounded-lg text-xs text-gray-600">
-                                <FileText className="w-3 h-3 text-green-500" />
-                                {f.name.length > 20 ? f.name.slice(0, 17) + '…' : f.name}
-                                <span className="text-gray-400">({(f.size / 1024).toFixed(0)}KB)</span>
-                              </span>
-                            ))}
-                          </div>
-                          <p className="text-xs text-gray-400">Нажмите чтобы изменить выбор</p>
-                        </div>
-                      ) : (
-                        <div className="space-y-2">
-                          <Upload className="w-10 h-10 text-gray-300 mx-auto" />
-                          <p className="text-sm font-medium text-gray-500">Нажмите или перетащите файлы</p>
-                          <p className="text-xs text-gray-400">PNG, JPG, WEBP · до 5 МБ каждый · можно выбрать несколько</p>
-                        </div>
-                      )}
-                    </div>
-                    <input type="file" accept="image/png,image/jpeg,image/webp" multiple className="hidden"
-                      onChange={e => { setImageFiles(Array.from(e.target.files || [])); setExtractMsg(null) }} />
-                  </label>
-                  {extractMsg && (
-                    <div className="flex items-center gap-2 p-3 bg-red-50 border border-red-100 rounded-lg">
-                      <AlertCircle className="w-4 h-4 text-red-500 flex-shrink-0" />
-                      <p className="text-sm text-red-600">{extractMsg}</p>
-                    </div>
-                  )}
-                </div>
-              )}
-
-              {/* Manual form */}
-              {inputMode === 'manual' && <>
-              {extractMsg && (
-                <div className="flex items-center gap-2 p-3 bg-green-50 border border-green-100 rounded-lg mb-4">
-                  <CheckCircle2 className="w-4 h-4 text-green-500 flex-shrink-0" />
-                  <p className="text-sm text-green-700 flex-1">{extractMsg}</p>
-                  <button onClick={() => setExtractMsg(null)}><X className="w-3.5 h-3.5 text-gray-400 hover:text-gray-600" /></button>
-                </div>
-              )}
               {error && <div className="flex items-center gap-2 p-3 bg-red-50 border border-red-100 rounded-lg mb-4"><AlertCircle className="w-4 h-4 text-red-500 flex-shrink-0" /><p className="text-sm text-red-600">{error}</p></div>}
 
               {/* Tab 1: Заёмщик */}
@@ -1427,144 +1281,78 @@ export default function CreditRiskPage() {
                 </div>
               )}
 
-              {/* Tab 2: Финансовые коэффициенты */}
+              {/* Tab 2: Финансовые коэффициенты — ручной ввод */}
               {tab === 2 && (
-                <div className="space-y-4">
-                  <div className="p-3 bg-blue-50 border border-blue-100 rounded-lg flex items-start gap-3">
-                    <Upload className="w-4 h-4 text-blue-500 flex-shrink-0 mt-0.5" />
-                    <div>
-                      <p className="text-xs text-blue-700 font-medium">Финансовые коэффициенты из скриншота</p>
-                      <p className="text-xs text-blue-500 mt-0.5">Загрузите скриншот(ы) финансовой отчётности через вкладку «Загрузить скрин» — AI автоматически извлечёт данные и рассчитает коэффициенты ниже.</p>
-                    </div>
-                  </div>
-                  {!hasFinData ? (
-                    <div className="flex flex-col items-center justify-center py-10 text-center gap-3">
-                      <FileText className="w-10 h-10 text-gray-200" />
-                      <p className="text-sm text-gray-400">Нет финансовых данных</p>
-                      <p className="text-xs text-gray-300">Используйте «Загрузить скрин» для автозаполнения</p>
-                    </div>
-                  ) : (
-                    <div className="overflow-hidden rounded-xl border border-gray-200">
-                      <table className="w-full text-xs">
-                        <thead>
-                          <tr className="bg-[#1B8A4C] text-white">
-                            <th className="text-left px-3 py-2 font-medium">Показатель</th>
-                            <th className="text-center px-3 py-2 font-medium">{form.p1_label || 'П1'}</th>
-                            <th className="text-center px-3 py-2 font-medium">{form.p2_label || 'П2'}</th>
-                            <th className="text-center px-3 py-2 font-medium">Норма</th>
-                            <th className="text-center px-3 py-2 font-medium">Статус</th>
-                          </tr>
-                        </thead>
-                        <tbody className="divide-y divide-gray-100">
-                          {[
-                            { label: 'Чистая выручка, TJS', v1: n('p1_net_rev') ? new Intl.NumberFormat('ru-RU').format(Math.round(n('p1_net_rev'))) : '—', v2: n('p2_net_rev') ? new Intl.NumberFormat('ru-RU').format(Math.round(n('p2_net_rev'))) : '—', norm: '—', ok: null },
-                            { label: 'Чистая прибыль, TJS', v1: new Intl.NumberFormat('ru-RU').format(Math.round(p1_net)), v2: new Intl.NumberFormat('ru-RU').format(Math.round(p2_net)), norm: '>0', ok: p2_net > 0 },
-                            { label: 'Ктл (текущая ликвидность)', v1: rv(p1_curr_ratio), v2: rv(p2_curr_ratio), norm: '>2.0', ok: isFinite(p2_curr_ratio) ? p2_curr_ratio > 2.0 : null },
-                            { label: 'Кбл (быстрая ликвидность)', v1: rv(p1_quick_ratio), v2: rv(p2_quick_ratio), norm: '>1.0', ok: isFinite(p2_quick_ratio) ? p2_quick_ratio > 1.0 : null },
-                            { label: 'ROA (рентабельность активов)', v1: pv(p1_roa), v2: pv(p2_roa), norm: '>6%', ok: isFinite(p2_roa) ? p2_roa > 6 : null },
-                            { label: 'ROE (рентабельность капитала)', v1: pv(p1_roe), v2: pv(p2_roe), norm: '>20%', ok: isFinite(p2_roe) ? p2_roe > 20 : null },
-                            { label: 'Кфин (леверидж Капитал/Долг)', v1: rv(p1_leverage), v2: rv(p2_leverage), norm: '≤0.5', ok: isFinite(p2_leverage) ? p2_leverage <= 0.5 : null },
-                            { label: 'Опер. ден. поток, TJS', v1: new Intl.NumberFormat('ru-RU').format(Math.round(p1_cf_net_op)), v2: new Intl.NumberFormat('ru-RU').format(Math.round(p2_cf_net_op)), norm: '>0', ok: p2_cf_net_op > 0 },
-                          ].map((row, i) => (
-                            <tr key={i} className="hover:bg-gray-50">
-                              <td className="px-3 py-2 text-gray-700 font-medium">{row.label}</td>
-                              <td className="px-3 py-2 text-center text-gray-600">{row.v1}</td>
-                              <td className="px-3 py-2 text-center text-gray-900 font-semibold">{row.v2}</td>
-                              <td className="px-3 py-2 text-center text-gray-400">{row.norm}</td>
-                              <td className="px-3 py-2 text-center">
-                                {row.ok === null ? <span className="text-gray-300">—</span> : row.ok ? <span className="text-green-600 font-bold">✓</span> : <span className="text-red-500 font-bold">✗</span>}
-                              </td>
-                            </tr>
-                          ))}
-                        </tbody>
-                      </table>
-                    </div>
-                  )}
-                </div>
-              )}
-
-              {/* Tab 2b: Таблица коэффициентов (прямой ввод / скрин) */}
-              {tab === 2 && (
-                <div className="space-y-4 border-t border-gray-100 pt-4 mt-2">
-                  <div className="p-3 bg-green-50 border border-green-100 rounded-lg">
-                    <p className="text-xs text-green-700 font-medium">Финансовые коэффициенты — прямой ввод или из скрина таблицы</p>
-                    <p className="text-xs text-green-600 mt-0.5">Заполните вручную или загрузите скриншот готовой таблицы коэффициентов. Эти данные появятся в заключении и Word-файле.</p>
-                  </div>
-
-                  {/* Скрин-загрузчик */}
-                  <div className="flex items-center gap-2">
-                    <label className="flex-1 cursor-pointer">
-                      <div className={`border-2 border-dashed rounded-lg p-2.5 text-center text-xs transition-colors ${coeffImgFiles.length > 0 ? 'border-green-400 bg-green-50 text-green-700' : 'border-gray-200 hover:border-green-400 text-gray-400'}`}>
-                        {coeffImgFiles.length > 0 ? `📎 ${coeffImgFiles[0].name}` : 'Загрузить скриншот таблицы коэффициентов'}
-                      </div>
-                      <input type="file" accept="image/*" className="hidden" onChange={e => setCoeffImgFiles(e.target.files ? [e.target.files[0]] : [])} />
-                    </label>
-                    <button onClick={handleExtractCoeffs} disabled={coeffImgFiles.length === 0 || extractingCoeff}
-                      className="px-3 py-2 bg-[#1B8A4C] text-white rounded-lg text-xs font-medium disabled:opacity-40 whitespace-nowrap">
-                      {extractingCoeff ? 'Извлечение...' : 'Извлечь'}
-                    </button>
-                  </div>
-                  {coeffMsg && <p className={`text-xs px-2 py-1 rounded ${coeffMsg.startsWith('Ошибка') ? 'bg-red-50 text-red-600' : 'bg-green-50 text-green-700'}`}>{coeffMsg}</p>}
-
-                  {/* Редактируемая таблица */}
+                <div className="space-y-3">
                   <div className="overflow-x-auto">
                     <table className="w-full text-xs border-collapse">
                       <thead>
                         <tr className="bg-[#1B8A4C] text-white">
-                          <th className="text-left px-2 py-1.5 font-medium">Показатель</th>
-                          <th className="text-center px-2 py-1.5 font-medium">
+                          <th className="text-left px-2 py-2 font-medium">Показатель</th>
+                          <th className="text-center px-2 py-2 font-medium w-28">
                             <input type="text" value={coeffForm.p1_label} onChange={e => setCoeffForm(p => ({ ...p, p1_label: e.target.value }))}
-                              placeholder="П1 (период)" className="w-24 px-1 py-0.5 bg-white/20 placeholder-white/60 text-white text-center text-xs border-b border-white/40 focus:outline-none" />
+                              placeholder="нач. периода" className="w-24 px-1 py-0.5 bg-white/20 placeholder-white/50 text-white text-center text-xs border-b border-white/40 focus:outline-none" />
                           </th>
-                          <th className="text-center px-2 py-1.5 font-medium">
+                          <th className="text-center px-2 py-2 font-medium w-28">
                             <input type="text" value={coeffForm.p2_label} onChange={e => setCoeffForm(p => ({ ...p, p2_label: e.target.value }))}
-                              placeholder="П2 (период)" className="w-24 px-1 py-0.5 bg-white/20 placeholder-white/60 text-white text-center text-xs border-b border-white/40 focus:outline-none" />
+                              placeholder="отч. период" className="w-24 px-1 py-0.5 bg-white/20 placeholder-white/50 text-white text-center text-xs border-b border-white/40 focus:outline-none" />
                           </th>
-                          <th className="text-center px-2 py-1.5 font-medium">Норма</th>
+                          <th className="text-center px-2 py-2 font-medium w-24">Норма</th>
+                          <th className="text-center px-2 py-2 font-medium w-24">Соответствует</th>
+                          <th className="text-left px-2 py-2 font-medium hidden lg:table-cell">Обозначение</th>
                         </tr>
                       </thead>
                       <tbody className="divide-y divide-gray-100">
                         {([
                           { cat: 'Показатели ликвидности', rows: [
-                            { key: 'ctl', label: 'Коэффициент текущей ликвидности (Ктл)', norm: '>2.0 (>200%)' },
-                            { key: 'kbl', label: 'Коэффициент быстрой ликвидности (Кбл)', norm: '>1.0 (>100%)' },
+                            { key: 'ctl', label: 'Коэффициент текущей ликвидности', norm: '>2.0 (>200%)', hasP1: true, oboz: 'Оборотные активы / КО', check: (v: number) => v > 2.0 },
+                            { key: 'kbl', label: 'Коэффициент быстрой ликвидности', norm: '>1.0 (>100%)', hasP1: true, oboz: '(Ден.ср. + Деб.) / КО', check: (v: number) => v > 1.0 },
                           ]},
                           { cat: 'Показатели рентабельности', rows: [
-                            { key: 'roa', label: 'Рентабельность активов (ROA), %', norm: '>6' },
-                            { key: 'roe', label: 'Рентабельность собственных средств (ROE), %', norm: '>20' },
+                            { key: 'roa', label: 'Рентабельность активов (ROA), %', norm: '>6%', hasP1: true, oboz: 'Прибыль / Активы × 100%', check: (v: number) => v > 6 },
+                            { key: 'roe', label: 'Рентабельность собственных средств (ROE), %', norm: '>20%', hasP1: true, oboz: 'Прибыль / СК × 100%', check: (v: number) => v > 20 },
                           ]},
                           { cat: 'Показатели финансовой устойчивости', rows: [
-                            { key: 'kfin', label: 'Коэффициент финансирования/левериджа (Кфин)', norm: '>0.5' },
+                            { key: 'kfin', label: 'Коэффициент финансирования (левериджа)', norm: '>0.5', hasP1: false, oboz: 'СК / Заёмный капитал', check: (v: number) => v > 0.5 },
                           ]},
                           { cat: 'Показатели кредитоспособности', rows: [
-                            { key: 'dscr', label: 'Коэффициент покрытия долга (DSCR)', norm: '>1.0' },
-                            { key: 'coll_cov', label: 'Коэффициент покрытия залогом, %', norm: '>120' },
+                            { key: 'dscr', label: 'Коэффициент покрытия долга (DSCR)', norm: '>1.0', hasP1: false, oboz: 'Опер. поток / Долг. сервис', check: (v: number) => v > 1.0 },
+                            { key: 'coll_cov', label: 'Коэффициент покрытия залогом, %', norm: '>120%', hasP1: false, oboz: 'Залог / Кредит × 100%', check: (v: number) => v > 120 },
                           ]},
-                        ] as { cat: string; rows: { key: string; label: string; norm: string }[] }[]).flatMap(g => [
+                        ] as { cat: string; rows: { key: string; label: string; norm: string; hasP1: boolean; oboz: string; check: (v: number) => boolean }[] }[]).flatMap(g => [
                           <tr key={g.cat} className="bg-gray-100 border-t border-gray-200">
-                            <td colSpan={4} className="px-2 py-1 text-[10px] font-bold text-gray-500 uppercase tracking-wide">{g.cat}</td>
+                            <td colSpan={6} className="px-2 py-1 text-[10px] font-bold text-gray-500 uppercase tracking-wide">{g.cat}</td>
                           </tr>,
-                          ...g.rows.map((row, i) => (
-                            <tr key={row.key} className={i % 2 === 0 ? 'bg-white' : 'bg-gray-50'}>
-                              <td className="px-2 py-1 text-gray-700">{row.label}</td>
-                              {(['p1', 'p2'] as const).map(p => (
-                                <td key={p} className="px-1 py-0.5">
-                                  <input type="text" inputMode="decimal"
-                                    value={coeffForm[`${row.key}_${p}`] ?? ''}
-                                    onChange={e => setCoeffForm(prev => ({ ...prev, [`${row.key}_${p}`]: e.target.value }))}
-                                    placeholder="—"
-                                    className="w-full px-1.5 py-0.5 border border-gray-200 rounded text-right text-xs focus:outline-none focus:ring-1 focus:ring-[#1B8A4C] bg-white" />
+                          ...g.rows.map((row, i) => {
+                            const v2Raw = coeffForm[`${row.key}_p2`]
+                            const v2 = v2Raw !== '' && v2Raw != null ? parseFloat(v2Raw) : NaN
+                            const meetsEl = isNaN(v2)
+                              ? <span className="text-gray-300 text-[11px]">—</span>
+                              : row.check(v2)
+                                ? <span className="text-green-600 font-bold text-[11px]">Да</span>
+                                : <span className="text-red-500 font-bold text-[11px]">Нет</span>
+                            return (
+                              <tr key={row.key} className={i % 2 === 0 ? 'bg-white' : 'bg-gray-50'}>
+                                <td className="px-2 py-1 text-gray-700">{row.label}</td>
+                                <td className="px-1 py-0.5">
+                                  {row.hasP1
+                                    ? <input type="text" inputMode="decimal" value={coeffForm[`${row.key}_p1`] ?? ''} onChange={e => setCoeffForm(prev => ({ ...prev, [`${row.key}_p1`]: e.target.value }))} placeholder="—" className="w-full px-1.5 py-0.5 border border-gray-200 rounded text-right text-xs focus:outline-none focus:ring-1 focus:ring-[#1B8A4C] bg-white" />
+                                    : <span className="block text-center text-gray-300">—</span>}
                                 </td>
-                              ))}
-                              <td className="px-2 py-1 text-center text-gray-400">{row.norm}</td>
-                            </tr>
-                          )),
+                                <td className="px-1 py-0.5">
+                                  <input type="text" inputMode="decimal" value={coeffForm[`${row.key}_p2`] ?? ''} onChange={e => setCoeffForm(prev => ({ ...prev, [`${row.key}_p2`]: e.target.value }))} placeholder="—" className="w-full px-1.5 py-0.5 border border-gray-200 rounded text-right text-xs focus:outline-none focus:ring-1 focus:ring-[#1B8A4C] bg-white" />
+                                </td>
+                                <td className="px-2 py-1 text-center text-gray-400 text-[10px]">{row.norm}</td>
+                                <td className="px-2 py-1 text-center">{meetsEl}</td>
+                                <td className="px-2 py-1 text-gray-400 text-[10px] hidden lg:table-cell">{row.oboz}</td>
+                              </tr>
+                            )
+                          }),
                         ])}
                       </tbody>
                     </table>
                   </div>
-                  <button onClick={() => { setCoeffForm(EMPTY_COEFF); setCoeffMsg(null) }}
-                    className="text-xs text-gray-400 hover:text-red-500">Очистить коэффициенты</button>
+                  <button onClick={() => setCoeffForm(EMPTY_COEFF)} className="text-xs text-gray-400 hover:text-red-500">Очистить</button>
                 </div>
               )}
 
@@ -1873,38 +1661,21 @@ export default function CreditRiskPage() {
                   </div>
                 </div>
               )}
-              </>}
             </div>
 
             <div className="flex items-center justify-between p-5 border-t border-gray-100">
-              {inputMode === 'image' ? (
-                <>
-                  <div />
-                  <div className="flex gap-2">
-                    <button onClick={() => { setShowModal(false); setForm(EMPTY); setInputMode('manual'); setImageFiles([]); setExtractMsg(null) }}
-                      className="px-4 py-2 border border-gray-200 rounded-lg text-sm text-gray-600 hover:bg-gray-50">Отмена</button>
-                    <button onClick={handleExtract} disabled={imageFiles.length === 0 || extracting}
-                      className="flex items-center gap-2 px-4 py-2 bg-[#1B8A4C] text-white rounded-lg text-sm font-medium hover:bg-[#177040] disabled:opacity-50">
-                      {extracting
-                        ? <><Loader2 className="w-4 h-4 animate-spin" /> Извлечение...</>
-                        : <><Upload className="w-4 h-4" /> Извлечь данные{imageFiles.length > 1 ? ` (${imageFiles.length})` : ''}</>}
-                    </button>
-                  </div>
-                </>
-              ) : (
-                <>
-                  <div>{tab > 1 && <button onClick={() => setTab(tab-1)} className="px-4 py-2 border border-gray-200 rounded-lg text-sm text-gray-600 hover:bg-gray-50">← Назад</button>}</div>
-                  <div className="flex gap-2">
-                    <button onClick={() => { setShowModal(false); setForm(EMPTY); setInputMode('manual'); setImageFiles([]); setExtractMsg(null) }}
-                      className="px-4 py-2 border border-gray-200 rounded-lg text-sm text-gray-600 hover:bg-gray-50">Отмена</button>
-                    {tab < 6
-                      ? <button onClick={() => setTab(tab+1)} className="px-4 py-2 bg-[#1B8A4C] text-white rounded-lg text-sm font-medium hover:bg-[#177040]">Далее →</button>
-                      : <button onClick={handleGenerate} disabled={generating} className="flex items-center gap-2 px-4 py-2 bg-[#1B8A4C] text-white rounded-lg text-sm font-medium hover:bg-[#177040] disabled:opacity-70">
-                          {generating ? <><Loader2 className="w-4 h-4 animate-spin" /> AI анализирует...</> : <><CheckCircle2 className="w-4 h-4" /> {editingId ? 'Перегенерировать' : 'Сгенерировать'}</>}
-                        </button>}
-                  </div>
-                </>
-              )}
+              <>
+                <div>{tab > 1 && <button onClick={() => setTab(tab-1)} className="px-4 py-2 border border-gray-200 rounded-lg text-sm text-gray-600 hover:bg-gray-50">← Назад</button>}</div>
+                <div className="flex gap-2">
+                  <button onClick={() => { setShowModal(false); setForm(EMPTY) }}
+                    className="px-4 py-2 border border-gray-200 rounded-lg text-sm text-gray-600 hover:bg-gray-50">Отмена</button>
+                  {tab < 6
+                    ? <button onClick={() => setTab(tab+1)} className="px-4 py-2 bg-[#1B8A4C] text-white rounded-lg text-sm font-medium hover:bg-[#177040]">Далее →</button>
+                    : <button onClick={handleGenerate} disabled={generating} className="flex items-center gap-2 px-4 py-2 bg-[#1B8A4C] text-white rounded-lg text-sm font-medium hover:bg-[#177040] disabled:opacity-70">
+                        {generating ? <><Loader2 className="w-4 h-4 animate-spin" /> AI анализирует...</> : <><CheckCircle2 className="w-4 h-4" /> {editingId ? 'Перегенерировать' : 'Сгенерировать'}</>}
+                      </button>}
+                </div>
+              </>
             </div>
           </div>
         </div>
