@@ -11,6 +11,52 @@ export interface NewsItem {
   isoDate: string
   category: NewsCategory
   summary?: string
+  isCounterparty?: boolean
+}
+
+// ── Банки-контрагенты Алиф Банка ─────────────────────────────────────────────
+const COUNTERPARTY_KEYWORDS = [
+  // Российские
+  'Сбербанк', 'Сбер', 'Sberbank', 'СберБанк',
+  'Tinkoff', 'Тинькофф', 'Т-Банк', 'T-Bank',
+  'Транскапиталбанк', 'ТКБ Банк', 'TKB Bank',
+  'МТС Банк', 'МТС-Банк', 'MTS Bank',
+  'Москоммерцбанк', 'Moskommertsbank',
+  'Цифра банк', 'Tsifra Bank',
+  'Банк 131', 'Bank 131',
+  'Солид Банк', 'Солидбанк', 'Solid Bank',
+  // Таджикские
+  'Банк Эсхата', 'Эсхата', 'Eskhata',
+  'Спитамен Банк', 'Спитаменбанк', 'Spitamen Bank',
+  'Азия-Инвест Банк', 'Азия Инвест', 'Asia Invest Bank',
+  'Универсал банк', 'АКБ Универсал', 'Universal Bank',
+  // Кыргызские
+  'Бакай Банк', 'Бакайбанк', 'Bakai Bank',
+  // Белорусские
+  'Паритетбанк', 'Паритет Банк', 'Paritetbank',
+  'МТБанк', 'МТ Банк', 'MTBank',
+  'Технобанк', 'Technobank',
+  'Белорусский народный банк', 'БНБ-Банк', 'BNB Bank',
+  // Казахские
+  'Банк ЦентрКредит', 'ЦентрКредит', 'Bank CenterCredit', 'CenterCredit',
+  // Международные
+  'Bank of Georgia', 'Банк Грузии',
+  'Ardshinbank', 'Ардшинбанк',
+  'Mashreqbank', 'Машрекбанк', 'Mashreq',
+  'Agricultural Bank of China', 'AgriBank', 'Агробанк Китая',
+  'Chouzhou Commercial Bank', 'Чжоушан банк',
+  'Arab Banking Corporation', 'ABC Bank',
+  'Aktif Yatirim', 'Aktif Bank',
+  'Asakabank', 'Асакабанк',
+]
+
+const COUNTERPARTY_PATTERNS: RegExp[] = COUNTERPARTY_KEYWORDS.map(kw => {
+  const escaped = kw.replace(/[.*+?^${}()|[\]\\]/g, '\\$&').replace(/[\s\-]+/g, '[\\s\\-]+')
+  return new RegExp(`(?<![a-zA-Zа-яёА-ЯЁ0-9])${escaped}(?![a-zA-Zа-яёА-ЯЁ0-9])`, 'i')
+})
+
+function matchesCounterparty(text: string): boolean {
+  return COUNTERPARTY_PATTERNS.some(re => re.test(text))
 }
 
 // financeOnly: true → источник публикует ТОЛЬКО финансовые/деловые новости,
@@ -177,18 +223,23 @@ export async function GET() {
           const title = item.title?.trim() || ''
           if (!title) continue
 
-          // Для общеновостных источников — строгий фильтр по заголовку.
-          // Для финансово-специализированных — пропускаем все статьи.
-          if (!financeOnly) {
-            const { pass, matchedBy } = matchesFinanceTitle(title)
-            console.log(`[NEWS] ${pass ? `PASS via ${matchedBy}` : 'SKIP            '} [${source}] ${title.slice(0, 90)}`)
-            if (!pass) continue
-          }
-
           const rawDesc: string = (item as unknown as Record<string, unknown>).rawDesc as string || ''
           const descText = rawDesc
             ? rawDesc.replace(/<[^>]+>/g, '').trim().slice(0, 400)
             : (item.contentSnippet || '').slice(0, 400)
+
+          const isCounterparty = matchesCounterparty(title) || matchesCounterparty(descText)
+
+          // Для общеновостных источников — строгий фильтр по заголовку.
+          // Для финансово-специализированных — пропускаем все статьи.
+          // Контрагентные новости всегда проходят независимо от финансового фильтра.
+          if (!financeOnly && !isCounterparty) {
+            const { pass, matchedBy } = matchesFinanceTitle(title)
+            console.log(`[NEWS] ${pass ? `PASS via ${matchedBy}` : 'SKIP            '} [${source}] ${title.slice(0, 90)}`)
+            if (!pass) continue
+          } else if (!financeOnly && isCounterparty) {
+            console.log(`[NEWS] PASS via COUNTERPARTY [${source}] ${title.slice(0, 90)}`)
+          }
 
           const iso = item.isoDate || item.pubDate || ''
           all.push({
@@ -201,6 +252,7 @@ export async function GET() {
             isoDate: iso,
             category,
             summary: descText.slice(0, 220) || undefined,
+            isCounterparty,
           })
         }
       } catch {

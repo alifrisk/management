@@ -3,13 +3,14 @@ import { useState, useEffect } from 'react'
 import { ExternalLink, RefreshCw, Newspaper } from 'lucide-react'
 import type { NewsItem, NewsCategory } from '@/app/api/news/route'
 
-type FilterTab = 'all' | NewsCategory
+type FilterTab = 'all' | NewsCategory | 'counterparties'
 
 const TABS: { id: FilterTab; label: string }[] = [
-  { id: 'all',   label: 'Все' },
-  { id: 'tj',    label: 'Таджикистан' },
-  { id: 'cis',   label: 'СНГ' },
-  { id: 'world', label: 'Мир' },
+  { id: 'all',            label: 'Все' },
+  { id: 'tj',             label: 'Таджикистан' },
+  { id: 'cis',            label: 'СНГ' },
+  { id: 'world',          label: 'Мир' },
+  { id: 'counterparties', label: 'Контрагенты' },
 ]
 
 const CAT_BADGE: Record<NewsCategory, string> = {
@@ -77,7 +78,11 @@ export default function NewsBlock() {
 
   function switchTab(t: FilterTab) { setTab(t); setVisible(PAGE_SIZE) }
 
-  const filtered = tab === 'all' ? all : all.filter(n => n.category === tab)
+  const filtered = tab === 'counterparties'
+    ? all.filter(n => n.isCounterparty)
+    : tab === 'all'
+    ? all
+    : all.filter(n => n.category === tab)
   const lead     = filtered[0]
   const rest     = filtered.slice(1, visible)
   const hasMore  = visible < filtered.length
@@ -162,6 +167,11 @@ export default function NewsBlock() {
                 <span className={`text-[10px] font-semibold px-2 py-0.5 rounded-full ${CAT_BADGE[lead.category]}`}>
                   {CAT_LABEL[lead.category]}
                 </span>
+                {lead.isCounterparty && (
+                  <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-amber-100 text-amber-700">
+                    Контрагент
+                  </span>
+                )}
                 <span className={`text-[10px] font-medium px-2 py-0.5 rounded-full ${srcBadge(lead.source)}`}>
                   {lead.source}
                 </span>
@@ -196,6 +206,11 @@ export default function NewsBlock() {
                     <span className={`text-[9px] font-semibold px-1.5 py-0.5 rounded-full ${CAT_BADGE[item.category]}`}>
                       {CAT_LABEL[item.category]}
                     </span>
+                    {item.isCounterparty && (
+                      <span className="text-[9px] font-semibold px-1.5 py-0.5 rounded-full bg-amber-100 text-amber-700">
+                        Контрагент
+                      </span>
+                    )}
                     <span className={`text-[9px] font-medium px-1.5 py-0.5 rounded-full ${srcBadge(item.source)}`}>
                       {item.source}
                     </span>
