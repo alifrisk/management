@@ -950,21 +950,22 @@ export default function CreditRiskPage() {
                   <p className="text-xs font-bold text-gray-500 uppercase tracking-wide border-b border-gray-100 pb-1 mb-3">5. Риск-аппетит</p>
                   <div className="space-y-3">
                     {/* PAR30 МСБ */}
-                    {viewing.current_msb_par30_pct != null && viewing.sme_sector_portfolio && viewing.loan_amount ? (() => {
-                      const vRate = viewing.loan_currency !== 'TJS' ? (viewing.exchange_rate || 1) : 1
-                      const delta = viewing.loan_amount * vRate / viewing.sme_sector_portfolio * 100
-                      const after = (viewing.current_msb_par30_pct || 0) + delta
-                      const vio   = viewing.ra_msb_par30_limit && after > viewing.ra_msb_par30_limit
+                    {viewing.current_msb_par30_pct != null ? (() => {
+                      const vRate   = viewing.loan_currency !== 'TJS' ? (viewing.exchange_rate || 1) : 1
+                      const hasSme  = !!(viewing.sme_sector_portfolio && viewing.loan_amount)
+                      const delta   = hasSme ? (viewing.loan_amount! * vRate / viewing.sme_sector_portfolio! * 100) : null
+                      const after   = delta !== null ? (viewing.current_msb_par30_pct || 0) + delta : null
+                      const vio     = !!(viewing.ra_msb_par30_limit && after !== null && after > viewing.ra_msb_par30_limit)
                       return (
                         <div className={`p-3 rounded-xl border-2 ${vio ? 'bg-red-50 border-red-300' : 'bg-green-50 border-green-300'}`}>
                           <p className="text-xs font-semibold text-gray-600">PAR30 МСБ-портфеля</p>
                           <p className="text-[10px] text-blue-500 mb-2">Информационно — не является критерием вердикта</p>
                           <div className="grid grid-cols-3 gap-2 text-xs text-center">
                             <div><p className="text-gray-400">Сейчас</p><p className="font-bold text-lg">{viewing.current_msb_par30_pct.toFixed(2)}%</p></div>
-                            <div><p className="text-gray-400">Прирост</p><p className="font-bold text-lg text-orange-600">+{delta.toFixed(2)}%</p></div>
-                            <div><p className="text-gray-400">После</p><p className={`font-bold text-lg ${vio ? 'text-red-700' : 'text-green-700'}`}>{after.toFixed(2)}%</p></div>
+                            <div><p className="text-gray-400">Прирост</p><p className="font-bold text-lg text-orange-600">{delta !== null ? `+${delta.toFixed(2)}%` : '—'}</p></div>
+                            <div><p className="text-gray-400">После</p><p className={`font-bold text-lg ${vio ? 'text-red-700' : 'text-green-700'}`}>{after !== null ? `${after.toFixed(2)}%` : '—'}</p></div>
                           </div>
-                          {viewing.ra_msb_par30_limit && (
+                          {viewing.ra_msb_par30_limit && after !== null && (
                             <p className={`text-xs font-bold mt-2 ${vio ? 'text-red-700' : 'text-green-700'}`}>
                               {vio ? `❌ Нарушает лимит МСБ ${viewing.ra_msb_par30_limit}%` : `✅ В пределах лимита МСБ ${viewing.ra_msb_par30_limit}%`}
                             </p>
