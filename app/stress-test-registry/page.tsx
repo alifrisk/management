@@ -92,9 +92,219 @@ function ScenarioCard({ scenKey, scenData }: { scenKey: string; scenData: Record
   )
 }
 
+// ── Market risk: FX-effect table ───────────────────────────────────────────
+const regFmt = new Intl.NumberFormat('ru-RU')
+
+type FxScenarioData = {
+  cvar_pct: number; total_short: number; total_long: number
+  rows: Array<{ month: string; reg_cap: number; open_pos: number; fx_shock_pct: number; pnl_short: number; pnl_long: number }>
+}
+
+function FxEffectBlock({ data }: { data: Record<string, unknown> }) {
+  const period    = String(data.period    || '—')
+  const posLimPct = Number(data.pos_limit_pct || 0)
+  const scenarios: Array<{ label: string; hdrBg: string; sc: FxScenarioData }> = []
+  if (data.pessimistic)  scenarios.push({ label: 'Пессимистичный (CVaR95)',  hdrBg: 'bg-yellow-600', sc: data.pessimistic  as FxScenarioData })
+  if (data.catastrophic) scenarios.push({ label: 'Катастрофический (CVaR99)', hdrBg: 'bg-red-700',    sc: data.catastrophic as FxScenarioData })
+
+  return (
+    <div>
+      <h4 className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-1">
+        Эффект на прибыль — Открытая валютная позиция
+      </h4>
+      <p className="text-[11px] text-gray-400 mb-3">Период: {period} · Лимит ОВП: {posLimPct}%</p>
+      <div className="space-y-3">
+        {scenarios.map(({ label, hdrBg, sc }) => (
+          <div key={label} className="rounded-xl overflow-hidden border border-gray-200">
+            <div className={`${hdrBg} px-3 py-1.5 flex items-center justify-between`}>
+              <span className="text-white text-xs font-semibold">{label} — FX шок {sc.cvar_pct}%</span>
+            </div>
+            <div className="overflow-x-auto">
+              <table className="w-full text-[11px]">
+                <thead>
+                  <tr className="bg-gray-50 text-gray-500">
+                    {['Месяц','Рег. капитал','ОВП','FX шок%','P&L SHORT','P&L LONG'].map(h => (
+                      <th key={h} className="px-3 py-1.5 text-right first:text-left font-medium whitespace-nowrap">{h}</th>
+                    ))}
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-gray-100">
+                  {sc.rows.map((row, i) => (
+                    <tr key={i} className="bg-white">
+                      <td className="px-3 py-1.5 font-semibold text-gray-700">{row.month}</td>
+                      <td className="px-3 py-1.5 text-right text-gray-600">{row.reg_cap > 0 ? regFmt.format(row.reg_cap) : '—'}</td>
+                      <td className="px-3 py-1.5 text-right text-gray-800 font-medium">{row.open_pos > 0 ? regFmt.format(row.open_pos) : '—'}</td>
+                      <td className="px-3 py-1.5 text-right text-gray-500">{row.fx_shock_pct.toFixed(2)}%</td>
+                      <td className="px-3 py-1.5 text-right font-semibold text-red-600">{row.open_pos > 0 ? `−${regFmt.format(Math.abs(row.pnl_short))}` : '—'}</td>
+                      <td className="px-3 py-1.5 text-right font-semibold text-green-600">{row.open_pos > 0 ? `+${regFmt.format(row.pnl_long)}` : '—'}</td>
+                    </tr>
+                  ))}
+                </tbody>
+                <tfoot>
+                  <tr className="bg-gray-800">
+                    <td colSpan={4} className="px-3 py-2 text-xs font-semibold text-gray-300">Total Effect</td>
+                    <td className="px-3 py-2 text-right text-xs font-bold text-red-300">
+                      {sc.total_short < 0 ? `−${regFmt.format(Math.abs(sc.total_short))}` : '—'}
+                    </td>
+                    <td className="px-3 py-2 text-right text-xs font-bold text-green-300">
+                      {sc.total_long > 0 ? `+${regFmt.format(sc.total_long)}` : '—'}
+                    </td>
+                  </tr>
+                </tfoot>
+              </table>
+            </div>
+          </div>
+        ))}
+      </div>
+    </div>
+  )
+}
+
+// ── Market risk: Monte Carlo block ──────────────────────────────────────────
+function MonteCarloBlock({ data }: { data: Record<string, unknown> }) {
+  const rows: [string, string][] = [
+    ['Валюта',                    String(data.currency || '—')],
+    ['Среднее μ (%)',             data.mean     != null ? `${data.mean}%`     : '—'],
+    ['Откл. σ (%)',               data.std_dev  != null ? `${data.std_dev}%`  : '—'],
+    ['Горизонт (дней)',           data.horizon_days != null ? String(data.horizon_days) : '—'],
+    ['VaR 95% (ист.)',            data.var95_hist  != null ? `${data.var95_hist}%`  : '—'],
+    ['VaR 99% (ист.)',            data.var99_hist  != null ? `${data.var99_hist}%`  : '—'],
+    ['CVaR 95%',                  data.cvar95      != null ? `${data.cvar95}%`      : '—'],
+    ['CVaR 99%',                  data.cvar99      != null ? `${data.cvar99}%`      : '—'],
+    ['Ожидаемое (%)',             data.expected    != null ? `${data.expected}%`    : '—'],
+    ['Медиана (%)',               data.median      != null ? `${data.median}%`      : '—'],
+    ['Вер-ть укрепления (%)',     data.appreciation_pct != null ? `${data.appreciation_pct}%` : '—'],
+    ['Вер-ть ослабления (%)',     data.depreciation_pct != null ? `${data.depreciation_pct}%` : '—'],
+  ]
+  return (
+    <div>
+      <h4 className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-2">
+        Monte Carlo — Методологическая база
+      </h4>
+      <div className="bg-gray-50 rounded-xl p-3 grid grid-cols-2 gap-x-4 gap-y-1.5">
+        {rows.map(([label, value]) => (
+          <div key={label} className="flex flex-col">
+            <span className="text-[10px] text-gray-400 uppercase tracking-wide">{label}</span>
+            <span className="text-sm font-semibold text-gray-800">{value}</span>
+          </div>
+        ))}
+      </div>
+    </div>
+  )
+}
+
+// ── Market risk: Model 2 block ──────────────────────────────────────────────
+function Model2Block({ data }: { data: Record<string, unknown> }) {
+  const fmtTJS = (n: unknown) => n != null && Number(n) > 0 ? regFmt.format(Number(n)) + ' TJS' : '—'
+  const fmtPct = (n: unknown) => n != null ? Number(n).toFixed(2) + '%' : '—'
+
+  type ScData = { gdp_growth_pct: number; remit_share_pct: number; forecast_income: number; delta: number }
+  const pess = data.scenario_pessimistic  as ScData | undefined
+  const cat  = data.scenario_catastrophic as ScData | undefined
+
+  const baseRows: [string, string][] = [
+    ['ВВП базового периода',         fmtTJS(data.gdp_base)],
+    ['Прогноз роста ВВП',            fmtPct(data.gdp_growth_pct)],
+    ['Доля переводов в ВВП',         fmtPct(data.remit_share_pct)],
+    ['Бюджет переводов Банка',       fmtTJS(data.bank_budget)],
+    ['Доля Банка (авт.)',            fmtPct(data.bank_share_pct)],
+    ['Маржа (авт.)',                 Number(data.margin_pct || 0).toFixed(4) + '%'],
+    ['Ожидаемый ВВП',                fmtTJS(data.expected_gdp)],
+    ['Прогноз переводов в РТ',       fmtTJS(data.forecast_remit_rt)],
+    ['Прогнозный доход (ост. пер.)', fmtTJS(data.forecast_income_h2)],
+    ['Факт. объём переводов H1',     fmtTJS(data.actual_vol_h1)],
+    ['Факт. доход от переводов H1',  fmtTJS(data.actual_income_h1)],
+  ]
+
+  return (
+    <div>
+      <h4 className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-2">
+        Модель 2 — Каскадная модель денежных переводов
+      </h4>
+      <div className="bg-gray-50 rounded-xl p-3 space-y-1.5 mb-3">
+        {baseRows.filter(([, v]) => v !== '—').map(([label, value]) => (
+          <div key={label} className="flex items-baseline gap-2">
+            <span className="text-[11px] text-gray-400 shrink-0 w-52 truncate">{label}</span>
+            <span className="text-xs font-medium text-gray-800">{value}</span>
+          </div>
+        ))}
+      </div>
+      {(pess || cat) && (
+        <div className="grid grid-cols-2 gap-2">
+          {pess && (
+            <div className="rounded-xl border-2 border-yellow-200 bg-yellow-50 p-3">
+              <p className="text-xs font-bold text-yellow-700 mb-2">📉 Пессимистичный</p>
+              {([['Рост ВВП', fmtPct(pess.gdp_growth_pct)],['Доля переводов', fmtPct(pess.remit_share_pct)],['Прогнозный доход', fmtTJS(pess.forecast_income)],['Эффект (δ)', (pess.delta >= 0 ? '+' : '') + fmtTJS(pess.delta)]] as [string,string][]).map(([l,v]) => (
+                <div key={l} className="flex justify-between text-[11px] mb-1">
+                  <span className="text-gray-500">{l}</span>
+                  <span className={`font-semibold ${l === 'Эффект (δ)' ? (pess.delta >= 0 ? 'text-green-700' : 'text-red-700') : 'text-yellow-700'}`}>{v}</span>
+                </div>
+              ))}
+            </div>
+          )}
+          {cat && (
+            <div className="rounded-xl border-2 border-red-200 bg-red-50 p-3">
+              <p className="text-xs font-bold text-red-700 mb-2">⚠️ Катастрофический</p>
+              {([['Рост ВВП', fmtPct(cat.gdp_growth_pct)],['Доля переводов', fmtPct(cat.remit_share_pct)],['Прогнозный доход', fmtTJS(cat.forecast_income)],['Эффект (δ)', (cat.delta >= 0 ? '+' : '') + fmtTJS(cat.delta)]] as [string,string][]).map(([l,v]) => (
+                <div key={l} className="flex justify-between text-[11px] mb-1">
+                  <span className="text-gray-500">{l}</span>
+                  <span className={`font-semibold ${l === 'Эффект (δ)' ? (cat.delta >= 0 ? 'text-green-700' : 'text-red-700') : 'text-red-700'}`}>{v}</span>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
+    </div>
+  )
+}
+
+// ── Market risk: combined results block (new 3-block format + old flat compat) ──
+function MarketRiskResultsBlock({ data }: { data: Record<string, unknown> }) {
+  const isNewFormat = 'fx_effect' in data || 'monte_carlo' in data || 'model2' in data
+
+  if (!isNewFormat) {
+    // Backward compatibility: old flat format (var95_hist, cvar95, etc.)
+    const entries = Object.entries(data).filter(([, v]) => v !== null && v !== undefined)
+    return (
+      <div>
+        <h4 className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-2">Результаты</h4>
+        <div className="bg-gray-50 rounded-xl p-3 grid grid-cols-2 gap-x-4 gap-y-1.5">
+          {entries.map(([k, v]) => (
+            <div key={k} className="flex flex-col">
+              <span className="text-[10px] text-gray-400 uppercase tracking-wide">{labelField(k)}</span>
+              <span className="text-sm font-semibold text-gray-800">{formatFieldValue(k, v)}</span>
+            </div>
+          ))}
+        </div>
+      </div>
+    )
+  }
+
+  const fxEffect   = data.fx_effect   as Record<string, unknown> | null
+  const monteCarlo = data.monte_carlo as Record<string, unknown> | null
+  const model2     = data.model2      as Record<string, unknown> | null
+
+  return (
+    <div className="space-y-4">
+      {fxEffect
+        ? <FxEffectBlock data={fxEffect} />
+        : <p className="text-xs text-gray-400 italic">Блок открытой валютной позиции не заполнен</p>}
+      {monteCarlo
+        ? <MonteCarloBlock data={monteCarlo} />
+        : <p className="text-xs text-gray-400 italic">Монте Карло не запускался</p>}
+      {model2 && <Model2Block data={model2} />}
+    </div>
+  )
+}
+
 // ── Results block: scenarios → cards, flat → labeled grid ──────────────────
 function ResultsBlock({ riskType, data }: { riskType: RiskType; data: Record<string, unknown> }) {
   if (!Object.keys(data).length) return null
+
+  if (riskType === 'Рыночный риск') {
+    return <MarketRiskResultsBlock data={data} />
+  }
 
   const hasScenarios =
     riskType === 'Кредитный риск' || riskType === 'Операционный риск'
@@ -130,7 +340,7 @@ function ResultsBlock({ riskType, data }: { riskType: RiskType; data: Record<str
     )
   }
 
-  // Flat results (market risk, liquidity, etc.)
+  // Flat results (liquidity, etc.)
   const entries = Object.entries(data).filter(([, v]) => v !== null && v !== undefined)
   return (
     <div>

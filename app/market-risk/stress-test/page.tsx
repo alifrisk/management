@@ -237,38 +237,114 @@ export default function MarketStressTest() {
   async function saveToRegistry() {
     setSaving(true)
 
-    const h = HORIZONS.find(hh => hh.days === horizon)?.label || `${horizon} дн.`
+    const h      = HORIZONS.find(hh => hh.days === horizon)?.label || `${horizon} дн.`
+    const posLim = parseFloat(posLimitPct) || 0
 
-    const conclusion = mcResult
-      ? `Монте Карло (${currency}/TJS). Горизонт: ${h}. μ=${mean}%, σ=${stdDev}%. VaR 95%: ${mcResult.histVar95}%, VaR 99%: ${mcResult.histVar99}%. CVaR 95%: ${mcResult.cvar95}%, CVaR 99%: ${mcResult.cvar99}%.`
-      : 'Модель 1 — Монте Карло не запускался.'
+    // ── Блок 1: FX-эффект (открытая валютная позиция) ──
+    const buildFxScenario = (cvarPct: number) => {
+      const N            = ofpMonthIdxs.length || 1
+      const cvarPerMonth = cvarPct / N
+      let totalShort = 0, totalLong = 0
+      const rows = ofpMonthIdxs.map(mi => {
+        const rc      = parseFloat(regulCapMonthly[mi].replace(/\D/g, '')) || 0
+        const openPos = rc * posLim / 100
+        const sPnL    = -(openPos * cvarPerMonth / 100)
+        const lPnL    =  (openPos * cvarPerMonth / 100)
+        totalShort   += sPnL
+        totalLong    += lPnL
+        return { month: MONTH_LABELS[mi], reg_cap: rc, open_pos: openPos, fx_shock_pct: +cvarPerMonth.toFixed(4), pnl_short: +sPnL.toFixed(2), pnl_long: +lPnL.toFixed(2) }
+      })
+      return { cvar_pct: cvarPct, total_short: +totalShort.toFixed(2), total_long: +totalLong.toFixed(2), rows }
+    }
+    const hasFx = mcResult != null && posLim > 0 && ofpMonthIdxs.some(mi => (parseFloat(regulCapMonthly[mi].replace(/\D/g, '')) || 0) > 0)
+    const fxEffect = hasFx ? {
+      period:        ofpPeriod === 'custom' ? `${ofpMonths} мес.` : ofpPeriod,
+      pos_limit_pct: posLim,
+      pessimistic:   buildFxScenario(mcResult!.cvar95),
+      catastrophic:  buildFxScenario(mcResult!.cvar99),
+    } : null
+
+    // ── Блок 2: Monte Carlo ──
+    const monteCarloData = mcResult ? {
+      currency,
+      mean:             +mean,
+      std_dev:          +stdDev,
+      horizon_days:     horizon,
+      var95_hist:       mcResult.histVar95,
+      var99_hist:       mcResult.histVar99,
+      var95_param:      mcResult.paramVar95,
+      var99_param:      mcResult.paramVar99,
+      cvar95:           mcResult.cvar95,
+      cvar99:           mcResult.cvar99,
+      expected:         mcResult.expected,
+      median:           mcResult.median,
+      appreciation_pct: mcResult.appreciationPct,
+      depreciation_pct: mcResult.depreciationPct,
+    } : null
+
+    // ── Блок 3: Model 2 (каскадная модель переводов) ──
+    const hasModel2 = gdp0 > 0 || alifBudget > 0 || actVolH1n > 0
+    const model2Data = hasModel2 ? {
+      gdp_base:              gdp0,
+      gdp_growth_pct:        gdpGrowthP,
+      remit_share_pct:       remitShareP,
+      bank_budget:           alifBudget,
+      bank_share_pct:        +alifSharePct.toFixed(4),
+      margin_pct:            +marginPct.toFixed(4),
+      expected_gdp:          Math.round(expectedGdp),
+      forecast_remit_rt:     Math.round(forecastRemitRT),
+      forecast_income_h2:    Math.round(baseIncomeH2),
+      actual_vol_h1:         actVolH1n,
+      actual_income_h1:      actIncH1n,
+      scenario_pessimistic:  {
+        gdp_growth_pct:  pessGrowth,
+        remit_share_pct: pessRemit,
+        forecast_income: Math.round(calcIncomeH2(pessGrowth, pessRemit)),
+        delta:           Math.round(calcIncomeH2(pessGrowth, pessRemit) - baseIncomeH2),
+      },
+      scenario_catastrophic: {
+        gdp_growth_pct:  catGrowth,
+        remit_share_pct: catRemit,
+        forecast_income: Math.round(calcIncomeH2(catGrowth, catRemit)),
+        delta:           Math.round(calcIncomeH2(catGrowth, catRemit) - baseIncomeH2),
+      },
+    } : null
+
+    // ── Заключение (приоритет: FX → MC) ──
+    const parts: string[] = []
+    if (fxEffect) {
+      const p = fxEffect.pessimistic
+      const c = fxEffect.catastrophic
+      parts.push(
+        `FX-эффект (${fxEffect.period}, ОВП лимит ${fxEffect.pos_limit_pct}%): ` +
+        `Пессимистичный CVaR95=${p.cvar_pct}%: SHORT −${fmtNum(Math.abs(p.total_short))} / LONG +${fmtNum(p.total_long)} TJS. ` +
+        `Катастрофический CVaR99=${c.cvar_pct}%: SHORT −${fmtNum(Math.abs(c.total_short))} / LONG +${fmtNum(c.total_long)} TJS.`
+      )
+    }
+    if (monteCarloData) {
+      parts.push(
+        `Монте Карло (${currency}/TJS, горизонт ${h}): μ=${mean}%, σ=${stdDev}%. ` +
+        `VaR95: ${mcResult!.histVar95}%, VaR99: ${mcResult!.histVar99}%. ` +
+        `CVaR95: ${mcResult!.cvar95}%, CVaR99: ${mcResult!.cvar99}%.`
+      )
+    }
+    if (!parts.length) parts.push('Данные не введены.')
 
     const { error } = await supabase.from('stress_test_registry').insert({
-      risk_type: 'Рыночный риск',
+      risk_type:    'Рыночный риск',
       analyst_name: analystName,
-      period: `${dateFrom} — ${dateTo}`,
-      inputs: mcResult ? {
-        currency,
-        date_from:    dateFrom,
-        date_to:      dateTo,
-        mean,
-        std_dev:      stdDev,
-        iterations:   iters,
-        horizon_days: horizon,
-      } : null,
-      results: mcResult ? {
-        var95_hist:       mcResult.histVar95,
-        var99_hist:       mcResult.histVar99,
-        var95_param:      mcResult.paramVar95,
-        var99_param:      mcResult.paramVar99,
-        cvar95:           mcResult.cvar95,
-        cvar99:           mcResult.cvar99,
-        expected:         mcResult.expected,
-        median:           mcResult.median,
-        appreciation_pct: mcResult.appreciationPct,
-        depreciation_pct: mcResult.depreciationPct,
-      } : null,
-      conclusion,
+      period:       `${dateFrom} — ${dateTo}`,
+      inputs: {
+        currency:  currency || null,
+        date_from: dateFrom || null,
+        date_to:   dateTo   || null,
+      },
+      results: {
+        fx_effect:   fxEffect,
+        monte_carlo: monteCarloData,
+        model2:      model2Data,
+      },
+      conclusion: parts.join('\n'),
       status: 'Проведён',
     })
     setSaving(false)
