@@ -778,8 +778,8 @@ export default function CreditRiskPage() {
       <div className="sticky top-0 z-20 -mx-6 lg:-mx-8 px-6 lg:px-8 pt-5 pb-4 bg-[#F5F8F6]" style={{boxShadow: '0 2px 12px rgba(0,0,0,0.06)'}}>
         <div className="flex items-center justify-between">
           <div>
-            <h1 className="text-xl font-semibold text-gray-900">Кредитный риск — AI-заключения</h1>
-            <p className="text-sm text-gray-500 mt-0.5">Анализ заёмщиков МСБ с помощью искусственного интеллекта</p>
+            <h1 className="text-xl font-semibold text-gray-900">Кредитный риск — Заключения</h1>
+            <p className="text-sm text-gray-500 mt-0.5">Анализ кредитоспособности заёмщиков МСБ</p>
           </div>
           <button onClick={() => { closeModal(); setShowModal(true) }}
             className="flex items-center gap-2 px-4 py-2 bg-[#1B8A4C] text-white rounded-lg text-sm font-medium hover:bg-[#177040]">
@@ -1610,7 +1610,7 @@ export default function CreditRiskPage() {
                 <div className="space-y-4">
                   <div className="p-3 bg-blue-50 border border-blue-100 rounded-lg">
                     <p className="text-xs text-blue-700 font-medium">Дополнительная информация о заёмщике</p>
-                    <p className="text-xs text-blue-500 mt-0.5">Укажите любую информацию, которую AI должен учесть при составлении заключения: репутация, рыночная ситуация, связанные стороны, история отношений с банком, особые обстоятельства и т.д.</p>
+                    <p className="text-xs text-blue-500 mt-0.5">Укажите любую информацию, которую необходимо учесть при составлении заключения: репутация, рыночная ситуация, связанные стороны, история отношений с банком, особые обстоятельства и т.д.</p>
                   </div>
                   <div>
                     <label className={lbl}>Комментарий аналитика</label>
@@ -1740,7 +1740,7 @@ export default function CreditRiskPage() {
                   {tab < 6
                     ? <button onClick={() => setTab(tab+1)} className="px-4 py-2 bg-[#1B8A4C] text-white rounded-lg text-sm font-medium hover:bg-[#177040]">Далее →</button>
                     : <button onClick={handleGenerate} disabled={generating} className="flex items-center gap-2 px-4 py-2 bg-[#1B8A4C] text-white rounded-lg text-sm font-medium hover:bg-[#177040] disabled:opacity-70">
-                        {generating ? <><Loader2 className="w-4 h-4 animate-spin" /> AI анализирует...</> : <><CheckCircle2 className="w-4 h-4" /> {editingId ? 'Перегенерировать' : 'Сгенерировать'}</>}
+                        {generating ? <><Loader2 className="w-4 h-4 animate-spin" /> Анализируем...</> : <><CheckCircle2 className="w-4 h-4" /> {editingId ? 'Перегенерировать' : 'Сгенерировать'}</>}
                       </button>}
                 </div>
               </>

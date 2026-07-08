@@ -527,7 +527,7 @@ export default function MarketRiskPage() {
               </div>
               {viewing.ai_conclusion && (
                 <div>
-                  <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">AI Заключение</p>
+                  <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">Заключение</p>
                   <div className="bg-blue-50 border border-blue-100 rounded-lg p-4">
                     <p className="text-sm text-gray-800 whitespace-pre-wrap">{viewing.ai_conclusion}</p>
                   </div>

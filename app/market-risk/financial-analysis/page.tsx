@@ -713,7 +713,7 @@ export default function FinancialAnalysisPage() {
               </div>
               {viewing.ai_conclusion && (
                 <div>
-                  <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">AI МСФО Анализ</p>
+                  <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">МСФО Анализ</p>
                   <div className="border border-gray-100 rounded-lg p-4">
                     <p className="text-sm text-gray-900 whitespace-pre-wrap">{stripMarkdown(viewing.ai_conclusion)}</p>
                   </div>
@@ -738,7 +738,7 @@ export default function FinancialAnalysisPage() {
                   {editingId ? `Изменить анализ: ${form.code || ''}` : 'Финансовый анализ контрагента — МСФО'}
                 </h2>
                 <p className="text-xs text-gray-400 mt-0.5">
-                  {editingId ? 'Скорректируйте данные и перегенерируйте AI анализ' : 'Стандарт: МСФО (IFRS 9, IFRS 16, IAS 1)'}
+                  {editingId ? 'Скорректируйте данные и перегенерируйте анализ' : 'Стандарт: МСФО (IFRS 9, IFRS 16, IAS 1)'}
                 </p>
               </div>
               <button onClick={closeModal} className="text-gray-400 hover:text-gray-600"><X className="w-5 h-5" /></button>
@@ -775,7 +775,7 @@ export default function FinancialAnalysisPage() {
                 <div className="space-y-4">
                   <div className="bg-blue-50 border border-blue-100 rounded-lg p-3">
                     <p className="text-xs text-blue-800 font-medium">📄 Загрузите скриншоты или PDF аудированной МСФО отчётности банка</p>
-                    <p className="text-xs text-blue-700 mt-1">AI извлечёт данные из всех файлов и объединит · PNG, JPG, PDF · до 10 МБ каждый</p>
+                    <p className="text-xs text-blue-700 mt-1">Система извлечёт данные из всех файлов и объединит · PNG, JPG, PDF · до 10 МБ каждый</p>
                   </div>
                   <label className="block cursor-pointer">
                     <div className={`border-2 border-dashed rounded-xl p-8 text-center transition-colors ${imageFiles.length > 0 ? 'border-[#1B8A4C] bg-green-50' : 'border-gray-200 hover:border-[#1B8A4C] hover:bg-gray-50'}`}>
@@ -1034,7 +1034,7 @@ export default function FinancialAnalysisPage() {
                       ? <button onClick={() => setTab(tab+1)} className="px-4 py-2 bg-[#1B8A4C] text-white rounded-lg text-sm font-medium hover:bg-[#177040]">Далее →</button>
                       : <button onClick={handleGenerate} disabled={generating}
                           className="flex items-center gap-2 px-4 py-2 bg-[#1B8A4C] text-white rounded-lg text-sm font-medium hover:bg-[#177040] disabled:opacity-50">
-                          {generating ? <><Loader2 className="w-4 h-4 animate-spin" /> AI анализирует...</> : <><CheckCircle2 className="w-4 h-4" /> {editingId ? 'Перегенерировать' : 'Сгенерировать анализ'}</>}
+                          {generating ? <><Loader2 className="w-4 h-4 animate-spin" /> Анализируем...</> : <><CheckCircle2 className="w-4 h-4" /> {editingId ? 'Перегенерировать' : 'Сгенерировать анализ'}</>}
                         </button>}
                   </div>
                 </>

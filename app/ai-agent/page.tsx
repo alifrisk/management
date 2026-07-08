@@ -466,7 +466,7 @@ export default function RiskovikPage() {
           </div>
           <div>
             <h1 className="text-lg font-semibold text-gray-900 leading-tight">Рисковик</h1>
-            <p className="text-xs text-gray-500">AI-ассистент · Базель II/III · НБТ · ISO 31000</p>
+            <p className="text-xs text-gray-500">Ассистент · Базель II/III · НБТ · ISO 31000</p>
           </div>
         </div>
         <div className="flex items-center gap-2">
@@ -501,7 +501,7 @@ export default function RiskovikPage() {
                 <div className="p-3 border-b border-gray-100 flex items-center justify-between bg-gray-50">
                   <div>
                     <span className="text-xs font-semibold text-gray-700">База знаний</span>
-                    <p className="text-[10px] text-gray-400">Документы всегда доступны AI в каждом чате</p>
+                    <p className="text-[10px] text-gray-400">Документы всегда доступны в каждом чате</p>
                   </div>
                   <button onClick={() => setShowKB(false)}><X className="w-3.5 h-3.5 text-gray-400" /></button>
                 </div>
@@ -594,7 +594,7 @@ export default function RiskovikPage() {
       {liveData && (
         <div className="flex items-center gap-1.5 mb-2 px-2.5 py-1.5 bg-green-50 border border-green-200 rounded-lg text-xs text-green-700">
           <Zap className="w-3 h-3 flex-shrink-0" />
-          <span>Живые данные подключены — AI видит актуальные данные из системы</span>
+          <span>Живые данные подключены — система видит актуальные данные</span>
         </div>
       )}
 
@@ -622,7 +622,7 @@ export default function RiskovikPage() {
             </div>
             <h2 className="text-lg font-semibold text-gray-900 mb-1">Привет, я Рисковик!</h2>
             <p className="text-sm text-gray-500 max-w-sm mx-auto mb-1">Знаю Базель II/III, нормативы НБТ, ISO 31000.</p>
-            <p className="text-xs text-gray-400 max-w-sm mx-auto mb-5">Выберите модуль выше — AI подключится к живым данным системы.</p>
+            <p className="text-xs text-gray-400 max-w-sm mx-auto mb-5">Выберите модуль выше — система подключится к живым данным.</p>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-left">
               {SUGGESTED.map((q, i) => (
                 <button key={i} onClick={() => send(q)}
