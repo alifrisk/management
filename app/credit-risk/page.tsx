@@ -1081,7 +1081,7 @@ export default function CreditRiskPage() {
                       return (
                         <div className={`p-3 rounded-xl border-2 ${vio ? 'bg-red-50 border-red-300' : 'bg-green-50 border-green-300'}`}>
                           <p className="text-xs font-semibold text-gray-600">PAR30 МСБ-портфеля</p>
-                          <p className="text-[10px] text-blue-500 mb-2">Информационно — не является критерием вердикта</p>
+                          <p className="text-[10px] text-blue-500 mb-2">Информационно — не является критерием решения</p>
                           <div className="grid grid-cols-3 gap-2 text-xs text-center">
                             <div><p className="text-gray-400">Сейчас</p><p className="font-bold text-lg">{viewing.current_msb_par30_pct.toFixed(2)}%</p></div>
                             <div><p className="text-gray-400">Прирост</p><p className="font-bold text-lg text-orange-600">{delta !== null ? `+${delta.toFixed(2)}%` : '—'}</p></div>
