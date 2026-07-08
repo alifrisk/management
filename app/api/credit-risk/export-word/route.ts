@@ -438,14 +438,15 @@ export async function POST(request: Request) {
 
           // ── 4. КОНЦЕНТРАЦИЯ ──
           ...(() => {
-            const smePf = c.sme_sector_portfolio || 0
-            const bankPf = c.bank_total_portfolio || 0
+            const smePf   = c.sme_sector_portfolio || 0
+            const bankPf  = c.bank_total_portfolio || 0
             const loanAmt = c.loan_amount || 0
-            const raConc = c.ra_conc_limit || 0
+            const raConc  = c.ra_conc_limit || 0
             if (!smePf && !bankPf) return []
-            const concSme = smePf > 0 && loanAmt > 0 ? (loanAmt / smePf * 100) : 0
-            const concBank = bankPf > 0 && loanAmt > 0 ? (loanAmt / bankPf * 100) : 0
-            const concViolates = raConc > 0 && concSme > raConc
+            // Доля МСБ-сектора в общем портфеле (до и после выдачи)
+            const concSmeNow    = smePf > 0 && bankPf > 0 ? (smePf / bankPf * 100) : 0
+            const concSmeAfter  = bankPf > 0 ? ((smePf + loanAmt) / bankPf * 100) : 0
+            const concViolates  = raConc > 0 && concSmeAfter > raConc
             return [
               sectionHead('4', 'КОНЦЕНТРАЦИЯ КРЕДИТНОГО РИСКА'),
               new Table({
@@ -453,15 +454,15 @@ export async function POST(request: Request) {
                 columnWidths: [4000, 2677, 2677],
                 rows: [
                   new TableRow({ children: [cell('Показатель', { green: true, bold: true }), cell('Значение', { green: true, bold: true, center: true }), cell('Статус', { green: true, bold: true, center: true })] }),
-                  ...(smePf > 0 ? [new TableRow({ children: [
-                    cell(`Доля в портфеле МСБ (лимит: ${raConc > 0 ? raConc + '%' : 'не задан'})`, {}),
-                    cell(`${concSme.toFixed(2)}%`, { center: true, bold: true }),
-                    cell(concViolates ? '❌ Нарушает' : '✅ Норма', { center: true, color: concViolates ? 'C00000' : '1B8A4C' }),
+                  ...(smePf > 0 && bankPf > 0 ? [new TableRow({ children: [
+                    cell('Доля МСБ в портфеле до выдачи', {}),
+                    cell(`${concSmeNow.toFixed(2)}%`, { center: true }),
+                    cell('Информационно', { center: true, color: '555555' }),
                   ]})] : []),
                   ...(bankPf > 0 ? [new TableRow({ children: [
-                    cell('Доля от общего портфеля банка (инфо)', {}),
-                    cell(`${concBank.toFixed(2)}%`, { center: true }),
-                    cell('Информационно', { center: true, color: '555555' }),
+                    cell(`Доля МСБ в портфеле после выдачи (лимит: ${raConc > 0 ? raConc + '%' : 'не задан'})`, {}),
+                    cell(`${concSmeAfter.toFixed(2)}%`, { center: true, bold: true }),
+                    cell(concViolates ? '❌ Нарушает' : '✅ Норма', { center: true, color: concViolates ? 'C00000' : '1B8A4C' }),
                   ]})] : []),
                 ]
               }),
@@ -471,14 +472,31 @@ export async function POST(request: Request) {
 
           // ── 5. РИСК-АППЕТИТ ──
           ...(() => {
-            const bankPf = c.bank_total_portfolio || 0
-            const loanAmt = c.loan_amount || 0
-            const curPar30 = c.current_par30_pct || 0
-            const raPar30 = c.ra_par30_limit || 0
+            const smePf       = c.sme_sector_portfolio  || 0
+            const bankPf      = c.bank_total_portfolio  || 0
+            const loanAmt     = c.loan_amount           || 0
+            const curPar30    = c.current_par30_pct     || 0
+            const raPar30     = c.ra_par30_limit        || 0
+            const curMsbPar30 = c.current_msb_par30_pct || 0
+            const raMsbPar30  = c.ra_msb_par30_limit    || 0
             if (!bankPf || !loanAmt) return []
-            const delta = loanAmt / bankPf * 100
-            const after = curPar30 + delta
-            const violates = raPar30 > 0 && after > raPar30
+            // PAR30 общего портфеля банка
+            const bankDelta    = loanAmt / bankPf * 100
+            const bankAfter    = curPar30 + bankDelta
+            const bankViolates = raPar30 > 0 && bankAfter > raPar30
+            // PAR30 МСБ-портфеля (информационно)
+            const msbDelta    = smePf > 0 ? (loanAmt / smePf * 100) : 0
+            const msbAfter    = curMsbPar30 + msbDelta
+            const msbViolates = raMsbPar30 > 0 && msbAfter > raMsbPar30
+            const hasMsb      = smePf > 0 && (curMsbPar30 > 0 || raMsbPar30 > 0)
+            // Subheader row spanning 3 columns
+            const subHdr = (title: string) => new TableRow({ children: [new TableCell({
+              borders,
+              columnSpan: 3,
+              shading: { fill: 'F5F5F5', type: ShadingType.CLEAR },
+              margins: { top: 50, bottom: 50, left: 120, right: 120 },
+              children: [new Paragraph({ children: [new TextRun({ text: title, size: 18, bold: true, color: '555555', font: 'Times New Roman' })] })]
+            })] })
             return [
               sectionHead('5', 'РИСК-АППЕТИТ (PAR30)'),
               new Table({
@@ -486,9 +504,16 @@ export async function POST(request: Request) {
                 columnWidths: [4000, 2677, 2677],
                 rows: [
                   new TableRow({ children: [cell('Показатель', { green: true, bold: true }), cell('Значение', { green: true, bold: true, center: true }), cell('Статус', { green: true, bold: true, center: true })] }),
-                  new TableRow({ children: [cell('PAR30 до выдачи'), cell(curPar30 > 0 ? `${curPar30.toFixed(2)}%` : '—', { center: true }), cell('', {})] }),
-                  new TableRow({ children: [cell('Прирост PAR30 при дефолте'), cell(`+${delta.toFixed(2)}%`, { center: true, color: 'BF8F00', bold: true }), cell('', {})] }),
-                  new TableRow({ children: [cell(`PAR30 после выдачи (лимит: ${raPar30 > 0 ? raPar30 + '%' : 'не задан'})`), cell(`${after.toFixed(2)}%`, { center: true, bold: true }), cell(violates ? '❌ Нарушает' : '✅ Норма', { center: true, color: violates ? 'C00000' : '1B8A4C' })] }),
+                  subHdr('Общий портфель банка'),
+                  new TableRow({ children: [cell('PAR30 банка до выдачи', {}), cell(curPar30 > 0 ? `${curPar30.toFixed(2)}%` : '—', { center: true }), cell('', {})] }),
+                  new TableRow({ children: [cell('Прирост PAR30 при дефолте заёмщика', {}), cell(`+${bankDelta.toFixed(2)}%`, { center: true, color: 'BF8F00', bold: true }), cell('', {})] }),
+                  new TableRow({ children: [cell(`PAR30 банка после выдачи (лимит: ${raPar30 > 0 ? raPar30 + '%' : 'не задан'})`), cell(`${bankAfter.toFixed(2)}%`, { center: true, bold: true }), cell(bankViolates ? '❌ Нарушает' : '✅ Норма', { center: true, color: bankViolates ? 'C00000' : '1B8A4C' })] }),
+                  ...(hasMsb ? [
+                    subHdr('МСБ-портфель (информационно — не влияет на решение)'),
+                    new TableRow({ children: [cell('PAR30 МСБ до выдачи', {}), cell(curMsbPar30 > 0 ? `${curMsbPar30.toFixed(2)}%` : '—', { center: true }), cell('Информационно', { center: true, color: '555555' })] }),
+                    new TableRow({ children: [cell('Прирост PAR30 МСБ при дефолте заёмщика', {}), cell(`+${msbDelta.toFixed(2)}%`, { center: true, color: 'BF8F00', bold: true }), cell('Информационно', { center: true, color: '555555' })] }),
+                    new TableRow({ children: [cell(`PAR30 МСБ после выдачи (лимит: ${raMsbPar30 > 0 ? raMsbPar30 + '%' : 'не задан'})`), cell(`${msbAfter.toFixed(2)}%`, { center: true, bold: true }), cell(msbViolates ? '❌ Нарушает (инфо)' : '✅ Норма (инфо)', { center: true, color: msbViolates ? 'C00000' : '1B8A4C' })] }),
+                  ] : []),
                 ]
               }),
               para('', { after: 60 }),
