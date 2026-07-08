@@ -31,9 +31,10 @@ export function SessionTimeout() {
     if (countdownRef.current) clearInterval(countdownRef.current)
   }
 
-  const doLogout = useCallback(() => {
+  const doLogout = useCallback(async () => {
     clearTimers()
     setShowWarning(false)
+    await supabase.auth.signOut()
     sessionStorage.removeItem('alif_user')
     router.replace('/auth/login')
   }, [router])
