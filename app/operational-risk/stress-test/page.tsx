@@ -1,5 +1,5 @@
 'use client'
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useRef } from 'react'
 import { supabase } from '@/supabase/client'
 import { RefreshCw, Download, Printer, Save, Info } from 'lucide-react'
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts'
@@ -94,6 +94,17 @@ export default function OpStressTest() {
   }, [dateFrom, dateTo])
 
   useEffect(() => { fetchStats() }, [fetchStats])
+
+  // ── Sticky header sentinel ────────────────────────────────────────────────
+  const [isStuck, setIsStuck] = useState(false)
+  const sentinelRef = useRef<HTMLDivElement>(null)
+  useEffect(() => {
+    const el = sentinelRef.current
+    if (!el) return
+    const obs = new IntersectionObserver(([entry]) => setIsStuck(!entry.isIntersecting), { threshold: 0 })
+    obs.observe(el)
+    return () => obs.disconnect()
+  }, [])
 
   const H  = HORIZONS[horizonIdx]
   const fm = H.months
@@ -295,30 +306,36 @@ export default function OpStressTest() {
   return (
     <div className="max-w-7xl mx-auto space-y-5 print:space-y-3">
 
-      {/* Header */}
-      <div className="flex items-center justify-between flex-wrap gap-3">
-        <div>
-          <h1 className="text-xl font-semibold text-gray-900">Операционный риск — Стресс-тест</h1>
-          <p className="text-sm text-gray-500 mt-0.5">Сценарный прогноз на основе исторических инцидентов · горизонт: {H.label}</p>
-        </div>
-        <div className="flex items-center gap-2 print:hidden">
-          <button onClick={exportExcel}
-            className="flex items-center gap-1.5 px-3 py-2 border border-gray-200 rounded-lg text-sm text-gray-600 hover:bg-gray-50">
-            <Download className="w-4 h-4" /> Excel
-          </button>
-          <button onClick={() => window.print()}
-            className="flex items-center gap-1.5 px-3 py-2 border border-gray-200 rounded-lg text-sm text-gray-600 hover:bg-gray-50">
-            <Printer className="w-4 h-4" /> PDF
-          </button>
-          <button onClick={saveToRegistry} disabled={saving || !stats}
-            className="flex items-center gap-1.5 px-3 py-2 bg-[#1B8A4C] text-white rounded-lg text-sm hover:bg-[#166a3a] disabled:opacity-50">
-            <Save className="w-4 h-4" /> {saving ? 'Сохранение...' : 'Сохранить в реестр'}
-          </button>
-        </div>
-      </div>
+      {/* Sentinel — triggers sticky shadow when scrolled past */}
+      <div ref={sentinelRef} className="h-px" aria-hidden />
 
-      {/* Parameters */}
-      <div className={`${card} print:hidden`}>
+      {/* ── STICKY HEADER ─────────────────────────────────────────────────────── */}
+      <div className={`sticky top-0 z-30 bg-[#F5F8F6] pb-3 transition-shadow duration-200 print:static print:shadow-none ${isStuck ? 'shadow-[0_4px_16px_rgba(0,0,0,0.08)]' : ''}`}>
+
+        {/* Title + actions */}
+        <div className="flex items-center justify-between flex-wrap gap-3 pt-1">
+          <div>
+            <h1 className="text-xl font-semibold text-gray-900">Операционный риск — Стресс-тест</h1>
+            <p className="text-sm text-gray-500 mt-0.5">Сценарный прогноз на основе исторических инцидентов · горизонт: {H.label}</p>
+          </div>
+          <div className="flex items-center gap-2 print:hidden">
+            <button onClick={exportExcel}
+              className="flex items-center gap-1.5 px-3 py-2 border border-gray-200 rounded-lg text-sm text-gray-600 hover:bg-gray-50">
+              <Download className="w-4 h-4" /> Excel
+            </button>
+            <button onClick={() => window.print()}
+              className="flex items-center gap-1.5 px-3 py-2 border border-gray-200 rounded-lg text-sm text-gray-600 hover:bg-gray-50">
+              <Printer className="w-4 h-4" /> PDF
+            </button>
+            <button onClick={saveToRegistry} disabled={saving || !stats}
+              className="flex items-center gap-1.5 px-3 py-2 bg-[#1B8A4C] text-white rounded-lg text-sm hover:bg-[#166a3a] disabled:opacity-50">
+              <Save className="w-4 h-4" /> {saving ? 'Сохранение...' : 'Сохранить в реестр'}
+            </button>
+          </div>
+        </div>
+
+        {/* Parameters */}
+        <div className={`${card} print:hidden mt-3`}>
         <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-3">Параметры стресс-теста</p>
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 items-end">
           <div>
@@ -400,6 +417,10 @@ export default function OpStressTest() {
             Катастрофический = макс. ущерб/мес + мин. возвратность.
           </p>
         </div>
+        {/* end Parameters card */}
+        </div>
+
+      {/* end sticky wrapper */}
       </div>
 
       {/* Historical data table */}
