@@ -334,8 +334,18 @@ export default function OpStressTest() {
           </div>
         </div>
 
+        {/* Tab switcher */}
+        <div className="flex border-b border-gray-200 print:hidden mt-3 bg-white rounded-t-xl px-1">
+          {([1,2] as const).map(t => (
+            <button key={t} onClick={() => setTab(t)}
+              className={`px-5 py-2.5 text-sm font-semibold border-b-2 transition-colors ${tab===t ? 'border-[#1B8A4C] text-[#1B8A4C]' : 'border-transparent text-gray-500 hover:text-gray-700'}`}>
+              {t===1 ? '📈 Модель 1 — Сценарный прогноз' : '🔢 Модель 2 — What-If матрица'}
+            </button>
+          ))}
+        </div>
+
         {/* Parameters */}
-        <div className={`${card} print:hidden mt-3`}>
+        <div className={`${card} print:hidden rounded-t-none border-t-0`}>
         <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-3">Параметры стресс-теста</p>
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 items-end">
           <div>
@@ -468,16 +478,6 @@ export default function OpStressTest() {
           <p className="text-sm text-yellow-800">⚠️ Нет данных об инцидентах за выбранный период. Измените диапазон дат.</p>
         </div>
       )}
-
-      {/* Tabs */}
-      <div className="flex border-b border-gray-200 print:hidden">
-        {([1,2] as const).map(t => (
-          <button key={t} onClick={() => setTab(t)}
-            className={`px-5 py-3 text-sm font-semibold border-b-2 transition-colors ${tab===t ? 'border-[#1B8A4C] text-[#1B8A4C]' : 'border-transparent text-gray-500 hover:text-gray-700'}`}>
-            {t===1 ? '📈 Модель 1 — Сценарный прогноз' : '🔢 Модель 2 — What-If матрица'}
-          </button>
-        ))}
-      </div>
 
       {/* ═══ MODEL 1 ═══ */}
       {tab === 1 && (
