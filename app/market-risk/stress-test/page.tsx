@@ -1,5 +1,5 @@
 'use client'
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { RefreshCw, Download, Printer, TrendingDown, TrendingUp, Info, Database, Save } from 'lucide-react'
 import { supabase } from '@/supabase/client'
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, BarChart, Bar, Cell } from 'recharts'
@@ -120,6 +120,17 @@ export default function MarketStressTest() {
           .then(({ data: p }) => { if (p) setAnalystName(p.full_name || '') })
       }
     })
+  }, [])
+
+  // ── Sticky header sentinel ────────────────────────────────────────────────
+  const [isStuck, setIsStuck] = useState(false)
+  const sentinelRef = useRef<HTMLDivElement>(null)
+  useEffect(() => {
+    const el = sentinelRef.current
+    if (!el) return
+    const obs = new IntersectionObserver(([entry]) => setIsStuck(!entry.isIntersecting), { threshold: 0 })
+    obs.observe(el)
+    return () => obs.disconnect()
   }, [])
 
   // Model 1 — source
@@ -395,36 +406,44 @@ export default function MarketStressTest() {
   return (
     <div className="max-w-7xl mx-auto space-y-5">
 
-      {/* Header */}
-      <div className="flex items-center justify-between flex-wrap gap-3">
-        <div>
-          <h1 className="text-xl font-semibold text-gray-900">Рыночный риск — Стресс-тест</h1>
-          <p className="text-sm text-gray-500 mt-0.5">Монте Карло · Макроэкономический анализ</p>
-        </div>
-        <div className="flex items-center gap-2">
-          <button onClick={exportExcel} className="flex items-center gap-1.5 px-3 py-2 border border-gray-200 rounded-lg text-sm text-gray-600 hover:bg-gray-50">
-            <Download className="w-4 h-4" /> Excel
-          </button>
-          <button onClick={() => window.print()} className="flex items-center gap-1.5 px-3 py-2 border border-gray-200 rounded-lg text-sm text-gray-600 hover:bg-gray-50">
-            <Printer className="w-4 h-4" /> PDF
-          </button>
-          <button onClick={saveToRegistry} disabled={saving}
-            className="flex items-center gap-1.5 px-3 py-2 bg-[#1B8A4C] text-white rounded-lg text-sm hover:bg-[#166a3a] disabled:opacity-50">
-            <Save className="w-4 h-4" /> {saving ? 'Сохранение...' : 'Сохранить в реестр'}
-          </button>
-        </div>
-      </div>
+      {/* Sticky sentinel */}
+      <div ref={sentinelRef} className="h-px" aria-hidden />
 
-      {/* ── Переключатель моделей (вверху) ── */}
-      <div className="flex gap-1 bg-gray-100 rounded-xl p-1">
-        <button onClick={() => setModel(1)}
-          className={`flex-1 px-4 py-2.5 rounded-lg text-sm font-medium transition-all ${model === 1 ? 'bg-white shadow-sm text-gray-900' : 'text-gray-500 hover:text-gray-700'}`}>
-          📈 Модель 1 — Монте Карло (валютный риск)
-        </button>
-        <button onClick={() => setModel(2)}
-          className={`flex-1 px-4 py-2.5 rounded-lg text-sm font-medium transition-all ${model === 2 ? 'bg-white shadow-sm text-gray-900' : 'text-gray-500 hover:text-gray-700'}`}>
-          🌍 Модель 2 — Денежные переводы (макро)
-        </button>
+      {/* ── Sticky header ── */}
+      <div className={`sticky top-0 z-30 bg-[#F5F8F6] pb-3 transition-shadow duration-200 print:static print:shadow-none${isStuck ? ' shadow-[0_4px_16px_rgba(0,0,0,0.08)]' : ''}`}>
+
+        {/* Header */}
+        <div className="flex items-center justify-between flex-wrap gap-3 pt-5">
+          <div>
+            <h1 className="text-xl font-semibold text-gray-900">Рыночный риск — Стресс-тест</h1>
+            <p className="text-sm text-gray-500 mt-0.5">Монте Карло · Макроэкономический анализ</p>
+          </div>
+          <div className="flex items-center gap-2 print:hidden">
+            <button onClick={exportExcel} className="flex items-center gap-1.5 px-3 py-2 border border-gray-200 rounded-lg text-sm text-gray-600 hover:bg-gray-50">
+              <Download className="w-4 h-4" /> Excel
+            </button>
+            <button onClick={() => window.print()} className="flex items-center gap-1.5 px-3 py-2 border border-gray-200 rounded-lg text-sm text-gray-600 hover:bg-gray-50">
+              <Printer className="w-4 h-4" /> PDF
+            </button>
+            <button onClick={saveToRegistry} disabled={saving}
+              className="flex items-center gap-1.5 px-3 py-2 bg-[#1B8A4C] text-white rounded-lg text-sm hover:bg-[#166a3a] disabled:opacity-50">
+              <Save className="w-4 h-4" /> {saving ? 'Сохранение...' : 'Сохранить в реестр'}
+            </button>
+          </div>
+        </div>
+
+        {/* ── Переключатель моделей ── */}
+        <div className="flex gap-1 bg-gray-100 rounded-xl p-1 mt-3 print:hidden">
+          <button onClick={() => setModel(1)}
+            className={`flex-1 px-4 py-2.5 rounded-lg text-sm font-medium transition-all ${model === 1 ? 'bg-white shadow-sm text-gray-900' : 'text-gray-500 hover:text-gray-700'}`}>
+            📈 Модель 1 — Монте Карло (валютный риск)
+          </button>
+          <button onClick={() => setModel(2)}
+            className={`flex-1 px-4 py-2.5 rounded-lg text-sm font-medium transition-all ${model === 2 ? 'bg-white shadow-sm text-gray-900' : 'text-gray-500 hover:text-gray-700'}`}>
+            🌍 Модель 2 — Денежные переводы (макро)
+          </button>
+        </div>
+
       </div>
 
       {/* ════════════════════════════════════
