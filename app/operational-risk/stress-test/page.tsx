@@ -378,50 +378,46 @@ export default function OpStressTest() {
             ))}
           </div>
         </div>
+        </div>{/* end Parameters card */}
+      </div>{/* end sticky wrapper */}
 
-        {/* Reference block */}
-        {stats && optim && pess && cat && (
-          <div className="mt-4 p-3 bg-white border border-gray-100 rounded-lg">
-            <p className="text-[11px] font-semibold text-gray-500 uppercase tracking-wide mb-2">
-              Прогноз за {H.label}
-            </p>
-            <div className="grid grid-cols-3 gap-2 text-xs">
-              {([
-                { label: '📈 Оптимистичный', sc: optim, ck: 'optim' as const },
-                { label: '📉 Пессимистичный', sc: pess, ck: 'pess'  as const },
-                { label: '⚠️ Катастрофический', sc: cat, ck: 'cat'   as const },
-              ]).map(({ label, sc, ck }) => {
-                const c = REF_COLORS[ck]
-                return (
-                  <div key={label} className={`rounded-lg p-2.5 ${c.wrap}`}>
-                    <p className={`font-bold text-[11px] mb-1.5 ${c.text}`}>{label}</p>
-                    <div className="space-y-1">
-                      <div className="flex justify-between"><span className="text-gray-400">Ущерб/мес:</span><span className="font-semibold">{fmt(sc.lossPerMonth)}</span></div>
-                      <div className="flex justify-between"><span className="text-gray-400">Возвратность:</span><span className={`font-semibold ${c.text}`}>{sc.recoveryRate.toFixed(1)}%</span></div>
-                      <div className="flex justify-between border-t border-gray-100 pt-1"><span className="text-gray-400">Ущерб итого:</span><span className="font-bold">{fmt(tLoss(sc))}</span></div>
-                      <div className="flex justify-between"><span className="text-gray-400">Чистый убыток:</span><span className={`font-bold ${c.text}`}>{fmt(netLoss(sc))}</span></div>
-                    </div>
-                  </div>
-                )
-              })}
-            </div>
-          </div>
-        )}
-
-        <div className="mt-3 p-3 bg-blue-50 rounded-lg flex items-start gap-2">
-          <Info className="w-4 h-4 text-blue-500 mt-0.5 flex-shrink-0" />
-          <p className="text-xs text-blue-700">
-            <span className="font-semibold">Методология:</span> Инциденты группируются по месяцам.
-            Оптимистичный = мин. ущерб/мес + макс. возвратность.
-            Пессимистичный = средние значения.
-            Катастрофический = макс. ущерб/мес + мин. возвратность.
+      {/* Reference block — прокручивается вместе с контентом */}
+      {stats && optim && pess && cat && (
+        <div className={`${card} print:hidden`}>
+          <p className="text-[11px] font-semibold text-gray-500 uppercase tracking-wide mb-2">
+            Прогноз за {H.label}
           </p>
+          <div className="grid grid-cols-3 gap-2 text-xs">
+            {([
+              { label: '📈 Оптимистичный', sc: optim, ck: 'optim' as const },
+              { label: '📉 Пессимистичный', sc: pess, ck: 'pess'  as const },
+              { label: '⚠️ Катастрофический', sc: cat, ck: 'cat'   as const },
+            ]).map(({ label, sc, ck }) => {
+              const c = REF_COLORS[ck]
+              return (
+                <div key={label} className={`rounded-lg p-2.5 ${c.wrap}`}>
+                  <p className={`font-bold text-[11px] mb-1.5 ${c.text}`}>{label}</p>
+                  <div className="space-y-1">
+                    <div className="flex justify-between"><span className="text-gray-400">Ущерб/мес:</span><span className="font-semibold">{fmt(sc.lossPerMonth)}</span></div>
+                    <div className="flex justify-between"><span className="text-gray-400">Возвратность:</span><span className={`font-semibold ${c.text}`}>{sc.recoveryRate.toFixed(1)}%</span></div>
+                    <div className="flex justify-between border-t border-gray-100 pt-1"><span className="text-gray-400">Ущерб итого:</span><span className="font-bold">{fmt(tLoss(sc))}</span></div>
+                    <div className="flex justify-between"><span className="text-gray-400">Чистый убыток:</span><span className={`font-bold ${c.text}`}>{fmt(netLoss(sc))}</span></div>
+                  </div>
+                </div>
+              )
+            })}
+          </div>
+          <div className="mt-3 p-3 bg-blue-50 rounded-lg flex items-start gap-2">
+            <Info className="w-4 h-4 text-blue-500 mt-0.5 flex-shrink-0" />
+            <p className="text-xs text-blue-700">
+              <span className="font-semibold">Методология:</span> Инциденты группируются по месяцам.
+              Оптимистичный = мин. ущерб/мес + макс. возвратность.
+              Пессимистичный = средние значения.
+              Катастрофический = макс. ущерб/мес + мин. возвратность.
+            </p>
+          </div>
         </div>
-        {/* end Parameters card */}
-        </div>
-
-      {/* end sticky wrapper */}
-      </div>
+      )}
 
       {/* Historical data table */}
       {stats ? (
