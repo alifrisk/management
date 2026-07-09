@@ -1,5 +1,5 @@
 'use client'
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { Download, Printer, TrendingDown, Info, Save } from 'lucide-react'
 import { supabase } from '@/supabase/client'
 
@@ -46,6 +46,17 @@ export default function CreditStressTest() {
           .then(({ data: p }) => { if (p) setAnalystName(p.full_name || '') })
       }
     })
+  }, [])
+
+  // ── Sticky header sentinel ────────────────────────────────────────────────
+  const [isStuck, setIsStuck] = useState(false)
+  const sentinelRef = useRef<HTMLDivElement>(null)
+  useEffect(() => {
+    const el = sentinelRef.current
+    if (!el) return
+    const obs = new IntersectionObserver(([entry]) => setIsStuck(!entry.isIntersecting), { threshold: 0 })
+    obs.observe(el)
+    return () => obs.disconnect()
   }, [])
 
   const P  = parseN(portfolio)
@@ -228,98 +239,106 @@ export default function CreditStressTest() {
   return (
     <div className="max-w-7xl mx-auto space-y-5 print:space-y-3">
 
-      {/* Заголовок */}
-      <div className="flex items-center justify-between flex-wrap gap-3">
-        <div>
-          <h1 className="text-xl font-semibold text-gray-900">Кредитный риск — Стресс-тест</h1>
-          <p className="text-sm text-gray-500 mt-0.5">Сценарный анализ PAR30 · Горизонт: {CREDIT_HORIZONS[horizonIdx].label}{reportDate && ` · ${new Date(reportDate).toLocaleDateString('ru-RU', {month:'long',year:'numeric'})}`}</p>
+      {/* Sticky sentinel */}
+      <div ref={sentinelRef} className="h-px" aria-hidden />
+
+      {/* ── Sticky header ── */}
+      <div className={`sticky top-0 z-30 bg-[#F5F8F6] pb-3 transition-shadow duration-200 print:static print:shadow-none${isStuck ? ' shadow-[0_4px_16px_rgba(0,0,0,0.08)]' : ''}`}>
+
+        {/* Заголовок */}
+        <div className="flex items-center justify-between flex-wrap gap-3 pt-5">
+          <div>
+            <h1 className="text-xl font-semibold text-gray-900">Кредитный риск — Стресс-тест</h1>
+            <p className="text-sm text-gray-500 mt-0.5">Сценарный анализ PAR30 · Горизонт: {CREDIT_HORIZONS[horizonIdx].label}{reportDate && ` · ${new Date(reportDate).toLocaleDateString('ru-RU', {month:'long',year:'numeric'})}`}</p>
+          </div>
+          <div className="flex items-center gap-2 print:hidden">
+            <button onClick={exportExcel}
+              className="flex items-center gap-1.5 px-3 py-2 border border-gray-200 rounded-lg text-sm text-gray-600 hover:bg-gray-50">
+              <Download className="w-4 h-4" /> Excel
+            </button>
+            <button onClick={() => window.print()}
+              className="flex items-center gap-1.5 px-3 py-2 border border-gray-200 rounded-lg text-sm text-gray-600 hover:bg-gray-50">
+              <Printer className="w-4 h-4" /> PDF
+            </button>
+            <button onClick={saveToRegistry} disabled={saving}
+              className="flex items-center gap-1.5 px-3 py-2 bg-[#1B8A4C] text-white rounded-lg text-sm hover:bg-[#166a3a] disabled:opacity-50">
+              <Save className="w-4 h-4" /> {saving ? 'Сохранение...' : 'Сохранить в реестр'}
+            </button>
+          </div>
         </div>
-        <div className="flex items-center gap-2 print:hidden">
-          <button onClick={exportExcel}
-            className="flex items-center gap-1.5 px-3 py-2 border border-gray-200 rounded-lg text-sm text-gray-600 hover:bg-gray-50">
-            <Download className="w-4 h-4" /> Excel
-          </button>
-          <button onClick={() => window.print()}
-            className="flex items-center gap-1.5 px-3 py-2 border border-gray-200 rounded-lg text-sm text-gray-600 hover:bg-gray-50">
-            <Printer className="w-4 h-4" /> PDF
-          </button>
-          <button onClick={saveToRegistry} disabled={saving}
-            className="flex items-center gap-1.5 px-3 py-2 bg-[#1B8A4C] text-white rounded-lg text-sm hover:bg-[#166a3a] disabled:opacity-50">
-            <Save className="w-4 h-4" /> {saving ? 'Сохранение...' : 'Сохранить в реестр'}
-          </button>
+
+        {/* Tab switcher */}
+        <div className="flex border-b border-gray-200 print:hidden mt-3 bg-white rounded-t-xl px-1">
+          {([1,2] as const).map(t => (
+            <button key={t} onClick={() => setTab(t)}
+              className={`px-5 py-2.5 text-sm font-semibold border-b-2 transition-colors ${tab===t ? 'border-[#1B8A4C] text-[#1B8A4C]' : 'border-transparent text-gray-500 hover:text-gray-700'}`}>
+              {t===1 ? '📈 Модель 1 — Сценарии' : '🔢 Модель 2 — What-If матрица'}
+            </button>
+          ))}
+        </div>
+
+        {/* Входные данные */}
+        <div className={`${card} print:hidden rounded-t-none border-t-0`}>
+          <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-3">Входные данные</p>
+          <div className="grid grid-cols-2 lg:grid-cols-5 gap-4">
+            <div>
+              <label className={lbl}>Дата отчётности</label>
+              <input type="date" value={reportDate}
+                max={new Date().toISOString().split('T')[0]}
+                onChange={e => setReportDate(e.target.value)}
+                className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#1B8A4C] bg-white" />
+            </div>
+            <div>
+              <label className={lbl}>Кредитный портфель (TJS)</label>
+              <input type="text" inputMode="numeric" value={portfolio}
+                onChange={e => setPortfolio(fmtN(e.target.value))}
+                placeholder="1 122 167 083" className={inp} />
+            </div>
+            <div>
+              <label className={lbl}>Текущий PAR30 (%)</label>
+              <input type="text" inputMode="decimal" value={currentPar}
+                onChange={e => setCurrentPar(e.target.value)}
+                placeholder="2.50" className={inp} />
+            </div>
+            <div>
+              <label className={lbl}>Текущий Coverage Rate (%)</label>
+              <input type="text" inputMode="decimal" value={currentCov}
+                onChange={e => setCurrentCov(e.target.value)}
+                placeholder="80" className={inp} />
+            </div>
+            <div>
+              <label className={lbl}>Базовая прибыль (TJS)</label>
+              <input type="text" inputMode="numeric" value={baseProfit}
+                onChange={e => setBaseProfit(fmtN(e.target.value))}
+                placeholder="119 816 175" className={inp} />
+            </div>
+          </div>
+
+          {/* Горизонт прогноза */}
+          <div className="mt-4">
+            <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">Горизонт прогноза</p>
+            <div className="flex gap-2 flex-wrap">
+              {CREDIT_HORIZONS.map((h, i) => (
+                <button key={h.months} onClick={() => setHorizonIdx(i)}
+                  className={`px-4 py-2 rounded-lg text-sm font-medium border-2 transition-all ${horizonIdx === i ? 'bg-green-50 border-[#1B8A4C] text-[#1B8A4C]' : 'bg-white border-gray-200 text-gray-500 hover:border-gray-300'}`}>
+                  {h.label}
+                </button>
+              ))}
+            </div>
+            <p className="text-xs text-gray-400 mt-1.5">
+              Оптимистичный = мин. прирост · Пессимистичный = средний прирост · Катастрофический = макс. прирост
+            </p>
+          </div>
         </div>
       </div>
 
-      {/* Входные данные */}
-      <div className={card}>
-        <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-3">Входные данные</p>
-        <div className="grid grid-cols-2 lg:grid-cols-5 gap-4">
-          <div>
-            <label className={lbl}>Дата отчётности</label>
-            <input type="date" value={reportDate}
-              max={new Date().toISOString().split('T')[0]}
-              onChange={e => setReportDate(e.target.value)}
-              className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#1B8A4C] bg-white" />
-          </div>
-          <div>
-            <label className={lbl}>Кредитный портфель (TJS)</label>
-            <input type="text" inputMode="numeric" value={portfolio}
-              onChange={e => setPortfolio(fmtN(e.target.value))}
-              placeholder="1 122 167 083" className={inp} />
-          </div>
-          <div>
-            <label className={lbl}>Текущий PAR30 (%)</label>
-            <input type="text" inputMode="decimal" value={currentPar}
-              onChange={e => setCurrentPar(e.target.value)}
-              placeholder="2.50" className={inp} />
-          </div>
-          <div>
-            <label className={lbl}>Текущий Coverage Rate (%)</label>
-            <input type="text" inputMode="decimal" value={currentCov}
-              onChange={e => setCurrentCov(e.target.value)}
-              placeholder="80" className={inp} />
-          </div>
-          <div>
-            <label className={lbl}>Базовая прибыль (TJS)</label>
-            <input type="text" inputMode="numeric" value={baseProfit}
-              onChange={e => setBaseProfit(fmtN(e.target.value))}
-              placeholder="119 816 175" className={inp} />
-          </div>
-        </div>
-
-        {/* Горизонт прогноза */}
-        <div className="mt-4">
-          <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">Горизонт прогноза</p>
-          <div className="flex gap-2 flex-wrap">
-            {CREDIT_HORIZONS.map((h, i) => (
-              <button key={h.months} onClick={() => setHorizonIdx(i)}
-                className={`px-4 py-2 rounded-lg text-sm font-medium border-2 transition-all ${horizonIdx === i ? 'bg-green-50 border-[#1B8A4C] text-[#1B8A4C]' : 'bg-white border-gray-200 text-gray-500 hover:border-gray-300'}`}>
-                {h.label}
-              </button>
-            ))}
-          </div>
-          <p className="text-xs text-gray-400 mt-1.5">
-            Оптимистичный = мин. прирост · Пессимистичный = средний прирост · Катастрофический = макс. прирост
-          </p>
-        </div>
-        {/* Формула */}
-        <div className="mt-3 p-3 bg-blue-50 rounded-lg flex items-start gap-2">
-          <Info className="w-4 h-4 text-blue-500 mt-0.5 flex-shrink-0" />
-          <p className="text-xs text-blue-700">
-            <span className="font-semibold">Формула:</span> Доп. резерв = Портфель × (Новый PAR30% − Текущий PAR30%) × Coverage Rate% ·
-            Коэффициенты масштабируются по выбранному горизонту
-          </p>
-        </div>
-      </div>
-
-      {/* Вкладки */}
-      <div className="flex border-b border-gray-200 print:hidden">
-        {([1,2] as const).map(t => (
-          <button key={t} onClick={() => setTab(t)}
-            className={`px-5 py-3 text-sm font-semibold border-b-2 transition-colors ${tab===t ? 'border-[#1B8A4C] text-[#1B8A4C]' : 'border-transparent text-gray-500 hover:text-gray-700'}`}>
-            {t===1 ? '📈 Модель 1 — Сценарии' : '🔢 Модель 2 — What-If матрица'}
-          </button>
-        ))}
+      {/* Формула (scrollable) */}
+      <div className="p-3 bg-blue-50 rounded-lg flex items-start gap-2 print:hidden">
+        <Info className="w-4 h-4 text-blue-500 mt-0.5 flex-shrink-0" />
+        <p className="text-xs text-blue-700">
+          <span className="font-semibold">Формула:</span> Доп. резерв = Портфель × (Новый PAR30% − Текущий PAR30%) × Coverage Rate% ·
+          Коэффициенты масштабируются по выбранному горизонту
+        </p>
       </div>
 
       {/* ═══ МОДЕЛЬ 1 ═══ */}
