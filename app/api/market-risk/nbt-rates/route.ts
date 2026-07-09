@@ -100,7 +100,7 @@ function calcStats(rates: { date: string; value: number }[], trim = false) {
     current:     rates[rates.length - 1].value,
     first:       rates[0].value,
     totalChange: Math.round((rates[rates.length-1].value - rates[0].value) / rates[0].value * 10000) / 100,
-    dataPoints:  rates.length,
+    points:      rates.length,
     returns,
     rates:       rates.slice(-90),
   }
