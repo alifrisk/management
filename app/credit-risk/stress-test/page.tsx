@@ -81,10 +81,11 @@ export default function CreditStressTest() {
   const setGrow = (row: number, col: number, val: string) =>
     setGrowTable(prev => prev.map((r, ri) => ri === row ? r.map((c, ci) => ci === col ? val : c) : r))
 
-  // Три сценария: Оптимистичный (мин), Пессимистичный (средний), Катастрофический (макс)
+  // PAR: мин прирост → оптимистичный, макс → катастрофический
+  // Coverage: логика обратная — макс прирост резервов → оптимистичный, мин → катастрофический
   const optim = {
     par: Math.round(compound(CP, growTable[1][0]) * 100) / 100,
-    cov: Math.min(100, Math.round(compound(CC, growTable[4][0]) * 10) / 10),
+    cov: Math.min(100, Math.round(compound(CC, growTable[4][2]) * 10) / 10),
   }
   const pess = {
     par: Math.round(compound(CP, growTable[1][1]) * 100) / 100,
@@ -92,7 +93,7 @@ export default function CreditStressTest() {
   }
   const cat = {
     par: Math.round(compound(CP, growTable[1][2]) * 100) / 100,
-    cov: Math.min(100, Math.round(compound(CC, growTable[4][2]) * 10) / 10),
+    cov: Math.min(100, Math.round(compound(CC, growTable[4][0]) * 10) / 10),
   }
 
   // Текущие значения PAR7/90/180 для справочного прогноза
@@ -305,6 +306,7 @@ export default function CreditStressTest() {
               <input type="text" inputMode="decimal" value={currentCov}
                 onChange={e => setCurrentCov(e.target.value)}
                 placeholder="80" className={inp} />
+              <p className="text-[10px] text-amber-600 mt-1">↑ рост резервов — благоприятно; ↓ падение — стрессово</p>
             </div>
             <div>
               <label className={lbl}>Базовая прибыль (TJS)</label>
@@ -406,7 +408,9 @@ export default function CreditStressTest() {
                   </tr>
                   <tr className="bg-green-50/50">
                     <td className="py-2 pr-4 font-bold text-gray-700 whitespace-nowrap">
-                      Coverage (%)<br/><span className="font-normal text-[10px] text-green-600">основной для резерва</span>
+                      Coverage (%)<br/>
+                      <span className="font-normal text-[10px] text-green-600">основной для резерва</span><br/>
+                      <span className="font-normal text-[10px] text-amber-600">⚠ логика обратная PAR: макс→оптимист.</span>
                     </td>
                     <td className="px-2 py-2 text-center font-semibold text-gray-700 text-xs">{CC > 0 ? `${CC}%` : '—'}</td>
                     <td className="px-2 py-2"><input type="text" inputMode="decimal" value={growTable[4][0]} onChange={e => setGrow(4,0,e.target.value)} placeholder="0.5" className={`${inp} text-xs py-1.5 border-green-300`} /></td>
