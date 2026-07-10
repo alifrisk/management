@@ -42,8 +42,10 @@ export async function POST(req: Request) {
     const anonClient = authClient()
     const now        = new Date()
 
+    const urlPrefix = (process.env.NEXT_PUBLIC_SUPABASE_URL ?? '').slice(0, 30)
     console.log('[login] START', { email, ip, key })
     console.log('[login] ENV check', {
+      urlPrefix,
       hasUrl:         !!process.env.NEXT_PUBLIC_SUPABASE_URL,
       hasServiceRole: !!process.env.SUPABASE_SERVICE_ROLE_KEY,
       hasAnonKey:     !!process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY,
@@ -58,7 +60,7 @@ export async function POST(req: Request) {
 
     console.log('[login] SELECT login_attempts', {
       rec,
-      selectError: selectError ? { message: selectError.message, code: selectError.code, details: selectError.details } : null,
+      selectError: selectError ? JSON.stringify(selectError) : null,
     })
 
     // Record is stale (older than TTL) or absent → treat as fresh
@@ -86,11 +88,7 @@ export async function POST(req: Request) {
 
     console.log('[login] signInWithPassword result', {
       hasSession: !!data?.session,
-      signInError: signInError ? {
-        message: signInError.message,
-        status:  (signInError as { status?: number }).status,
-        name:    signInError.name,
-      } : null,
+      signInError: signInError ? JSON.stringify(signInError) : null,
     })
 
     if (signInError || !data.session) {
@@ -99,15 +97,23 @@ export async function POST(req: Request) {
         ? new Date(now.getTime() + LOCK_MINUTES * 60 * 1000).toISOString()
         : null
 
-      console.log('[login] UPSERT login_attempts', { key, newCount, lockedUntil })
-      const { error: upsertError } = await db.from('login_attempts').upsert({
-        key,
-        attempt_count: newCount,
-        locked_until:  lockedUntil,
-        updated_at:    now.toISOString(),
-      })
-      console.log('[login] UPSERT result', {
-        upsertError: upsertError ? { message: upsertError.message, code: upsertError.code, details: upsertError.details } : null,
+      // Use INSERT/UPDATE instead of UPSERT to avoid PostgREST routing issues
+      console.log('[login] writing login_attempts', { key, newCount, lockedUntil, hasExistingRec: !!rec })
+      let writeError: unknown = null
+      if (rec) {
+        const { error } = await db
+          .from('login_attempts')
+          .update({ attempt_count: newCount, locked_until: lockedUntil, updated_at: now.toISOString() })
+          .eq('key', key)
+        writeError = error
+      } else {
+        const { error } = await db
+          .from('login_attempts')
+          .insert({ key, attempt_count: newCount, locked_until: lockedUntil, updated_at: now.toISOString() })
+        writeError = error
+      }
+      console.log('[login] write result', {
+        writeError: writeError ? JSON.stringify(writeError) : null,
       })
 
       const attemptsLeft = Math.max(0, MAX_ATTEMPTS - newCount)
