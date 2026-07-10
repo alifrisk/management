@@ -5,10 +5,20 @@ const MAX_ATTEMPTS = 5
 const LOCK_MINUTES = 10
 const TTL_MINUTES  = 15
 
+// Service role — only for login_attempts table (bypasses RLS)
 function adminClient() {
   return createClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
     process.env.SUPABASE_SERVICE_ROLE_KEY!,
+    { auth: { autoRefreshToken: false, persistSession: false } }
+  )
+}
+
+// Anon key — for signInWithPassword (standard user auth operation)
+function authClient() {
+  return createClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
     { auth: { autoRefreshToken: false, persistSession: false } }
   )
 }
@@ -26,21 +36,22 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: 'Email и пароль обязательны' }, { status: 400 })
     }
 
-    const ip      = getIP(req)
-    const key     = `${ip}:${email.toLowerCase()}`
-    const supabase = adminClient()
-    const now     = new Date()
+    const ip    = getIP(req)
+    const key   = `${ip}:${email.toLowerCase()}`
+    const db    = adminClient()
+    const auth  = authClient()
+    const now   = new Date()
 
-    // Read current rate-limit record
-    const { data: rec } = await supabase
+    // Read current rate-limit record (service role bypasses RLS)
+    const { data: rec } = await db
       .from('login_attempts')
       .select('attempt_count, locked_until, updated_at')
       .eq('key', key)
       .maybeSingle()
 
     // Record is stale (older than TTL) or absent → treat as fresh
-    const ageMin     = rec ? (now.getTime() - new Date(rec.updated_at).getTime()) / 60000 : Infinity
-    const isStale    = ageMin >= TTL_MINUTES
+    const ageMin       = rec ? (now.getTime() - new Date(rec.updated_at).getTime()) / 60000 : Infinity
+    const isStale      = ageMin >= TTL_MINUTES
     const currentCount = isStale ? 0 : (rec?.attempt_count ?? 0)
 
     // Blocked?
@@ -54,8 +65,8 @@ export async function POST(req: Request) {
       )
     }
 
-    // Attempt sign-in
-    const { data, error: signInError } = await supabase.auth.signInWithPassword({ email, password })
+    // Attempt sign-in via anon-key client (standard user auth operation)
+    const { data, error: signInError } = await auth.signInWithPassword({ email, password })
 
     if (signInError || !data.session) {
       const newCount    = currentCount + 1
@@ -63,7 +74,7 @@ export async function POST(req: Request) {
         ? new Date(now.getTime() + LOCK_MINUTES * 60 * 1000).toISOString()
         : null
 
-      await supabase.from('login_attempts').upsert({
+      await db.from('login_attempts').upsert({
         key,
         attempt_count: newCount,
         locked_until:  lockedUntil,
@@ -78,7 +89,7 @@ export async function POST(req: Request) {
     }
 
     // Success — clear counter
-    await supabase.from('login_attempts').delete().eq('key', key)
+    await db.from('login_attempts').delete().eq('key', key)
 
     return NextResponse.json({
       access_token:  data.session.access_token,

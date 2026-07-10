@@ -42,28 +42,51 @@ export default function LoginPage() {
     setLoading(true)
     setError(null)
 
-    // Проверка домена
+    // Клиентская проверка домена — до запроса к серверу
     if (!email.endsWith('@alif.tj')) {
       setError('Доступ только для сотрудников ОАО «Алиф Банк». Используйте корпоративную почту @alif.tj')
       setLoading(false)
       return
     }
 
-    const { data, error: signInError } = await supabase.auth.signInWithPassword({ email, password })
-
-    if (signInError) {
-      if (signInError.message.includes('Invalid login credentials')) {
-        setError('Неверный email или пароль.')
-      } else {
-        setError('Ошибка: ' + signInError.message)
-      }
+    let res: Response
+    let data: Record<string, unknown>
+    try {
+      res = await fetch('/api/auth/login', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email, password }),
+      })
+      data = await res.json()
+    } catch {
+      setError('Ошибка сети. Проверьте подключение к интернету.')
       setLoading(false)
       return
     }
 
-    if (data.session) {
-      await redirectByRole(data.session.user.id)
+    if (res.status === 429) {
+      const mins = Math.ceil((data.retryAfterSeconds as number) / 60)
+      setError(`Слишком много неудачных попыток. Попробуйте через ${mins} мин.`)
+      setLoading(false)
+      return
     }
+
+    if (!res.ok) {
+      const left = data.attemptsLeft as number | undefined
+      const suffix =
+        left === undefined ? '' :
+        left > 0           ? ` Осталось попыток: ${left}.` :
+                             ' Аккаунт заблокирован на 10 минут.'
+      setError(((data.error as string) ?? 'Ошибка входа.') + suffix)
+      setLoading(false)
+      return
+    }
+
+    await supabase.auth.setSession({
+      access_token:  data.access_token  as string,
+      refresh_token: data.refresh_token as string,
+    })
+    await redirectByRole(data.user_id as string)
   }
 
   if (loading) {
