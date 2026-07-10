@@ -36,11 +36,11 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: 'Email и пароль обязательны' }, { status: 400 })
     }
 
-    const ip    = getIP(req)
-    const key   = `${ip}:${email.toLowerCase()}`
-    const db    = adminClient()
-    const auth  = authClient()
-    const now   = new Date()
+    const ip         = getIP(req)
+    const key        = `${ip}:${email.toLowerCase()}`
+    const db         = adminClient()
+    const anonClient = authClient()
+    const now        = new Date()
 
     // Read current rate-limit record (service role bypasses RLS)
     const { data: rec } = await db
@@ -66,7 +66,7 @@ export async function POST(req: Request) {
     }
 
     // Attempt sign-in via anon-key client (standard user auth operation)
-    const { data, error: signInError } = await auth.signInWithPassword({ email, password })
+    const { data, error: signInError } = await anonClient.auth.signInWithPassword({ email, password })
 
     if (signInError || !data.session) {
       const newCount    = currentCount + 1
