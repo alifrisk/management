@@ -30,14 +30,98 @@ const CONTEXTS = [
 ]
 
 function fmtText(text: string) {
+  const inlineFmt = (s: string) => s
+    .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
+    .replace(/`([^`]+)`/g, '<code class="bg-gray-100 px-1 py-0.5 rounded text-xs font-mono">$1</code>')
+
+  // 1. Escape raw HTML first
   const escaped = text
     .replace(/&/g, '&amp;')
     .replace(/</g, '&lt;')
     .replace(/>/g, '&gt;')
-  return escaped
-    .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
-    .replace(/`(.*?)`/g, '<code class="bg-gray-100 px-1 py-0.5 rounded text-xs font-mono">$1</code>')
-    .replace(/\n/g, '<br/>')
+
+  const lines = escaped.split('\n')
+  type Chunk = { block: true; html: string } | { block: false; text: string }
+  const chunks: Chunk[] = []
+  let i = 0
+
+  while (i < lines.length) {
+    const line = lines[i]
+
+    // 2. Table block — collect consecutive | lines
+    if (line.trim().startsWith('|')) {
+      const tableLines: string[] = []
+      while (i < lines.length && lines[i].trim().startsWith('|')) {
+        tableLines.push(lines[i].trim())
+        i++
+      }
+      const isSep = (l: string) => /^\|[-|\s:]+\|$/.test(l.replace(/\s+/g, ''))
+      const rows = tableLines.filter(l => !isSep(l))
+      if (rows.length) {
+        let html = '<div class="overflow-x-auto my-2"><table class="w-full text-xs border-collapse">'
+        rows.forEach((row, ri) => {
+          const cells = row.split('|').slice(1, -1)
+          const bg = ri === 0 ? 'bg-[#1B8A4C]/10' : ri % 2 === 1 ? 'bg-gray-50' : 'bg-white'
+          html += `<tr class="${bg}">`
+          cells.forEach(c => {
+            const cell = inlineFmt(c.trim())
+            html += ri === 0
+              ? `<th class="border border-gray-200 px-3 py-2 text-left text-xs font-semibold text-gray-700">${cell}</th>`
+              : `<td class="border border-gray-200 px-3 py-1.5 text-left text-xs text-gray-600">${cell}</td>`
+          })
+          html += '</tr>'
+        })
+        html += '</table></div>'
+        chunks.push({ block: true, html })
+      }
+      continue
+    }
+
+    // 3. List block — collect consecutive - / * lines
+    if (/^[ \t]*[-*] /.test(line)) {
+      const listLines: string[] = []
+      while (i < lines.length && /^[ \t]*[-*] /.test(lines[i])) {
+        listLines.push(lines[i])
+        i++
+      }
+      let html = '<ul class="list-disc list-inside my-1.5 space-y-0.5 text-sm">'
+      listLines.forEach(l => {
+        html += `<li class="text-gray-700">${inlineFmt(l.replace(/^[ \t]*[-*] /, ''))}</li>`
+      })
+      html += '</ul>'
+      chunks.push({ block: true, html })
+      continue
+    }
+
+    // 4. Headings
+    if (/^## /.test(line)) {
+      chunks.push({ block: true, html: `<h3 class="text-base font-semibold text-gray-900 mt-3 mb-1">${inlineFmt(line.replace(/^## /, ''))}</h3>` })
+      i++; continue
+    }
+    if (/^# /.test(line)) {
+      chunks.push({ block: true, html: `<h2 class="text-lg font-bold text-gray-900 mt-4 mb-1">${inlineFmt(line.replace(/^# /, ''))}</h2>` })
+      i++; continue
+    }
+
+    chunks.push({ block: false, text: line })
+    i++
+  }
+
+  // Render: flush text runs with inline formatting + <br/>, blocks go verbatim
+  const parts: string[] = []
+  let buf: string[] = []
+  function flush() {
+    if (buf.length) {
+      parts.push(inlineFmt(buf.join('\n')).replace(/\n/g, '<br/>'))
+      buf = []
+    }
+  }
+  for (const chunk of chunks) {
+    if (chunk.block) { flush(); parts.push(chunk.html) }
+    else buf.push(chunk.text)
+  }
+  flush()
+  return parts.join('')
 }
 
 export default function RiskovikPage() {
