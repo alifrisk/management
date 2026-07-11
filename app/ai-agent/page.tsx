@@ -2,7 +2,7 @@
 import { useState, useRef, useEffect, useCallback } from 'react'
 import { supabase } from '@/supabase/client'
 import { apiFetch } from '@/lib/api-fetch'
-import { Send, Bot, User, Loader2, Copy, Check, Paperclip, X, FileText, Plus, History, ChevronDown, Edit2, BookOpen, Trash2, Zap } from 'lucide-react'
+import { Send, Bot, User, Loader2, Copy, Check, Paperclip, X, FileText, Plus, History, ChevronDown, Edit2, BookOpen, Trash2, Zap, Database } from 'lucide-react'
 
 interface Message { id: string; role: 'user' | 'assistant'; content: string }
 interface Chat { id: string; title: string; created_at: string }
@@ -151,6 +151,7 @@ export default function RiskovikPage() {
   const [kbContent, setKbContent] = useState('')
   const [kbSaving,  setKbSaving]  = useState(false)
   const [isAdmin,   setIsAdmin]   = useState(false)
+  const [savedToKB, setSavedToKB] = useState<Set<number>>(new Set())
   const kbFileRef = useRef<HTMLInputElement>(null)
 
   // Live data from Supabase
@@ -490,6 +491,14 @@ export default function RiskovikPage() {
     setKbDocs(prev => prev.filter(d => d.id !== id))
   }
 
+  async function saveDocToKB(doc: DocFile, idx: number) {
+    const { error } = await supabase.from('knowledge_documents').insert({ title: doc.name, content: doc.content })
+    if (!error) {
+      setSavedToKB(prev => new Set(prev).add(idx))
+      await loadKBDocs()
+    }
+  }
+
   async function saveEdit(msgId: string) {
     if (!editText.trim() || !chatId) return
     await supabase.from('ai_messages').update({ content: editText }).eq('id', msgId)
@@ -728,9 +737,16 @@ export default function RiskovikPage() {
         <div className="flex items-center gap-2 flex-wrap mb-2 flex-shrink-0">
           {docs.map((d, i) => (
             <div key={i} className="flex items-center gap-1.5 bg-blue-50 border border-blue-200 rounded-lg px-2.5 py-1 text-xs text-blue-700">
-              <FileText className="w-3 h-3" />
+              <FileText className="w-3 h-3 flex-shrink-0" />
               <span className="max-w-32 truncate">{d.name}</span>
-              <button onClick={() => setDocs(prev => prev.filter((_, j) => j !== i))} className="hover:text-red-500 ml-0.5">
+              {isAdmin && (
+                savedToKB.has(i)
+                  ? <Check className="w-3 h-3 text-green-500 flex-shrink-0" />
+                  : <button onClick={() => saveDocToKB(d, i)} className="hover:text-[#1B8A4C] ml-0.5 flex-shrink-0" title="Сохранить в базу знаний">
+                      <Database className="w-3 h-3" />
+                    </button>
+              )}
+              <button onClick={() => setDocs(prev => prev.filter((_, j) => j !== i))} className="hover:text-red-500 ml-0.5 flex-shrink-0">
                 <X className="w-3 h-3" />
               </button>
             </div>
