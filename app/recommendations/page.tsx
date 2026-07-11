@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useRef } from 'react'
 import { useRouter } from 'next/navigation'
 import { supabase } from '@/supabase/client'
 import { Plus, Edit2, Trash2, X, CheckCircle2, AlertCircle, Clock, Filter, Search, Eye, Download, Upload, FileText } from 'lucide-react'
@@ -74,6 +74,8 @@ const getDaysLeft = (d: string) => d ? Math.ceil((new Date(d).getTime() - Date.n
 
 export default function RecommendationsPage() {
   const router = useRouter()
+  const sentinelRef = useRef<HTMLDivElement>(null)
+  const [isScrolled, setIsScrolled] = useState(false)
   const [items, setItems] = useState<Recommendation[]>([])
   const [loading, setLoading] = useState(true)
   const [showModal, setShowModal] = useState(false)
@@ -112,6 +114,17 @@ export default function RecommendationsPage() {
         sessionStorage.removeItem('new_rec_prefill')
       } catch { /* ignore */ }
     }
+  }, [])
+
+  useEffect(() => {
+    const sentinel = sentinelRef.current
+    if (!sentinel) return
+    const observer = new IntersectionObserver(
+      ([entry]) => setIsScrolled(!entry.isIntersecting),
+      { threshold: 0 }
+    )
+    observer.observe(sentinel)
+    return () => observer.disconnect()
   }, [])
 
   const setF = (k: string, v: string) => setForm(p => ({ ...p, [k]: v }))
@@ -234,7 +247,8 @@ export default function RecommendationsPage() {
 
   return (
     <div className="max-w-6xl mx-auto">
-      <div className="sticky top-0 z-20 -mx-6 lg:-mx-8 px-6 lg:px-8 pt-5 pb-4 bg-[#F5F8F6]" style={{boxShadow: '0 2px 12px rgba(0,0,0,0.06)'}}>
+      <div ref={sentinelRef} className="h-px" />
+      <div className="sticky top-0 z-20 -mx-6 lg:-mx-8 px-6 lg:px-8 pt-5 pb-4 bg-[#F5F8F6] transition-shadow duration-200" style={isScrolled ? {boxShadow: '0 2px 12px rgba(0,0,0,0.06)'} : undefined}>
         <div className="flex items-center justify-between flex-wrap gap-3">
           <div>
             <h1 className="text-xl font-semibold text-gray-900">Реестр рекомендаций СУР</h1>

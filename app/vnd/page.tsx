@@ -1,7 +1,7 @@
 'use client'
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useRef } from 'react'
 import { supabase } from '@/supabase/client'
-import { Plus, Download, Eye, Trash2, X, Upload, FileText, AlertTriangle, CheckCircle, Clock, Filter, Search, History } from 'lucide-react'
+import { Plus, Download, Eye, Trash2, X, Upload, FileText, AlertTriangle, CheckCircle, Clock, Search, History } from 'lucide-react'
 
 interface VNDDocument {
   id: string
@@ -10,7 +10,6 @@ interface VNDDocument {
   version: string; description: string
   file_path: string; file_name: string; file_size: number; file_type: string
   uploaded_by: string; created_at: string; updated_at: string
-  // ✅ Три типа документов
   draft_path: string; draft_name: string
   explanatory_path: string; explanatory_name: string
   original_path: string; original_name: string
@@ -24,6 +23,7 @@ interface DocumentVersion {
 
 const CATEGORIES = ['Политика', 'Процедура', 'Инструкция', 'Методология', 'Регламент', 'Положение', 'Другое']
 const STATUSES = ['Действующий', 'На пересмотре', 'Архив']
+const PAGE_SIZE = 20
 
 function getDaysUntilReview(reviewDate: string): number | null {
   if (!reviewDate) return null
@@ -61,7 +61,6 @@ export default function VNDPage() {
   const [versions, setVersions] = useState<DocumentVersion[]>([])
   const [form, setForm] = useState(EMPTY_FORM)
   const [file, setFile] = useState<File | null>(null)
-  // ✅ Три типа файлов
   const [draftFile, setDraftFile] = useState<File | null>(null)
   const [explanatoryFile, setExplanatoryFile] = useState<File | null>(null)
   const [originalFile, setOriginalFile] = useState<File | null>(null)
@@ -74,6 +73,9 @@ export default function VNDPage() {
   const [newVersionDoc, setNewVersionDoc] = useState<VNDDocument | null>(null)
   const [newVersionFile, setNewVersionFile] = useState<File | null>(null)
   const [newVersionNotes, setNewVersionNotes] = useState('')
+  const [page, setPage] = useState(1)
+  const sentinelRef = useRef<HTMLDivElement>(null)
+  const [isScrolled, setIsScrolled] = useState(false)
 
   const fetch_ = useCallback(async () => {
     setLoading(true)
@@ -83,6 +85,19 @@ export default function VNDPage() {
   }, [])
 
   useEffect(() => { fetch_() }, [fetch_])
+
+  useEffect(() => {
+    const sentinel = sentinelRef.current
+    if (!sentinel) return
+    const observer = new IntersectionObserver(
+      ([entry]) => setIsScrolled(!entry.isIntersecting),
+      { threshold: 0 }
+    )
+    observer.observe(sentinel)
+    return () => observer.disconnect()
+  }, [])
+
+  useEffect(() => { setPage(1) }, [search, filterCategory, filterStatus])
 
   const setF = (k: string, v: string) => setForm(p => ({ ...p, [k]: v }))
 
@@ -106,27 +121,14 @@ export default function VNDPage() {
       let explanatoryPath = '', explanatoryName = ''
       let originalPath = '', originalName = ''
 
-      // Upload main file (backward compat)
       if (file) {
         filePath = await uploadFile(file)
         fileName = file.name; fileSize = file.size
         fileType = file.name.split('.').pop() || ''
       }
-      // Upload draft
-      if (draftFile) {
-        draftPath = await uploadFile(draftFile)
-        draftName = draftFile.name
-      }
-      // Upload explanatory
-      if (explanatoryFile) {
-        explanatoryPath = await uploadFile(explanatoryFile)
-        explanatoryName = explanatoryFile.name
-      }
-      // Upload original
-      if (originalFile) {
-        originalPath = await uploadFile(originalFile)
-        originalName = originalFile.name
-      }
+      if (draftFile) { draftPath = await uploadFile(draftFile); draftName = draftFile.name }
+      if (explanatoryFile) { explanatoryPath = await uploadFile(explanatoryFile); explanatoryName = explanatoryFile.name }
+      if (originalFile) { originalPath = await uploadFile(originalFile); originalName = originalFile.name }
 
       const payload = {
         title: form.title, category: form.category,
@@ -226,6 +228,9 @@ export default function VNDPage() {
     return true
   })
 
+  const totalPages = Math.ceil(filtered.length / PAGE_SIZE)
+  const paginated = filtered.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE)
+
   const expiringSoon = docs.filter(d => { const days = getDaysUntilReview(d.review_date); return days !== null && days <= 30 && days > 0 && d.status === 'Действующий' }).length
   const expired = docs.filter(d => { const days = getDaysUntilReview(d.review_date); return days !== null && days <= 0 && d.status === 'Действующий' }).length
 
@@ -261,152 +266,181 @@ export default function VNDPage() {
   )
 
   return (
-    <div className="max-w-6xl mx-auto space-y-5">
-      <div className="flex items-center justify-between flex-wrap gap-3">
-        <div>
-          <h1 className="text-xl font-semibold text-gray-900">ВНД СУР — Внутренние нормативные документы</h1>
-          <p className="text-sm text-gray-500 mt-0.5">Хранилище документов Службы управления рисками</p>
-        </div>
-        <button onClick={() => { setForm(EMPTY_FORM); setFile(null); setDraftFile(null); setExplanatoryFile(null); setOriginalFile(null); setEditingId(null); setError(null); setShowModal(true) }}
-          className="flex items-center gap-2 px-4 py-2 bg-[#1B8A4C] text-white rounded-lg text-sm font-medium hover:bg-[#177040]">
-          <Plus className="w-4 h-4" /> Загрузить документ
-        </button>
-      </div>
+    <div className="max-w-6xl mx-auto">
+      <div ref={sentinelRef} className="h-px" />
 
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
-        {[
-          { label: 'Всего документов', value: docs.length, c: 'text-gray-900', icon: <FileText className="w-5 h-5 text-gray-400" /> },
-          { label: 'Действующие', value: docs.filter(d => d.status === 'Действующий').length, c: 'text-green-600', icon: <CheckCircle className="w-5 h-5 text-green-400" /> },
-          { label: 'Истекают (30 дн.)', value: expiringSoon, c: 'text-orange-600', icon: <Clock className="w-5 h-5 text-orange-400" /> },
-          { label: 'Просроченные', value: expired, c: 'text-red-600', icon: <AlertTriangle className="w-5 h-5 text-red-400" /> },
-        ].map(s => (
-          <div key={s.label} className="bg-white rounded-xl border border-gray-100 p-4 shadow-sm flex items-center gap-3">
-            {s.icon}
-            <div><p className={`text-2xl font-bold ${s.c}`}>{s.value}</p><p className="text-xs text-gray-500">{s.label}</p></div>
+      {/* Sticky header */}
+      <div
+        className="sticky top-0 z-20 -mx-6 lg:-mx-8 px-6 lg:px-8 pt-5 pb-4 bg-[#F5F8F6] transition-shadow duration-200"
+        style={isScrolled ? { boxShadow: '0 2px 12px rgba(0,0,0,0.06)' } : undefined}
+      >
+        <div className="flex items-center justify-between flex-wrap gap-3">
+          <div>
+            <h1 className="text-xl font-semibold text-gray-900">ВНД СУР — Внутренние нормативные документы</h1>
+            <p className="text-sm text-gray-500 mt-0.5">Хранилище документов Службы управления рисками</p>
           </div>
-        ))}
-      </div>
-
-      {expired > 0 && (
-        <div className="flex items-center gap-3 p-4 bg-red-50 border border-red-200 rounded-xl">
-          <AlertTriangle className="w-5 h-5 text-red-600 flex-shrink-0" />
-          <p className="text-sm text-red-700 font-medium">{expired} документ(ов) требуют пересмотра — срок действия истёк!</p>
-        </div>
-      )}
-      {expiringSoon > 0 && (
-        <div className="flex items-center gap-3 p-4 bg-orange-50 border border-orange-200 rounded-xl">
-          <Clock className="w-5 h-5 text-orange-600 flex-shrink-0" />
-          <p className="text-sm text-orange-700 font-medium">{expiringSoon} документ(ов) истекают в течение 30 дней</p>
-        </div>
-      )}
-
-      <div className="bg-white rounded-xl border border-gray-100 p-4 shadow-sm flex items-center gap-3 flex-wrap">
-        <div className="flex-1 relative min-w-[200px]">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
-          <input type="text" placeholder="Поиск по названию или номеру..." value={search} onChange={e => setSearch(e.target.value)}
-            className="w-full pl-9 pr-4 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#1B8A4C]" />
-        </div>
-        <select value={filterCategory} onChange={e => setFilterCategory(e.target.value)} className="px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#1B8A4C] bg-white">
-          <option value="">Все категории</option>
-          {CATEGORIES.map(c => <option key={c}>{c}</option>)}
-        </select>
-        <select value={filterStatus} onChange={e => setFilterStatus(e.target.value)} className="px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#1B8A4C] bg-white">
-          <option value="">Все статусы</option>
-          {STATUSES.map(s => <option key={s}>{s}</option>)}
-        </select>
-        {(filterCategory || filterStatus || search) && (
-          <button onClick={() => { setFilterCategory(''); setFilterStatus(''); setSearch('') }} className="text-xs text-gray-500 hover:text-gray-700 flex items-center gap-1">
-            <X className="w-3.5 h-3.5" /> Сбросить
+          <button onClick={() => { setForm(EMPTY_FORM); setFile(null); setDraftFile(null); setExplanatoryFile(null); setOriginalFile(null); setEditingId(null); setError(null); setShowModal(true) }}
+            className="flex items-center gap-2 px-4 py-2 bg-[#1B8A4C] text-white rounded-lg text-sm font-medium hover:bg-[#177040]">
+            <Plus className="w-4 h-4" /> Загрузить документ
           </button>
+        </div>
+
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 mt-4">
+          {[
+            { label: 'Всего документов', value: docs.length, c: 'text-gray-900', icon: <FileText className="w-5 h-5 text-gray-400" /> },
+            { label: 'Действующие', value: docs.filter(d => d.status === 'Действующий').length, c: 'text-green-600', icon: <CheckCircle className="w-5 h-5 text-green-400" /> },
+            { label: 'Истекают (30 дн.)', value: expiringSoon, c: 'text-orange-600', icon: <Clock className="w-5 h-5 text-orange-400" /> },
+            { label: 'Просроченные', value: expired, c: 'text-red-600', icon: <AlertTriangle className="w-5 h-5 text-red-400" /> },
+          ].map(s => (
+            <div key={s.label} className="bg-white rounded-xl border border-gray-100 p-4 shadow-sm flex items-center gap-3">
+              {s.icon}
+              <div><p className={`text-2xl font-bold ${s.c}`}>{s.value}</p><p className="text-xs text-gray-500">{s.label}</p></div>
+            </div>
+          ))}
+        </div>
+
+        {expired > 0 && (
+          <div className="flex items-center gap-3 p-4 bg-red-50 border border-red-200 rounded-xl mt-3">
+            <AlertTriangle className="w-5 h-5 text-red-600 flex-shrink-0" />
+            <p className="text-sm text-red-700 font-medium">{expired} документ(ов) требуют пересмотра — срок действия истёк!</p>
+          </div>
         )}
+        {expiringSoon > 0 && (
+          <div className="flex items-center gap-3 p-4 bg-orange-50 border border-orange-200 rounded-xl mt-3">
+            <Clock className="w-5 h-5 text-orange-600 flex-shrink-0" />
+            <p className="text-sm text-orange-700 font-medium">{expiringSoon} документ(ов) истекают в течение 30 дней</p>
+          </div>
+        )}
+
+        <div className="bg-white rounded-xl border border-gray-100 p-4 shadow-sm flex items-center gap-3 flex-wrap mt-3">
+          <div className="flex-1 relative min-w-[200px]">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+            <input type="text" placeholder="Поиск по названию или номеру..." value={search} onChange={e => setSearch(e.target.value)}
+              className="w-full pl-9 pr-4 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#1B8A4C]" />
+          </div>
+          <select value={filterCategory} onChange={e => setFilterCategory(e.target.value)} className="px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#1B8A4C] bg-white">
+            <option value="">Все категории</option>
+            {CATEGORIES.map(c => <option key={c}>{c}</option>)}
+          </select>
+          <select value={filterStatus} onChange={e => setFilterStatus(e.target.value)} className="px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#1B8A4C] bg-white">
+            <option value="">Все статусы</option>
+            {STATUSES.map(s => <option key={s}>{s}</option>)}
+          </select>
+          {(filterCategory || filterStatus || search) && (
+            <button onClick={() => { setFilterCategory(''); setFilterStatus(''); setSearch('') }} className="text-xs text-gray-500 hover:text-gray-700 flex items-center gap-1">
+              <X className="w-3.5 h-3.5" /> Сбросить
+            </button>
+          )}
+        </div>
       </div>
 
-      <div className="bg-white rounded-xl border border-gray-100 shadow-sm overflow-hidden">
-        <div className="overflow-x-auto">
-          <table className="w-full text-sm">
-            <thead>
-              <tr className="bg-gray-50 border-b border-gray-100">
-                {['Документ','Категория','Версия','Статус','Утверждён','Пересмотр','Файлы',''].map(h => (
-                  <th key={h} className="text-left px-4 py-3 text-xs font-medium text-gray-500 uppercase whitespace-nowrap">{h}</th>
-                ))}
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-gray-50">
-              {loading ? <tr><td colSpan={8} className="text-center py-12 text-gray-400">Загрузка...</td></tr>
-                : filtered.length === 0 ? <tr><td colSpan={8} className="text-center py-12 text-gray-400">
-                    <FileText className="w-8 h-8 mx-auto mb-2 opacity-30" /><p>Документов нет</p>
-                  </td></tr>
-                : filtered.map(doc => {
-                  const si = getStatusInfo(doc)
-                  const days = getDaysUntilReview(doc.review_date)
-                  return (
-                    <tr key={doc.id} className="hover:bg-gray-50">
-                      <td className="px-4 py-3">
-                        <div className="flex items-center gap-2">
-                          <span className="text-lg">{fileIcon(doc.file_type)}</span>
-                          <div>
-                            <p className="font-medium text-gray-900">{doc.title}</p>
-                            {doc.document_number && <p className="text-xs text-gray-400">№ {doc.document_number}</p>}
+      {/* Table */}
+      <div className="mt-5">
+        <div className="bg-white rounded-xl border border-gray-100 shadow-sm overflow-hidden">
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="bg-gray-50 border-b border-gray-100">
+                  {['Документ','Категория','Версия','Статус','Утверждён','Пересмотр','Файлы',''].map(h => (
+                    <th key={h} className="text-left px-4 py-3 text-xs font-medium text-gray-500 uppercase whitespace-nowrap">{h}</th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-gray-50">
+                {loading ? <tr><td colSpan={8} className="text-center py-12 text-gray-400">Загрузка...</td></tr>
+                  : filtered.length === 0 ? <tr><td colSpan={8} className="text-center py-12 text-gray-400">
+                      <FileText className="w-8 h-8 mx-auto mb-2 opacity-30" /><p>Документов нет</p>
+                    </td></tr>
+                  : paginated.map(doc => {
+                    const si = getStatusInfo(doc)
+                    const days = getDaysUntilReview(doc.review_date)
+                    return (
+                      <tr key={doc.id} className="hover:bg-gray-50">
+                        <td className="px-4 py-3">
+                          <div className="flex items-center gap-2">
+                            <span className="text-lg">{fileIcon(doc.file_type)}</span>
+                            <div>
+                              <p className="font-medium text-gray-900">{doc.title}</p>
+                              {doc.document_number && <p className="text-xs text-gray-400">№ {doc.document_number}</p>}
+                            </div>
                           </div>
-                        </div>
-                      </td>
-                      <td className="px-4 py-3"><span className="text-xs bg-blue-50 text-blue-700 px-2 py-0.5 rounded-full font-medium">{doc.category}</span></td>
-                      <td className="px-4 py-3 text-gray-600 font-medium">v{doc.version}</td>
-                      <td className="px-4 py-3"><span className={`inline-flex px-2 py-0.5 rounded-full text-xs font-medium ${si.color}`}>{si.label}</span></td>
-                      <td className="px-4 py-3 text-gray-500 text-xs">{doc.approved_date ? new Date(doc.approved_date).toLocaleDateString('ru-RU') : '—'}</td>
-                      <td className="px-4 py-3">
-                        {doc.review_date ? (
-                          <span className={`text-xs font-medium ${days !== null && days <= 0 ? 'text-red-600' : days !== null && days <= 30 ? 'text-orange-600' : 'text-gray-500'}`}>
-                            {new Date(doc.review_date).toLocaleDateString('ru-RU')}
-                            {days !== null && days <= 30 && <span className="ml-1">({days <= 0 ? 'истёк' : `${days} дн.`})</span>}
-                          </span>
-                        ) : '—'}
-                      </td>
-                      {/* ✅ Три типа файлов */}
-                      <td className="px-4 py-3">
-                        <div className="flex items-center gap-1">
-                          {doc.draft_path && (
-                            <button onClick={() => handleDownload(doc.draft_path, doc.draft_name)} title="Скачать Word драфт"
-                              className="flex items-center gap-0.5 px-1.5 py-0.5 bg-blue-50 text-blue-600 rounded text-xs hover:bg-blue-100">
-                              📝
-                            </button>
-                          )}
-                          {doc.explanatory_path && (
-                            <button onClick={() => handleDownload(doc.explanatory_path, doc.explanatory_name)} title="Скачать PDF пояснительная"
-                              className="flex items-center gap-0.5 px-1.5 py-0.5 bg-orange-50 text-orange-600 rounded text-xs hover:bg-orange-100">
-                              📋
-                            </button>
-                          )}
-                          {doc.original_path && (
-                            <button onClick={() => handleDownload(doc.original_path, doc.original_name)} title="Скачать PDF оригинал"
-                              className="flex items-center gap-0.5 px-1.5 py-0.5 bg-green-50 text-green-600 rounded text-xs hover:bg-green-100">
-                              ✅
-                            </button>
-                          )}
-                          {doc.file_path && !doc.draft_path && !doc.explanatory_path && !doc.original_path && (
-                            <button onClick={() => handleDownload(doc.file_path, doc.file_name)} title="Скачать"
-                              className="flex items-center gap-0.5 px-1.5 py-0.5 bg-gray-50 text-gray-600 rounded text-xs hover:bg-gray-100">
-                              📄
-                            </button>
-                          )}
-                          {!doc.draft_path && !doc.explanatory_path && !doc.original_path && !doc.file_path && (
-                            <span className="text-xs text-gray-300">—</span>
-                          )}
-                        </div>
-                      </td>
-                      <td className="px-4 py-3">
-                        <div className="flex items-center gap-1">
-                          <button onClick={() => loadVersions(doc)} title="История" className="p-1.5 text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg"><History className="w-3.5 h-3.5" /></button>
-                          <button onClick={() => openEdit(doc)} title="Редактировать" className="p-1.5 text-gray-400 hover:text-yellow-600 hover:bg-yellow-50 rounded-lg"><Eye className="w-3.5 h-3.5" /></button>
-                          <button onClick={() => setNewVersionDoc(doc)} title="Новая версия" className="p-1.5 text-gray-400 hover:text-purple-600 hover:bg-purple-50 rounded-lg"><Upload className="w-3.5 h-3.5" /></button>
-                          <button onClick={() => handleDelete(doc)} title="Удалить" className="p-1.5 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg"><Trash2 className="w-3.5 h-3.5" /></button>
-                        </div>
-                      </td>
-                    </tr>
-                  )
-                })}
-            </tbody>
-          </table>
+                        </td>
+                        <td className="px-4 py-3"><span className="text-xs bg-blue-50 text-blue-700 px-2 py-0.5 rounded-full font-medium">{doc.category}</span></td>
+                        <td className="px-4 py-3 text-gray-600 font-medium">v{doc.version}</td>
+                        <td className="px-4 py-3"><span className={`inline-flex px-2 py-0.5 rounded-full text-xs font-medium ${si.color}`}>{si.label}</span></td>
+                        <td className="px-4 py-3 text-gray-500 text-xs">{doc.approved_date ? new Date(doc.approved_date).toLocaleDateString('ru-RU') : '—'}</td>
+                        <td className="px-4 py-3">
+                          {doc.review_date ? (
+                            <span className={`text-xs font-medium ${days !== null && days <= 0 ? 'text-red-600' : days !== null && days <= 30 ? 'text-orange-600' : 'text-gray-500'}`}>
+                              {new Date(doc.review_date).toLocaleDateString('ru-RU')}
+                              {days !== null && days <= 30 && <span className="ml-1">({days <= 0 ? 'истёк' : `${days} дн.`})</span>}
+                            </span>
+                          ) : '—'}
+                        </td>
+                        <td className="px-4 py-3">
+                          <div className="flex items-center gap-1">
+                            {doc.draft_path && (
+                              <button onClick={() => handleDownload(doc.draft_path, doc.draft_name)} title="Скачать Word драфт"
+                                className="flex items-center gap-0.5 px-1.5 py-0.5 bg-blue-50 text-blue-600 rounded text-xs hover:bg-blue-100">
+                                📝
+                              </button>
+                            )}
+                            {doc.explanatory_path && (
+                              <button onClick={() => handleDownload(doc.explanatory_path, doc.explanatory_name)} title="Скачать PDF пояснительная"
+                                className="flex items-center gap-0.5 px-1.5 py-0.5 bg-orange-50 text-orange-600 rounded text-xs hover:bg-orange-100">
+                                📋
+                              </button>
+                            )}
+                            {doc.original_path && (
+                              <button onClick={() => handleDownload(doc.original_path, doc.original_name)} title="Скачать PDF оригинал"
+                                className="flex items-center gap-0.5 px-1.5 py-0.5 bg-green-50 text-green-600 rounded text-xs hover:bg-green-100">
+                                ✅
+                              </button>
+                            )}
+                            {doc.file_path && !doc.draft_path && !doc.explanatory_path && !doc.original_path && (
+                              <button onClick={() => handleDownload(doc.file_path, doc.file_name)} title="Скачать"
+                                className="flex items-center gap-0.5 px-1.5 py-0.5 bg-gray-50 text-gray-600 rounded text-xs hover:bg-gray-100">
+                                📄
+                              </button>
+                            )}
+                            {!doc.draft_path && !doc.explanatory_path && !doc.original_path && !doc.file_path && (
+                              <span className="text-xs text-gray-300">—</span>
+                            )}
+                          </div>
+                        </td>
+                        <td className="px-4 py-3">
+                          <div className="flex items-center gap-1">
+                            <button onClick={() => loadVersions(doc)} title="История" className="p-1.5 text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg"><History className="w-3.5 h-3.5" /></button>
+                            <button onClick={() => openEdit(doc)} title="Редактировать" className="p-1.5 text-gray-400 hover:text-yellow-600 hover:bg-yellow-50 rounded-lg"><Eye className="w-3.5 h-3.5" /></button>
+                            <button onClick={() => setNewVersionDoc(doc)} title="Новая версия" className="p-1.5 text-gray-400 hover:text-purple-600 hover:bg-purple-50 rounded-lg"><Upload className="w-3.5 h-3.5" /></button>
+                            <button onClick={() => handleDelete(doc)} title="Удалить" className="p-1.5 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg"><Trash2 className="w-3.5 h-3.5" /></button>
+                          </div>
+                        </td>
+                      </tr>
+                    )
+                  })}
+              </tbody>
+            </table>
+          </div>
+          {filtered.length > PAGE_SIZE && (
+            <div className="px-4 py-3 border-t border-gray-100 flex items-center justify-between">
+              <p className="text-xs text-gray-500">
+                Показано {(page - 1) * PAGE_SIZE + 1}–{Math.min(page * PAGE_SIZE, filtered.length)} из {filtered.length}
+              </p>
+              <div className="flex items-center gap-1">
+                <button onClick={() => setPage(p => Math.max(1, p - 1))} disabled={page === 1}
+                  className="px-2.5 py-1 text-xs border border-gray-200 rounded disabled:opacity-40 hover:bg-gray-50">←</button>
+                {Array.from({ length: Math.min(totalPages, 5) }, (_, i) => i + 1).map(p => (
+                  <button key={p} onClick={() => setPage(p)}
+                    className={`px-2.5 py-1 text-xs rounded border ${page === p ? 'bg-[#1B8A4C] text-white border-[#1B8A4C]' : 'border-gray-200 hover:bg-gray-50'}`}>
+                    {p}
+                  </button>
+                ))}
+                <button onClick={() => setPage(p => Math.min(totalPages, p + 1))} disabled={page === totalPages}
+                  className="px-2.5 py-1 text-xs border border-gray-200 rounded disabled:opacity-40 hover:bg-gray-50">→</button>
+              </div>
+            </div>
+          )}
         </div>
       </div>
 
@@ -501,7 +535,6 @@ export default function VNDPage() {
                 <div className="lg:col-span-2"><label className={lbl}>Описание</label><textarea value={form.description} onChange={e => setF('description', e.target.value)} rows={2} placeholder="Краткое описание..." className={inp + ' resize-none'} /></div>
               </div>
 
-              {/* ✅ Три типа файлов */}
               <div>
                 <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-3">Файлы документа</p>
                 <div className="space-y-3">
