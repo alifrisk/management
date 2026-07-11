@@ -42,11 +42,11 @@ export async function POST(req: Request) {
     const anonClient = authClient()
     const now        = new Date()
 
-    const urlPrefix = (process.env.NEXT_PUBLIC_SUPABASE_URL ?? '').slice(0, 30)
+    const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL ?? ''
     console.log('[login] START', { email, ip, key })
     console.log('[login] ENV check', {
-      urlPrefix,
-      hasUrl:         !!process.env.NEXT_PUBLIC_SUPABASE_URL,
+      urlFull:        supabaseUrl,
+      hasUrl:         !!supabaseUrl,
       hasServiceRole: !!process.env.SUPABASE_SERVICE_ROLE_KEY,
       hasAnonKey:     !!process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY,
     })
@@ -62,6 +62,11 @@ export async function POST(req: Request) {
       rec,
       selectError: selectError ? JSON.stringify(selectError) : null,
     })
+
+    if (selectError) {
+      console.error('[login] SELECT FAILED — aborting', JSON.stringify(selectError))
+      return NextResponse.json({ error: 'Внутренняя ошибка сервера (SELECT)' }, { status: 500 })
+    }
 
     // Record is stale (older than TTL) or absent → treat as fresh
     const ageMin       = rec ? (now.getTime() - new Date(rec.updated_at).getTime()) / 60000 : Infinity
