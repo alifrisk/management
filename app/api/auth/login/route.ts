@@ -5,10 +5,15 @@ const MAX_ATTEMPTS = 5
 const LOCK_MINUTES = 10
 const TTL_MINUTES  = 15
 
+// Strip accidental /rest/v1 suffix — Supabase client appends it internally
+function baseUrl() {
+  return (process.env.NEXT_PUBLIC_SUPABASE_URL ?? '').replace(/\/rest\/v1\/?$/, '').replace(/\/$/, '')
+}
+
 // Service role — only for login_attempts table (bypasses RLS)
 function adminClient() {
   return createClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    baseUrl(),
     process.env.SUPABASE_SERVICE_ROLE_KEY!,
     { auth: { autoRefreshToken: false, persistSession: false } }
   )
@@ -17,7 +22,7 @@ function adminClient() {
 // Anon key — for signInWithPassword (standard user auth operation)
 function authClient() {
   return createClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    baseUrl(),
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
     { auth: { autoRefreshToken: false, persistSession: false } }
   )
