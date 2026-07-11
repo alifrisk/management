@@ -77,7 +77,13 @@ function fmtText(text: string) {
       continue
     }
 
-    // 3. List block — collect consecutive - / * lines
+    // 3. Horizontal rule
+    if (/^-{3,}$/.test(line.trim())) {
+      chunks.push({ block: true, html: '<hr class="my-3 border-gray-200" />' })
+      i++; continue
+    }
+
+    // 4. List block — collect consecutive - / * lines
     if (/^[ \t]*[-*] /.test(line)) {
       const listLines: string[] = []
       while (i < lines.length && /^[ \t]*[-*] /.test(lines[i])) {
