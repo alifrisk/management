@@ -240,15 +240,17 @@ export default function FinancialAnalysisPage() {
     if (form.currency === 'USD') return
     setFetchingRate(true)
     try {
-      const res = await fetch(`https://open.er-api.com/v6/latest/USD`)
-      const json = await res.json()
-      const rate = json?.rates?.[form.currency]
-      if (rate) {
-        const rateStr = rate.toFixed(4)
-        setF('p1_usd_rate', rateStr)
-        if (sameRate) setF('p2_usd_rate', rateStr)
+      const res = await fetch(`/api/market-risk/exchange-rates?currency=${form.currency}`)
+      if (res.ok) {
+        const json = await res.json()
+        const rate: number | undefined = json?.rate
+        if (rate) {
+          const rateStr = rate.toFixed(4)
+          setF('p1_usd_rate', rateStr)
+          if (sameRate) setF('p2_usd_rate', rateStr)
+        }
       }
-    } catch { /* silently fail */ }
+    } catch { /* silently fail — rate field stays editable */ }
     setFetchingRate(false)
   }
 
