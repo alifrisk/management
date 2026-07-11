@@ -474,6 +474,9 @@ export default function StressTestRegistryPage() {
   const [filterFrom, setFilterFrom] = useState('')
   const [filterTo, setFilterTo] = useState('')
   const [filterAnalyst, setFilterAnalyst] = useState('')
+  const [page, setPage] = useState(1)
+  const sentinelRef = useRef<HTMLDivElement>(null)
+  const [isScrolled, setIsScrolled] = useState(false)
 
   useEffect(() => {
     async function load() {
@@ -488,6 +491,19 @@ export default function StressTestRegistryPage() {
     load()
   }, [])
 
+  useEffect(() => {
+    const sentinel = sentinelRef.current
+    if (!sentinel) return
+    const observer = new IntersectionObserver(
+      ([entry]) => setIsScrolled(!entry.isIntersecting),
+      { threshold: 0 }
+    )
+    observer.observe(sentinel)
+    return () => observer.disconnect()
+  }, [])
+
+  useEffect(() => { setPage(1) }, [filterRisk, filterFrom, filterTo, filterAnalyst])
+
   const filtered = entries.filter(e => {
     if (filterRisk && e.risk_type !== filterRisk) return false
     if (filterFrom && e.created_at < filterFrom) return false
@@ -497,6 +513,9 @@ export default function StressTestRegistryPage() {
   })
 
   const hasFilters = filterRisk || filterFrom || filterTo || filterAnalyst
+  const PAGE_SIZE = 20
+  const totalPages = Math.ceil(filtered.length / PAGE_SIZE)
+  const paginated = filtered.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE)
 
   function clearFilters() {
     setFilterRisk(''); setFilterFrom(''); setFilterTo(''); setFilterAnalyst('')
@@ -520,7 +539,12 @@ export default function StressTestRegistryPage() {
   for (const e of entries) counts[e.risk_type] = (counts[e.risk_type] ?? 0) + 1
 
   return (
-    <div className="max-w-5xl mx-auto space-y-5">
+    <div className="max-w-5xl mx-auto">
+      <div ref={sentinelRef} className="h-px" />
+      <div
+        className="sticky top-0 z-20 -mx-6 lg:-mx-8 px-6 lg:px-8 pt-5 pb-4 bg-[#F5F8F6] transition-shadow duration-200"
+        style={isScrolled ? { boxShadow: '0 2px 12px rgba(0,0,0,0.06)' } : undefined}
+      >
       {/* Header */}
       <div className="flex items-center gap-3">
         <div className="w-9 h-9 bg-[#1B8A4C]/10 rounded-xl flex items-center justify-center">
@@ -533,7 +557,7 @@ export default function StressTestRegistryPage() {
       </div>
 
       {/* Summary chips */}
-      <div className="flex flex-wrap gap-2">
+      <div className="flex flex-wrap gap-2 mt-4">
         {RISK_TYPES.map(rt => {
           const c = RISK_COLORS[rt]
           const n = counts[rt] ?? 0
@@ -552,7 +576,7 @@ export default function StressTestRegistryPage() {
       </div>
 
       {/* Filters */}
-      <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-4">
+      <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-4 mt-3">
         <div className="flex flex-wrap gap-3 items-end">
           <div className="flex-1 min-w-40">
             <label className="block text-xs text-gray-500 mb-1.5">
@@ -596,7 +620,9 @@ export default function StressTestRegistryPage() {
           )}
         </div>
       </div>
+      </div>{/* end sticky */}
 
+      <div className="mt-5">
       {/* Table */}
       <div className="bg-white rounded-xl border border-gray-100 shadow-sm overflow-hidden">
         {loading ? (
@@ -620,7 +646,7 @@ export default function StressTestRegistryPage() {
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-50">
-              {filtered.map(entry => {
+              {paginated.map(entry => {
                 const colors = RISK_COLORS[entry.risk_type] ?? { bg: 'bg-gray-50', text: 'text-gray-700', dot: 'bg-gray-400' }
                 return (
                   <tr key={entry.id} className="hover:bg-gray-50/50 transition-colors cursor-pointer group"
@@ -660,12 +686,32 @@ export default function StressTestRegistryPage() {
           </table>
         )}
 
-        {!loading && filtered.length > 0 && (
+        {!loading && filtered.length > PAGE_SIZE && (
+          <div className="px-4 py-3 border-t border-gray-100 flex items-center justify-between">
+            <p className="text-xs text-gray-500">
+              Показано {(page - 1) * PAGE_SIZE + 1}–{Math.min(page * PAGE_SIZE, filtered.length)} из {filtered.length}
+            </p>
+            <div className="flex items-center gap-1">
+              <button onClick={() => setPage(p => Math.max(1, p - 1))} disabled={page === 1}
+                className="px-2.5 py-1 text-xs border border-gray-200 rounded disabled:opacity-40 hover:bg-gray-50">←</button>
+              {Array.from({ length: Math.min(totalPages, 5) }, (_, i) => i + 1).map(p => (
+                <button key={p} onClick={() => setPage(p)}
+                  className={`px-2.5 py-1 text-xs rounded border ${page === p ? 'bg-[#1B8A4C] text-white border-[#1B8A4C]' : 'border-gray-200 hover:bg-gray-50'}`}>
+                  {p}
+                </button>
+              ))}
+              <button onClick={() => setPage(p => Math.min(totalPages, p + 1))} disabled={page === totalPages}
+                className="px-2.5 py-1 text-xs border border-gray-200 rounded disabled:opacity-40 hover:bg-gray-50">→</button>
+            </div>
+          </div>
+        )}
+        {!loading && filtered.length > 0 && filtered.length <= PAGE_SIZE && (
           <div className="px-4 py-2.5 border-t border-gray-50 text-xs text-gray-400">
             Показано {filtered.length} из {entries.length} записей
           </div>
         )}
       </div>
+      </div>{/* end mt-5 */}
 
       {/* Detail modal */}
       {selected && <DetailModal entry={selected} onClose={() => setSelected(null)} />}
