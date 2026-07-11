@@ -8,6 +8,8 @@ interface Indicator {
   rate: number | null
   change: number | null
   change7d?: number | null
+  changeMtM?: number | null
+  changeYtY?: number | null
   unit: string
   source?: string
 }
@@ -29,8 +31,8 @@ const fmtRate = (n: number | null, unit: string) => {
   return new Intl.NumberFormat('ru-RU', { maximumFractionDigits: 2 }).format(n)
 }
 
-const changeColor = (c: number | null) => {
-  if (c === null) return 'text-gray-400'
+const changeColor = (c: number | null | undefined) => {
+  if (c == null) return 'text-gray-400'
   if (c > 0) return 'text-green-600'
   if (c < 0) return 'text-red-600'
   return 'text-gray-500'
@@ -43,10 +45,28 @@ const changeBg = (c: number | null) => {
   return 'bg-gray-50'
 }
 
+const fmtChange = (val: number | null | undefined) =>
+  val != null ? `${val > 0 ? '+' : ''}${val}%` : '—'
+
+// ── Single change row ─────────────────────────────────────────────────────────
+function ChangeRow({ val, label }: { val: number | null | undefined; label: string }) {
+  return (
+    <div className={`flex items-center gap-1 text-xs font-semibold ${changeColor(val)}`}>
+      {val != null && val > 0
+        ? <TrendingUp className="w-3 h-3" />
+        : val != null && val < 0
+          ? <TrendingDown className="w-3 h-3" />
+          : <Minus className="w-3 h-3" />}
+      <span>{fmtChange(val)}</span>
+      <span className="font-normal text-gray-400">{label}</span>
+    </div>
+  )
+}
+
 // ── Card ──────────────────────────────────────────────────────────────────────
 function Card({ item }: { item: Indicator }) {
-  const isPos = item.change !== null && item.change > 0
-  const isNeg = item.change !== null && item.change < 0
+  const hasHistory = item.change7d !== undefined
+
   return (
     <div className={`rounded-xl border border-gray-100 p-4 shadow-sm ${changeBg(item.change)}`}>
       <div className="flex items-start justify-between mb-2 gap-1">
@@ -58,32 +78,23 @@ function Card({ item }: { item: Indicator }) {
           <span className="flex-shrink-0 text-[9px] font-medium text-blue-600 bg-blue-50 border border-blue-200 rounded px-1 py-0.5 leading-tight">MOEX</span>
         )}
       </div>
-      <p className="text-xl font-bold text-gray-900 mb-1 mt-0">
+
+      <p className="text-xl font-bold text-gray-900 mb-2">
         {item.rate !== null ? fmtRate(item.rate, item.unit) : '—'}
         <span className="text-xs font-normal text-gray-400 ml-1">{item.unit}</span>
       </p>
-      <div className="flex flex-col gap-0.5">
-        {item.change7d !== undefined ? (
-          <>
-            <div className={`flex items-center gap-1 text-xs font-semibold ${changeColor(item.change)}`}>
-              {item.change != null && item.change > 0 ? <TrendingUp className="w-3 h-3"/> : item.change != null && item.change < 0 ? <TrendingDown className="w-3 h-3"/> : <Minus className="w-3 h-3"/>}
-              <span>{item.change != null ? `${item.change > 0 ? '+' : ''}${item.change}%` : '—'}</span>
-              <span className="font-normal text-gray-400">24ч</span>
-            </div>
-            <div className={`flex items-center gap-1 text-xs font-semibold ${changeColor(item.change7d ?? null)}`}>
-              {item.change7d != null && item.change7d > 0 ? <TrendingUp className="w-3 h-3"/> : item.change7d != null && item.change7d < 0 ? <TrendingDown className="w-3 h-3"/> : <Minus className="w-3 h-3"/>}
-              <span>{item.change7d != null ? `${item.change7d > 0 ? '+' : ''}${item.change7d}%` : '—'}</span>
-              <span className="font-normal text-gray-400">7д</span>
-            </div>
-          </>
-        ) : (
-          <div className={`flex items-center gap-1 text-xs font-semibold ${changeColor(item.change)}`}>
-            {item.change != null && item.change > 0 ? <TrendingUp className="w-3 h-3"/> : item.change != null && item.change < 0 ? <TrendingDown className="w-3 h-3"/> : <Minus className="w-3 h-3"/>}
-            <span>{item.change != null ? `${item.change > 0 ? '+' : ''}${item.change}%` : '—'}</span>
-            <span className="font-normal text-gray-400">24ч</span>
-          </div>
-        )}
-      </div>
+
+      {hasHistory ? (
+        /* 2×2 grid: [24ч | 7д] / [30д | 1г] */
+        <div className="grid grid-cols-2 gap-x-2 gap-y-0.5">
+          <ChangeRow val={item.change}    label="24ч" />
+          <ChangeRow val={item.change7d}  label="7д"  />
+          <ChangeRow val={item.changeMtM} label="30д" />
+          <ChangeRow val={item.changeYtY} label="1г"  />
+        </div>
+      ) : (
+        <ChangeRow val={item.change} label="24ч" />
+      )}
     </div>
   )
 }
@@ -105,16 +116,16 @@ function Section({ title, icon, items }: { title: string; icon: string; items: I
 
 // ── Main ──────────────────────────────────────────────────────────────────────
 export default function MarketIndicatorsPage() {
-  const [data,     setData]     = useState<IndicatorsData | null>(null)
-  const [loading,  setLoading]  = useState(true)
-  const [error,    setError]    = useState<string | null>(null)
-  const [lastFetch,setLastFetch]= useState<Date | null>(null)
+  const [data,      setData]      = useState<IndicatorsData | null>(null)
+  const [loading,   setLoading]   = useState(true)
+  const [error,     setError]     = useState<string | null>(null)
+  const [lastFetch, setLastFetch] = useState<Date | null>(null)
   const [fetchCount, setFetchCount] = useState(0)
 
   const fetchData = useCallback(async () => {
     setLoading(true); setError(null)
     try {
-      const res = await fetch('/api/market-risk/indicators', { cache: 'no-store' })
+      const res  = await fetch('/api/market-risk/indicators', { cache: 'no-store' })
       const json = await res.json()
       if (json.error) throw new Error(json.error)
       setData(json)
@@ -131,7 +142,6 @@ export default function MarketIndicatorsPage() {
     const interval = setInterval(fetchData, 5 * 60 * 1000)
     return () => clearInterval(interval)
   }, [fetchData])
-
 
   return (
     <div className="max-w-7xl mx-auto space-y-6">
@@ -168,7 +178,7 @@ export default function MarketIndicatorsPage() {
       {loading && !data && (
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
           {Array.from({ length: 8 }).map((_, i) => (
-            <div key={i} className="bg-gray-100 rounded-xl h-24 animate-pulse" />
+            <div key={i} className="bg-gray-100 rounded-xl h-28 animate-pulse" />
           ))}
         </div>
       )}
@@ -177,8 +187,8 @@ export default function MarketIndicatorsPage() {
       {data && (
         <div className="space-y-6">
           <Section title="Валюты (к USD)" icon="💱" items={data.currencies} />
-          <Section title="Сырьё" icon="🛢️" items={data.commodities as Indicator[]} />
-          <Section title="Криптовалюты" icon="₿" items={data.crypto} />
+          <Section title="Сырьё"          icon="🛢️" items={data.commodities as Indicator[]} />
+          <Section title="Криптовалюты"   icon="₿"  items={data.crypto} />
         </div>
       )}
 

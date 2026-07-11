@@ -53,26 +53,44 @@ function nearUralsContracts(): string[] {
   return result
 }
 
-// Urals crude oil from MOEX ISS (free, no key) — USD/bbl
-// Hard 3 s cap so a slow/blocked MOEX never stalls the whole route
-async function getUralsFromMOEX(): Promise<{ rate: number | null; change: number | null; change7d: number | null }> {
-  const NULL_R = { rate: null, change: null, change7d: null }
+type UralsResult = {
+  rate: number | null
+  change: number | null
+  change7d: number | null
+  changeMtM: number | null
+  changeYtY: number | null
+}
 
-  const doFetch = async () => {
-    const d7 = dateStr(7)
-    const candidates = nearUralsContracts()   // max 2 tickers
+// Urals crude oil from MOEX ISS (free, no key) — USD/bbl
+async function getUralsFromMOEX(): Promise<UralsResult> {
+  const NULL_R: UralsResult = { rate: null, change: null, change7d: null, changeMtM: null, changeYtY: null }
+
+  const doFetch = async (): Promise<UralsResult> => {
+    const d7   = dateStr(7)
+    const d30  = dateStr(30)
+    const d365 = dateStr(365)
+    const candidates = nearUralsContracts()
     type Sec = { columns: string[]; data: (number | null)[][] }
 
     const results = await Promise.all(candidates.map(async secid => {
       const base = `https://iss.moex.com/iss/engines/futures/markets/forts/boards/RFUD/securities/${secid}`
-      const [today, hist] = await Promise.all([
+      const [today, hist7, hist30, hist365] = await Promise.all([
         get(`${base}.json?iss.meta=off&marketdata.columns=LAST,OPEN`, 2000),
         get(`${base}/candles.json?from=${d7}&till=${d7}&interval=24&iss.meta=off&candles.columns=close`, 2000),
+        get(`${base}/candles.json?from=${d30}&till=${d30}&interval=24&iss.meta=off&candles.columns=close`, 2000),
+        get(`${base}/candles.json?from=${d365}&till=${d365}&interval=24&iss.meta=off&candles.columns=close`, 2000),
       ])
-      return { today, hist }
+      return { today, hist7, hist30, hist365 }
     }))
 
-    for (const { today, hist } of results) {
+    const candleClose = (hist: unknown): number | null => {
+      if (!hist) return null
+      const cv = (hist as Record<string, Sec>)?.candles
+      const c = cv?.data?.[0]?.[cv.columns.indexOf('close')] ?? null
+      return (c && c > 0) ? c as number : null
+    }
+
+    for (const { today, hist7, hist30, hist365 } of results) {
       if (!today) continue
       const md = (today as Record<string, Sec>)?.marketdata
       if (!md?.data?.[0]) continue
@@ -80,70 +98,79 @@ async function getUralsFromMOEX(): Promise<{ rate: number | null; change: number
       const open = md.data[0][md.columns.indexOf('OPEN')]
       if (!last || last <= 0) continue
 
-      const change = open && open > 0 ? Math.round((last - open) / open * 10000) / 100 : null
-      let change7d: number | null = null
-      if (hist) {
-        const cv = (hist as Record<string, Sec>)?.candles
-        const c7 = cv?.data?.[0]?.[cv.columns.indexOf('close')] ?? null
-        if (c7 && c7 > 0) change7d = Math.round((last - c7) / c7 * 10000) / 100
-      }
-      return { rate: Math.round(last * 100) / 100, change, change7d }
+      const change    = open && open > 0 ? Math.round((last - open) / open * 10000) / 100 : null
+      const c7        = candleClose(hist7)
+      const c30       = candleClose(hist30)
+      const c365      = candleClose(hist365)
+      const change7d  = c7   ? Math.round((last - c7)   / c7   * 10000) / 100 : null
+      const changeMtM = c30  ? Math.round((last - c30)  / c30  * 10000) / 100 : null
+      const changeYtY = c365 ? Math.round((last - c365) / c365 * 10000) / 100 : null
+
+      return { rate: Math.round(last * 100) / 100, change, change7d, changeMtM, changeYtY }
     }
     return NULL_R
   }
 
-  // Never wait more than 3 s for MOEX
   return Promise.race([
     doFetch(),
-    new Promise<typeof NULL_R>(resolve => setTimeout(() => resolve(NULL_R), 3000)),
+    new Promise<UralsResult>(resolve => setTimeout(() => resolve(NULL_R), 3000)),
   ])
 }
 
 export async function GET() {
   try {
     const syms = [
-      { id:'gold',   label:'Золото (XAU)',    s:'GC=F', u:'USD/oz'  },
-      { id:'silver', label:'Серебро (XAG)',   s:'SI=F', u:'USD/oz'  },
-      { id:'brent',  label:'Нефть Brent',     s:'BZ=F', u:'USD/bbl' },
-      { id:'wti',    label:'Нефть WTI',       s:'CL=F', u:'USD/bbl' },
+      { id:'gold',   label:'Золото (XAU)',  s:'GC=F', u:'USD/oz'  },
+      { id:'silver', label:'Серебро (XAG)', s:'SI=F', u:'USD/oz'  },
+      { id:'brent',  label:'Нефть Brent',   s:'BZ=F', u:'USD/bbl' },
+      { id:'wti',    label:'Нефть WTI',     s:'CL=F', u:'USD/bbl' },
     ]
 
     // All sources run in parallel
-    const [[fw0, fw1, fw7], [erApi, cg], uralsData, yahooResults] = await Promise.all([
-      Promise.all([getFWRates(0), getFWRates(1), getFWRates(7)]),
+    const [[fw0, fw1, fw7, fw30, fw365], [erApi, cg], uralsData, yahooResults] = await Promise.all([
+      Promise.all([
+        getFWRates(0), getFWRates(1), getFWRates(7), getFWRates(30), getFWRates(365),
+      ]),
       Promise.all([
         get('https://open.er-api.com/v6/latest/USD'),
-        get('https://api.coingecko.com/api/v3/coins/markets?vs_currency=usd&ids=bitcoin,ethereum&price_change_percentage=7d'),
+        // 30d and 1y natively supported by CoinGecko — no extra request
+        get('https://api.coingecko.com/api/v3/coins/markets?vs_currency=usd&ids=bitcoin,ethereum&price_change_percentage=7d,30d,1y'),
       ]),
       getUralsFromMOEX(),
-      Promise.all(syms.map(t => get(`https://query1.finance.yahoo.com/v8/finance/chart/${t.s}?interval=1d&range=30d`))),
+      // range=1y gives ~252 trading days — enough for both 30d and 365d lookbacks
+      Promise.all(syms.map(t => get(`https://query1.finance.yahoo.com/v8/finance/chart/${t.s}?interval=1d&range=1y`))),
     ])
 
     // ── Currencies ──────────────────────────────────────────────────────────
     const erRates = ((erApi as Record<string, unknown>)?.rates ?? {}) as Record<string, number>
     const erLower = Object.fromEntries(Object.entries(erRates).map(([k, v]) => [k.toLowerCase(), v]))
     const cur: Record<string, number> = { ...erLower, ...fw0 }
-    const p1 = fw1
-    const p7 = fw7
 
-    const chg = (a: number, b: number) => b ? Math.round((a-b)/b*10000)/100 : null
+    const chg = (a: number, b: number) => b ? Math.round((a - b) / b * 10000) / 100 : null
 
     const pair = (code: string, label: string) => ({
       id: `usd_${code}`, label,
-      rate:     cur[code] != null ? Math.round(Number(cur[code]) * 10000) / 10000 : null,
-      change:   cur[code] && p1[code] ? chg(cur[code], p1[code]) : null,
-      change7d: cur[code] && p7[code] ? chg(cur[code], p7[code]) : null,
+      rate:      cur[code] != null ? Math.round(Number(cur[code]) * 10000) / 10000 : null,
+      change:    cur[code] && fw1[code]   ? chg(cur[code], fw1[code])   : null,
+      change7d:  cur[code] && fw7[code]   ? chg(cur[code], fw7[code])   : null,
+      changeMtM: cur[code] && fw30[code]  ? chg(cur[code], fw30[code])  : null,
+      changeYtY: cur[code] && fw365[code] ? chg(cur[code], fw365[code]) : null,
       unit: code.toUpperCase(),
     })
 
     const cross = (xCode: string, label: string, decimals = 4) => {
-      const rate = cur['tjs'] && cur[xCode] ? Math.round(cur['tjs'] / cur[xCode] * Math.pow(10, decimals)) / Math.pow(10, decimals) : null
-      const r1   = p1['tjs'] && p1[xCode] ? p1['tjs'] / p1[xCode] : null
-      const r7   = p7['tjs'] && p7[xCode] ? p7['tjs'] / p7[xCode] : null
+      const pow  = Math.pow(10, decimals)
+      const rate = cur['tjs'] && cur[xCode]   ? Math.round(cur['tjs']   / cur[xCode]   * pow) / pow : null
+      const r1   = fw1['tjs'] && fw1[xCode]   ? fw1['tjs']   / fw1[xCode]   : null
+      const r7   = fw7['tjs'] && fw7[xCode]   ? fw7['tjs']   / fw7[xCode]   : null
+      const r30  = fw30['tjs'] && fw30[xCode] ? fw30['tjs']  / fw30[xCode]  : null
+      const r365 = fw365['tjs'] && fw365[xCode] ? fw365['tjs'] / fw365[xCode] : null
       return {
         id: `${xCode}_tjs`, label, rate,
-        change:   rate && r1 ? chg(rate, r1) : null,
-        change7d: rate && r7 ? chg(rate, r7) : null,
+        change:    rate && r1   ? chg(rate, r1)   : null,
+        change7d:  rate && r7   ? chg(rate, r7)   : null,
+        changeMtM: rate && r30  ? chg(rate, r30)  : null,
+        changeYtY: rate && r365 ? chg(rate, r365) : null,
         unit: 'TJS',
       }
     }
@@ -159,12 +186,38 @@ export async function GET() {
     // ── Crypto ──────────────────────────────────────────────────────────────
     const cgArr = Array.isArray(cg) ? (cg as Record<string, number>[]) : []
     const cgMap = Object.fromEntries(cgArr.map(c => [c.id, c]))
+
+    const cgItem = (id: string, label: string, unit: string) => {
+      const c = cgMap[id]
+      if (!c) return null
+      const p = (field: string) => c[field] != null ? Math.round(c[field] * 100) / 100 : null
+      return {
+        id, label, unit,
+        rate:      c.current_price,
+        change:    p('price_change_percentage_24h'),
+        change7d:  p('price_change_percentage_7d_in_currency'),
+        changeMtM: p('price_change_percentage_30d_in_currency'),
+        changeYtY: p('price_change_percentage_1y_in_currency'),
+      }
+    }
+
     const crypto = [
-      cgMap.bitcoin  && { id:'btc', label:'Bitcoin (BTC)',  rate: cgMap.bitcoin.current_price,  change: cgMap.bitcoin.price_change_percentage_24h   != null ? Math.round(cgMap.bitcoin.price_change_percentage_24h*100)/100   : null, change7d: cgMap.bitcoin.price_change_percentage_7d_in_currency  != null ? Math.round(cgMap.bitcoin.price_change_percentage_7d_in_currency*100)/100  : null, unit:'USD' },
-      cgMap.ethereum && { id:'eth', label:'Ethereum (ETH)', rate: cgMap.ethereum.current_price, change: cgMap.ethereum.price_change_percentage_24h  != null ? Math.round(cgMap.ethereum.price_change_percentage_24h*100)/100  : null, change7d: cgMap.ethereum.price_change_percentage_7d_in_currency != null ? Math.round(cgMap.ethereum.price_change_percentage_7d_in_currency*100)/100 : null, unit:'USD' },
+      cgItem('bitcoin',  'Bitcoin (BTC)',  'USD'),
+      cgItem('ethereum', 'Ethereum (ETH)', 'USD'),
     ].filter(Boolean)
 
     // ── Commodities ─────────────────────────────────────────────────────────
+    const findNearest = (timestamps: number[], cls: number[], daysAgo: number): number | null => {
+      if (!timestamps.length || !cls.length) return null
+      const target = Date.now() / 1000 - daysAgo * 86400
+      let bestIdx = 0, bestDiff = Math.abs(timestamps[0] - target)
+      for (let j = 1; j < timestamps.length; j++) {
+        const diff = Math.abs(timestamps[j] - target)
+        if (diff < bestDiff) { bestDiff = diff; bestIdx = j }
+      }
+      return cls[bestIdx] ?? null
+    }
+
     const yahooMapped = yahooResults.map((d, i) => {
       try {
         const r0         = ((d as Record<string,unknown>)?.chart as Record<string,unknown>)?.result as Record<string,unknown>[]
@@ -176,40 +229,46 @@ export async function GET() {
         const prv        = cls.length > 1 ? cls[cls.length-2] : meta.previousClose
         if (!cur2) return null
 
-        let change7d: number | null = null
-        const ts7 = Date.now() / 1000 - 7 * 86400
-        if (timestamps.length > 0 && cls.length > 0) {
-          let bestIdx = 0, bestDiff = Math.abs(timestamps[0] - ts7)
-          for (let j = 1; j < timestamps.length; j++) {
-            const diff = Math.abs(timestamps[j] - ts7)
-            if (diff < bestDiff) { bestDiff = diff; bestIdx = j }
-          }
-          const prv7 = cls[bestIdx]
-          if (prv7) change7d = Math.round((cur2 - prv7) / prv7 * 10000) / 100
-        }
+        const prv7   = findNearest(timestamps, cls, 7)
+        const prv30  = findNearest(timestamps, cls, 30)
+        const prv365 = findNearest(timestamps, cls, 365)
 
-        return { id: syms[i].id, label: syms[i].label, rate: Math.round(cur2*100)/100, change: prv ? Math.round((cur2-prv)/prv*10000)/100 : null, change7d, unit: syms[i].u }
+        return {
+          id:        syms[i].id,
+          label:     syms[i].label,
+          unit:      syms[i].u,
+          rate:      Math.round(cur2 * 100) / 100,
+          change:    prv   ? Math.round((cur2 - prv)   / prv   * 10000) / 100 : null,
+          change7d:  prv7  ? Math.round((cur2 - prv7)  / prv7  * 10000) / 100 : null,
+          changeMtM: prv30 ? Math.round((cur2 - prv30) / prv30 * 10000) / 100 : null,
+          changeYtY: prv365 ? Math.round((cur2 - prv365) / prv365 * 10000) / 100 : null,
+        }
       } catch { return null }
     }).filter(Boolean)
 
     // Urals discount to Brent — historically $1-3 pre-2022, $10-20 post-sanctions.
-    // 2024-2026 average: ≈$15/bbl. Used only when MOEX futures are unavailable.
     const URALS_DISCOUNT = 15
     const brentYahoo = yahooMapped.find(c => c?.id === 'brent') ?? null
 
     const uralsItem = (() => {
       if (uralsData.rate !== null) {
-        return { id: 'urals', label: 'Нефть Urals', rate: uralsData.rate, change: uralsData.change, change7d: uralsData.change7d, unit: 'USD/bbl', source: 'MOEX' }
+        return {
+          id: 'urals', label: 'Нефть Urals', unit: 'USD/bbl', source: 'MOEX',
+          rate:      uralsData.rate,
+          change:    uralsData.change,
+          change7d:  uralsData.change7d,
+          changeMtM: uralsData.changeMtM,
+          changeYtY: uralsData.changeYtY,
+        }
       }
       if (brentYahoo?.rate != null) {
         return {
-          id: 'urals',
-          label: 'Нефть Urals',
-          rate: Math.round((brentYahoo.rate - URALS_DISCOUNT) * 100) / 100,
-          change: brentYahoo.change,
-          change7d: brentYahoo.change7d,
-          unit: 'USD/bbl',
-          source: 'est',
+          id: 'urals', label: 'Нефть Urals', unit: 'USD/bbl', source: 'est',
+          rate:      Math.round((brentYahoo.rate - URALS_DISCOUNT) * 100) / 100,
+          change:    brentYahoo.change,
+          change7d:  brentYahoo.change7d,
+          changeMtM: brentYahoo.changeMtM,
+          changeYtY: brentYahoo.changeYtY,
         }
       }
       return null
