@@ -11,16 +11,12 @@ const nextConfig = {
       {
         source: '/(.*)',
         headers: [
-          // Запрет встраивания в iframe (защита от clickjacking)
-          { key: 'X-Frame-Options', value: 'SAMEORIGIN' },
-          // Запрет MIME-sniffing
-          { key: 'X-Content-Type-Options', value: 'nosniff' },
-          // Политика реферера
-          { key: 'Referrer-Policy', value: 'strict-origin-when-cross-origin' },
-          // Отключить устаревший XSS-фильтр браузера (современный подход)
-          { key: 'X-XSS-Protection', value: '0' },
-          // Ограничение доступа к браузерным API
-          { key: 'Permissions-Policy', value: 'camera=(), microphone=(), geolocation=()' },
+          { key: 'X-Frame-Options',            value: 'DENY' },
+          { key: 'X-Content-Type-Options',      value: 'nosniff' },
+          { key: 'Referrer-Policy',             value: 'strict-origin-when-cross-origin' },
+          { key: 'X-XSS-Protection',            value: '1; mode=block' },
+          { key: 'Permissions-Policy',          value: 'camera=(), microphone=(), geolocation=()' },
+          { key: 'Strict-Transport-Security',   value: 'max-age=63072000; includeSubDomains; preload' },
         ],
       },
     ]
