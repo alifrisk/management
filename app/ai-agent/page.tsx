@@ -323,13 +323,44 @@ export default function RiskovikPage() {
     if (ext === 'docx') return callApi('/api/extract-docx', await toBase64(file))
     if (ext === 'pdf') return callApi('/api/extract-pdf', await toBase64(file))
     if (ext === 'xlsx' || ext === 'xls') {
-      const XLSX = (await import('xlsx')).default
-      const ab = await file.arrayBuffer()
-      const wb = XLSX.read(ab)
+      const { Workbook } = await import('exceljs')
+      const wb = new Workbook()
+      await wb.xlsx.load(await file.arrayBuffer())
       const parts: string[] = []
-      wb.SheetNames.forEach(name => {
-        const csv = XLSX.utils.sheet_to_csv(wb.Sheets[name])
-        if (csv.trim()) parts.push(`[Лист: ${name}]\n${csv}`)
+      wb.eachSheet(ws => {
+        const rows: string[] = []
+        ws.eachRow({ includeEmpty: false }, row => {
+          const cells: string[] = []
+          for (let c = 1; c <= row.cellCount; c++) {
+            const val = row.getCell(c).value
+            let text = ''
+            if (val != null) {
+              if (val instanceof Date) {
+                text = val.toISOString().slice(0, 10)
+              } else if (typeof val === 'object') {
+                const obj = val as unknown as Record<string, unknown>
+                if (Array.isArray(obj.richText)) {
+                  text = (obj.richText as { text: string }[]).map(r => r.text).join('')
+                } else if (obj.result != null) {
+                  text = String(obj.result)
+                } else if (typeof obj.text === 'string') {
+                  text = obj.text
+                } else {
+                  text = String(val)
+                }
+              } else {
+                text = String(val)
+              }
+            }
+            if (text.includes(',') || text.includes('"') || text.includes('\n')) {
+              text = '"' + text.replace(/"/g, '""') + '"'
+            }
+            cells.push(text)
+          }
+          if (cells.some(c => c.length > 0)) rows.push(cells.join(','))
+        })
+        const csv = rows.join('\n')
+        if (csv.trim()) parts.push(`[Лист: ${ws.name}]\n${csv}`)
       })
       return parts.join('\n\n')
     }
