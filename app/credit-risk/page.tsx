@@ -743,6 +743,18 @@ export default function CreditRiskPage() {
   async function handleDelete(id: string) {
     if (!confirm('Удалить?')) return
     await supabase.from('credit_conclusions').delete().eq('id', id)
+    // Renumber remaining records in chronological order so numbers stay consecutive
+    const { data: remaining } = await supabase
+      .from('credit_conclusions')
+      .select('id')
+      .order('created_at', { ascending: true })
+    if (remaining) {
+      await Promise.all(
+        remaining.map((row, i) =>
+          supabase.from('credit_conclusions').update({ conclusion_number: i + 1 }).eq('id', row.id)
+        )
+      )
+    }
     fetch_()
   }
 

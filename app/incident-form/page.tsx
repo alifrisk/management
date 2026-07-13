@@ -42,9 +42,9 @@ const STEPS = [
 ]
 
 // ── Styles ────────────────────────────────────────────────────────────────────
-const inp = 'w-full px-4 py-3 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-[#1B8A4C] focus:border-transparent transition-all bg-white'
-const sel = 'w-full px-4 py-3 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-[#1B8A4C] focus:border-transparent bg-white transition-all appearance-none'
-const lbl = 'block text-xs font-semibold text-gray-500 mb-1.5 uppercase tracking-wide'
+const inp = 'w-full px-4 py-2.5 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-[#1B8A4C] focus:border-transparent transition-all bg-white'
+const sel = 'w-full px-4 py-2.5 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-[#1B8A4C] focus:border-transparent bg-white transition-all appearance-none'
+const lbl = 'block text-xs font-semibold text-gray-500 mb-1 uppercase tracking-wide'
 const err = (e?: string) => e ? ' border-red-300 focus:ring-red-400' : ''
 
 function FieldError({ msg }: { msg?: string }) {
@@ -227,12 +227,12 @@ export default function IncidentFormPage() {
         </div>
       )}
 
-      <div className="max-w-2xl mx-auto px-4 pt-24 pb-10">
+      <div className="max-w-2xl mx-auto px-4 pt-4 pb-5 md:pt-16 md:pb-10">
         <div className="bg-white rounded-3xl shadow-2xl overflow-hidden">
 
           {/* ── Step indicator ─────────────────────────────────────────── */}
-          <div className="px-6 pt-6 pb-5">
-            <div className="flex justify-between mb-4">
+          <div className="px-6 pt-4 pb-3">
+            <div className="flex justify-between mb-3">
               {STEPS.map(s => (
                 <div key={s.id} className="flex flex-col items-center gap-1.5 w-1/4">
                   <div className={`w-9 h-9 rounded-full flex items-center justify-center text-sm font-bold border-2 transition-all duration-300 ${
@@ -260,12 +260,12 @@ export default function IncidentFormPage() {
           <div className="h-px bg-gray-100" />
 
           {/* ── Step content ───────────────────────────────────────────── */}
-          <div className="px-6 py-5 min-h-[380px]">
+          <div className="px-6 py-3 min-h-[240px]">
 
             {/* Step 1: Discovery */}
             {step === 1 && (
-              <div className="space-y-4">
-                <div className="mb-2">
+              <div className="space-y-3">
+                <div className="mb-1">
                   <p className="font-semibold text-gray-900 text-base">Информация об обнаружении</p>
                   <p className="text-xs text-gray-400 mt-0.5">Кто и где обнаружил инцидент</p>
                 </div>
@@ -546,7 +546,7 @@ export default function IncidentFormPage() {
             )}
           </div>
 
-          <p className="text-center text-xs text-gray-300 py-4">
+          <p className="text-center text-xs text-gray-300 py-2.5">
             Поля * обязательны · Данные конфиденциальны
           </p>
         </div>
