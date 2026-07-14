@@ -7,8 +7,7 @@ const fmt  = (n: number) => n ? new Intl.NumberFormat('ru-RU').format(Math.round
 const fmtN = (v: string) => { const n = v.replace(/\D/g,''); return n ? new Intl.NumberFormat('ru-RU').format(Number(n)) : '' }
 const parseN = (v: string) => Number(v.replace(/\D/g,'')) || 0
 
-// Coverage столбцы для матрицы
-const COV_COLS = [50, 55, 60, 65, 70, 75, 80, 85, 90, 95, 100]
+const DEFAULT_COV_COLS = [50, 55, 60, 65, 70, 75, 80, 85, 90, 95, 100]
 
 const CREDIT_HORIZONS = [
   { months: 1,  label: '1 месяц'   },
@@ -118,6 +117,26 @@ export default function CreditStressTest() {
     return Array.from(all).sort((a, b) => a - b)
   })()
 
+  // Динамические столбцы матрицы: шаг 5% вокруг min/max сценарных Coverage, плюс точные optim/pess/cat
+  const covCols: number[] = (() => {
+    if (CC <= 0) return DEFAULT_COV_COLS
+    const step    = 5
+    const scVals  = [optim.cov, pess.cov, cat.cov].filter(v => v > 0)
+    const minCov  = scVals.length ? Math.min(...scVals) : CC
+    const maxCov  = scVals.length ? Math.max(...scVals) : CC
+    const start   = Math.max(0,   Math.floor((minCov - 10) / step) * step)
+    const end     = Math.min(100, Math.ceil ((maxCov + 10) / step) * step)
+    const base: number[] = []
+    for (let v = start; v <= end + 0.001; v = Math.round((v + step) * 10) / 10) {
+      base.push(v)
+    }
+    const all = new Set(base)
+    if (optim.cov > 0) all.add(optim.cov)
+    if (pess.cov  > 0) all.add(pess.cov)
+    if (cat.cov   > 0) all.add(cat.cov)
+    return Array.from(all).sort((a, b) => a - b)
+  })()
+
   // ── Сохранить в реестр ───────────────────────────
   async function saveToRegistry() {
     setSaving(true)
@@ -187,9 +206,9 @@ export default function CreditStressTest() {
     })
     rows.push([])
     rows.push(['МОДЕЛЬ 2 — WHAT-IF МАТРИЦА'])
-    rows.push(['PAR30% / Coverage →', ...COV_COLS.map(c => `${c}%`)])
+    rows.push(['PAR30% / Coverage →', ...covCols.map(c => `${c}%`)])
     parRows.forEach(par => {
-      rows.push([`${par}%`, ...COV_COLS.map(cov => BP > 0 ? String(Math.round(adjProfit(par, cov))) : String(-Math.round(Math.max(0, addReserve(par, cov)))))])
+      rows.push([`${par}%`, ...covCols.map(cov => BP > 0 ? String(Math.round(adjProfit(par, cov))) : String(-Math.round(Math.max(0, addReserve(par, cov)))))])
     })
     const csv = rows.map(r => r.map(c => `"${String(c).replace(/"/g,'""')}"`).join(',')).join('\n')
     const blob = new Blob(['\uFEFF'+csv], { type: 'text/csv;charset=utf-8;' })
@@ -580,11 +599,24 @@ export default function CreditStressTest() {
                       <th className="bg-gray-800 text-white px-3 py-2 text-left whitespace-nowrap sticky left-0">
                         PAR30% ↓ / Coverage →
                       </th>
-                      {COV_COLS.map(c => (
-                        <th key={c} className={`px-3 py-2 text-center whitespace-nowrap text-white ${c === 80 ? 'bg-[#1B8A4C]' : 'bg-gray-800'}`}>
-                          {c}%
-                        </th>
-                      ))}
+                      {covCols.map(c => {
+                        const isOptimCov = c === optim.cov && c !== pess.cov  && c !== cat.cov
+                        const isPessCov  = c === pess.cov  && c !== cat.cov
+                        const isCatCov   = c === cat.cov
+                        const isCC       = c === CC
+                        const thBg = isCatCov   ? 'bg-red-700'
+                                   : isPessCov  ? 'bg-yellow-600'
+                                   : isOptimCov ? 'bg-green-700'
+                                   : isCC        ? 'bg-[#1B8A4C]'
+                                   : 'bg-gray-800'
+                        const flag = isCatCov ? '⚠️' : isPessCov ? '📧' : isOptimCov ? '📈' : null
+                        return (
+                          <th key={c} className={`px-3 py-2 text-center whitespace-nowrap text-white ${thBg}`}>
+                            {flag && <span className="block text-[10px] leading-none mb-0.5">{flag}</span>}
+                            {Number.isInteger(c) ? c : c.toFixed(1)}%
+                          </th>
+                        )
+                      })}
                     </tr>
                   </thead>
                   <tbody>
@@ -601,14 +633,14 @@ export default function CreditStressTest() {
                             {isPess  && <span className="ml-1 text-[10px] text-yellow-500">📧</span>}
                             {isOptim && <span className="ml-1 text-[10px] text-green-500">📈</span>}
                           </td>
-                          {COV_COLS.map(cov => {
-                            const val = BP > 0 ? adjProfit(par, cov) : -Math.round(Math.max(0, addReserve(par, cov)))
+                          {covCols.map(cov => {
+                            const val    = BP > 0 ? adjProfit(par, cov) : -Math.round(Math.max(0, addReserve(par, cov)))
                             const isNeg  = val < 0
                             const isLow  = BP > 0 && val > 0 && val < BP * 0.9
-                            const isCov80 = cov === 80
+                            const isCovCC = CC > 0 && cov === CC
                             return (
                               <td key={cov} className={`px-2 py-1.5 text-center font-medium whitespace-nowrap
-                                ${isCov80 ? 'border-x border-green-200' : ''}
+                                ${isCovCC ? 'border-x border-green-200' : ''}
                                 ${isNeg ? 'text-red-700 bg-red-100' : isLow ? 'text-yellow-700' : 'text-green-700'}`}>
                                 {isNeg ? `(${fmt(Math.abs(val))})` : fmt(val)}
                               </td>
@@ -624,8 +656,8 @@ export default function CreditStressTest() {
                 <span className="flex items-center gap-1"><span className="w-3 h-3 bg-green-100 rounded inline-block"/> Прибыль &gt;90% базовой</span>
                 <span className="flex items-center gap-1"><span className="w-3 h-3 bg-yellow-100 rounded inline-block"/> 0–90% базовой</span>
                 <span className="flex items-center gap-1"><span className="w-3 h-3 bg-red-100 rounded inline-block"/> Убыток</span>
-                <span className="flex items-center gap-1"><span className="w-3 h-3 bg-[#1B8A4C]/20 rounded inline-block"/> Coverage 80% (текущий норматив)</span>
-                <span>📈 Оптимистичный · 📧 Пессимистичный · ⚠️ Катастрофический (точное значение PAR из Модели 1)</span>
+                {CC > 0 && <span className="flex items-center gap-1"><span className="w-3 h-3 bg-[#1B8A4C]/20 rounded inline-block"/> Coverage {CC}% (текущий)</span>}
+                <span>📈 Оптимистичный · 📧 Пессимистичный · ⚠️ Катастрофический (точные значения PAR и Coverage из Модели 1)</span>
               </div>
             </>
           )}
