@@ -101,7 +101,7 @@ export default function CreditStressTest() {
   const CP90  = parseFloat(curPar90)  || 0
   const CP180 = parseFloat(curPar180) || 0
 
-  // Динамические строки матрицы: шаг 0.5% от CP до CP+10%, плюс точные pess/cat
+  // Динамические строки матрицы: шаг 0.5% от CP до CP+10%, плюс точные optim/pess/cat
   const parRows: number[] = (() => {
     if (CP <= 0) return []
     const step  = 0.5
@@ -112,8 +112,9 @@ export default function CreditStressTest() {
       base.push(Math.round(v * 100) / 100)
     }
     const all = new Set(base)
-    if (pess.par > 0) all.add(pess.par)
-    if (cat.par  > 0) all.add(cat.par)
+    if (optim.par > 0) all.add(optim.par)
+    if (pess.par  > 0) all.add(pess.par)
+    if (cat.par   > 0) all.add(cat.par)
     return Array.from(all).sort((a, b) => a - b)
   })()
 
@@ -545,8 +546,9 @@ export default function CreditStressTest() {
                 </thead>
                 <tbody>
                   {[
-                    { name: 'Пессимистичный',   icon: '📉', par: pess.par, cov: pess.cov, bg: 'bg-yellow-50', border: 'border-yellow-200' },
-                    { name: 'Катастрофический', icon: '⚠️', par: cat.par,  cov: cat.cov,  bg: 'bg-red-50',    border: 'border-red-200'    },
+                    { name: 'Оптимистичный',    icon: '📈', par: optim.par, cov: optim.cov, bg: 'bg-green-50',  border: 'border-green-200'  },
+                    { name: 'Пессимистичный',   icon: '📉', par: pess.par,  cov: pess.cov,  bg: 'bg-yellow-50', border: 'border-yellow-200' },
+                    { name: 'Катастрофический', icon: '⚠️', par: cat.par,   cov: cat.cov,   bg: 'bg-red-50',    border: 'border-red-200'    },
                   ].map(sc => {
                     const res = Math.max(0, addReserve(sc.par, sc.cov))
                     return (
@@ -587,15 +589,17 @@ export default function CreditStressTest() {
                   </thead>
                   <tbody>
                     {parRows.map((par, pi) => {
-                      const isCat  = par === cat.par
-                      const isPess = par === pess.par && !isCat
-                      const rowBg  = isCat ? 'bg-red-50' : isPess ? 'bg-yellow-50' : pi%2===0 ? 'bg-white' : 'bg-gray-50'
+                      const isCat   = par === cat.par
+                      const isPess  = par === pess.par  && !isCat
+                      const isOptim = par === optim.par && !isCat && !isPess
+                      const rowBg   = isCat ? 'bg-red-50' : isPess ? 'bg-yellow-50' : isOptim ? 'bg-green-50' : pi%2===0 ? 'bg-white' : 'bg-gray-50'
                       return (
                         <tr key={par} className={rowBg}>
                           <td className="px-3 py-1.5 font-semibold text-gray-700 whitespace-nowrap border-r border-gray-200 sticky left-0 bg-inherit">
                             {par.toFixed(2)}%
-                            {isCat  && <span className="ml-1 text-[10px] text-red-500">⚠️</span>}
-                            {isPess && <span className="ml-1 text-[10px] text-yellow-500">📧</span>}
+                            {isCat   && <span className="ml-1 text-[10px] text-red-500">⚠️</span>}
+                            {isPess  && <span className="ml-1 text-[10px] text-yellow-500">📧</span>}
+                            {isOptim && <span className="ml-1 text-[10px] text-green-500">📈</span>}
                           </td>
                           {COV_COLS.map(cov => {
                             const val = BP > 0 ? adjProfit(par, cov) : -Math.round(Math.max(0, addReserve(par, cov)))
@@ -621,7 +625,7 @@ export default function CreditStressTest() {
                 <span className="flex items-center gap-1"><span className="w-3 h-3 bg-yellow-100 rounded inline-block"/> 0–90% базовой</span>
                 <span className="flex items-center gap-1"><span className="w-3 h-3 bg-red-100 rounded inline-block"/> Убыток</span>
                 <span className="flex items-center gap-1"><span className="w-3 h-3 bg-[#1B8A4C]/20 rounded inline-block"/> Coverage 80% (текущий норматив)</span>
-                <span>📧 Пессимистичный · ⚠️ Катастрофический (точное значение PAR из Модели 1)</span>
+                <span>📈 Оптимистичный · 📧 Пессимистичный · ⚠️ Катастрофический (точное значение PAR из Модели 1)</span>
               </div>
             </>
           )}
