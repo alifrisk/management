@@ -277,9 +277,10 @@ export default function CreditStressTest() {
             </button>
           ))}
         </div>
+      </div>
 
-        {/* Входные данные */}
-        <div className={`${card} print:hidden rounded-t-none border-t-0`}>
+      {/* Входные данные */}
+      <div className={`${card} print:hidden rounded-t-none border-t-0`}>
           <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-3">Входные данные</p>
           <div className="grid grid-cols-2 lg:grid-cols-5 gap-4">
             <div>
@@ -332,7 +333,6 @@ export default function CreditStressTest() {
             </p>
           </div>
         </div>
-      </div>
 
       {/* Формула (scrollable) */}
       <div className="p-3 bg-blue-50 rounded-lg flex items-start gap-2 print:hidden">
