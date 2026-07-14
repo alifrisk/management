@@ -791,8 +791,12 @@ export default function MarketStressTest() {
                       <tr className="bg-gray-800 text-white">
                         <th className="px-3 py-2 text-left sticky left-0 bg-gray-800">Месяц</th>
                         <th className="px-3 py-2 text-right">Рег. капитал банка (TJS)</th>
-                        <th className="px-3 py-2 text-right">Прогнозный курс {currency}/TJS</th>
-                        <th className="px-3 py-2 text-right">Изм. к текущему (%)</th>
+                        <th className="px-3 py-2 text-right">Курс {currency}/TJS (базовый)</th>
+                        <th className="px-3 py-2 text-right">Изм.% (базовый)</th>
+                        <th className="px-3 py-2 text-right bg-yellow-700">Курс (пессим. CVaR95)</th>
+                        <th className="px-3 py-2 text-right bg-yellow-700">Изм.% (пессим.)</th>
+                        <th className="px-3 py-2 text-right bg-red-800">Курс (катастр. CVaR99)</th>
+                        <th className="px-3 py-2 text-right bg-red-800">Изм.% (катастр.)</th>
                       </tr>
                     </thead>
                     <tbody>
@@ -804,6 +808,20 @@ export default function MarketStressTest() {
                         const changePct = (forecastRate !== null && nbtStats)
                           ? (forecastRate / nbtStats.current - 1) * 100
                           : null
+
+                        const frac = ((rowIdx + 1) * 30) / horizon
+                        const sqrtFrac = Math.sqrt(frac)
+                        const pessRate   = nbtStats ? nbtStats.current * (1 + (mcResult.cvar95 / 100) * sqrtFrac) : null
+                        const pessChgPct = (pessRate !== null && nbtStats) ? (pessRate / nbtStats.current - 1) * 100 : null
+                        const catRate    = nbtStats ? nbtStats.current * (1 + (mcResult.cvar99 / 100) * sqrtFrac) : null
+                        const catChgPct  = (catRate !== null && nbtStats) ? (catRate / nbtStats.current - 1) * 100 : null
+
+                        const fmtChg = (v: number | null, cls: string) => v !== null
+                          ? <span className={`font-semibold ${v > 0 ? 'text-red-600' : v < 0 ? 'text-green-600' : 'text-gray-500'}`}>
+                              {`${v > 0 ? '+' : ''}${v.toFixed(2)}%`}
+                            </span>
+                          : <span className="text-gray-300">—</span>
+
                         return (
                           <tr key={mi} className={rowIdx % 2 === 0 ? 'bg-white' : 'bg-gray-50'}>
                             <td className="px-3 py-1 font-semibold text-gray-700 sticky left-0 bg-inherit">{MONTH_LABELS[mi]}</td>
@@ -820,6 +838,18 @@ export default function MarketStressTest() {
                               {changePct !== null
                                 ? `${changePct > 0 ? '+' : ''}${changePct.toFixed(2)}%`
                                 : <span className="text-gray-300">—</span>}
+                            </td>
+                            <td className="px-3 py-1 text-right font-mono text-yellow-900 bg-yellow-50">
+                              {pessRate !== null ? pessRate.toFixed(4) : <span className="text-gray-300">—</span>}
+                            </td>
+                            <td className="px-3 py-1 text-right bg-yellow-50">
+                              {fmtChg(pessChgPct, '')}
+                            </td>
+                            <td className="px-3 py-1 text-right font-mono text-red-900 bg-red-50">
+                              {catRate !== null ? catRate.toFixed(4) : <span className="text-gray-300">—</span>}
+                            </td>
+                            <td className="px-3 py-1 text-right bg-red-50">
+                              {fmtChg(catChgPct, '')}
                             </td>
                           </tr>
                         )
