@@ -127,8 +127,8 @@ function calcStats(rates: { date: string; value: number }[], trim = false) {
   const variance = returns.reduce((s, r) => s + (r - mean) ** 2, 0) / returns.length
 
   return {
-    mean:        Math.round(mean * 100) / 100,
-    stdDev:      Math.round(Math.sqrt(variance) * 100) / 100,
+    mean:        mean,
+    stdDev:      Math.sqrt(variance),
     min:         Math.round(Math.min(...returns) * 100) / 100,
     max:         Math.round(Math.max(...returns) * 100) / 100,
     current:     rates[rates.length - 1].value,

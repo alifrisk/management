@@ -62,18 +62,11 @@ function runMonteCarlo(mean: number, sd: number, n: number) {
   return { probs, hist: hist.filter((_, i) => i % 2 === 0), var95loss, var99loss, median, expected, histVar95, histVar99, paramVar95, paramVar99, cvar95, cvar99, appreciationPct, depreciationPct }
 }
 
-function calcStats(rates: { date: string; value: number }[]) {
-  const returns = rates.slice(1).map((r, i) => (r.value - rates[i].value) / rates[i].value * 100)
-  const mean   = returns.reduce((s, r) => s + r, 0) / returns.length
-  const sd     = Math.sqrt(returns.reduce((s, r) => s + (r - mean) ** 2, 0) / returns.length)
-  return {
-    mean:   +mean.toFixed(4),
-    stdDev: +sd.toFixed(4),
-    min:    +Math.min(...returns).toFixed(2),
-    max:    +Math.max(...returns).toFixed(2),
-    current: rates[rates.length - 1].value,
-    points:  rates.length,
-  }
+type NbtStats = {
+  mean: number; stdDev: number; min: number; max: number
+  current: number; first: number; totalChange: number
+  points: number; returns: number[]
+  rates: { date: string; value: number }[]
 }
 
 function parseNBT(xml: string) {
@@ -142,7 +135,7 @@ export default function MarketStressTest() {
   const [nbtLoading, setNbtLoading] = useState(false)
   const [nbtError,   setNbtError]   = useState<string | null>(null)
   const [trimmed,    setTrimmed]    = useState(false)
-  const [nbtStats,   setNbtStats]   = useState<ReturnType<typeof calcStats> | null>(null)
+  const [nbtStats,   setNbtStats]   = useState<NbtStats | null>(null)
   const [nbtRates,   setNbtRates]   = useState<{ date: string; value: number }[]>([])
 
   // Parameters (auto-filled from NBT or manual)
@@ -197,8 +190,8 @@ export default function MarketStressTest() {
       const stats = data.stats
       setNbtStats(stats)
       setNbtRates(stats.rates || [])
-      setMean(String(stats.mean))
-      setStdDev(String(stats.stdDev))
+      setMean(stats.mean.toFixed(6))
+      setStdDev(stats.stdDev.toFixed(6))
     } catch (e: unknown) {
       setNbtError('Ошибка НБТ: ' + (e instanceof Error ? e.message : String(e)))
     }
@@ -513,8 +506,8 @@ export default function MarketStressTest() {
                   <div className="grid grid-cols-3 lg:grid-cols-6 gap-2 mt-2">
                     {[
                       { l: 'Курс сейчас', v: `${nbtStats.current} TJS`, c: 'text-gray-900' },
-                      { l: 'Mean (μ)', v: `${nbtStats.mean}%`, c: 'text-blue-600' },
-                      { l: 'StdDev (σ)', v: `${nbtStats.stdDev}%`, c: 'text-purple-600' },
+                      { l: 'Mean (μ)', v: `${nbtStats.mean.toFixed(4)}%`, c: 'text-blue-600' },
+                      { l: 'StdDev (σ)', v: `${nbtStats.stdDev.toFixed(4)}%`, c: 'text-purple-600' },
                       { l: 'Min', v: `${nbtStats.min}%`, c: 'text-green-600' },
                       { l: 'Max', v: `${nbtStats.max}%`, c: 'text-red-600' },
                       { l: 'Точек данных', v: String(nbtStats.points), c: 'text-gray-600' },
