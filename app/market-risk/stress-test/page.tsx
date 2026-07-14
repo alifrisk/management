@@ -67,8 +67,8 @@ function calcStats(rates: { date: string; value: number }[]) {
   const mean   = returns.reduce((s, r) => s + r, 0) / returns.length
   const sd     = Math.sqrt(returns.reduce((s, r) => s + (r - mean) ** 2, 0) / returns.length)
   return {
-    mean:   +mean.toFixed(2),
-    stdDev: +sd.toFixed(2),
+    mean:   +mean.toFixed(4),
+    stdDev: +sd.toFixed(4),
     min:    +Math.min(...returns).toFixed(2),
     max:    +Math.max(...returns).toFixed(2),
     current: rates[rates.length - 1].value,
@@ -799,6 +799,7 @@ export default function MarketStressTest() {
                         <th className="px-3 py-2 text-left sticky left-0 bg-gray-800">Месяц</th>
                         <th className="px-3 py-2 text-right">Рег. капитал банка (TJS)</th>
                         <th className="px-3 py-2 text-right">Прогнозный курс {currency}/TJS</th>
+                        <th className="px-3 py-2 text-right">Изм. к текущему (%)</th>
                       </tr>
                     </thead>
                     <tbody>
@@ -806,6 +807,9 @@ export default function MarketStressTest() {
                         const dailyDrift = parseFloat(mean)
                         const forecastRate = (nbtStats && !isNaN(dailyDrift))
                           ? nbtStats.current * Math.pow(1 + dailyDrift / 100, (rowIdx + 1) * 30)
+                          : null
+                        const changePct = (forecastRate !== null && nbtStats)
+                          ? (forecastRate / nbtStats.current - 1) * 100
                           : null
                         return (
                           <tr key={mi} className={rowIdx % 2 === 0 ? 'bg-white' : 'bg-gray-50'}>
@@ -818,6 +822,11 @@ export default function MarketStressTest() {
                             </td>
                             <td className="px-3 py-1 text-right font-mono text-gray-700">
                               {forecastRate !== null ? forecastRate.toFixed(4) : <span className="text-gray-300">—</span>}
+                            </td>
+                            <td className={`px-3 py-1 text-right font-mono font-semibold ${changePct === null ? '' : changePct > 0 ? 'text-red-600' : changePct < 0 ? 'text-green-600' : 'text-gray-500'}`}>
+                              {changePct !== null
+                                ? `${changePct > 0 ? '+' : ''}${changePct.toFixed(2)}%`
+                                : <span className="text-gray-300">—</span>}
                             </td>
                           </tr>
                         )
