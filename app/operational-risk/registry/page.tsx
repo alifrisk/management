@@ -218,6 +218,9 @@ export default function RegistryPage() {
       if (field === 'recovery_amount' && prev.loss_amount_tjs && Number(value) > Number(prev.loss_amount_tjs)) {
         alert('Сумма восстановления не может быть больше суммы ущерба!'); return prev
       }
+      if (field === 'recovery_type' && value === 'non_recoverable') {
+        updated.recovery_amount = ''
+      }
       if (field === 'probability' || field === 'impact' || field === 'control_quality') {
         const p = Number(field === 'probability' ? value : prev.probability) || 0
         const i = Number(field === 'impact' ? value : prev.impact) || 0
@@ -236,11 +239,20 @@ export default function RegistryPage() {
   async function handleSave() {
     setSaving(true)
     setError(null)
-    if (!formData.event_category_l1 || !formData.business_process || !formData.factor ||
-        !formData.system || !formData.cause || !formData.department ||
-        !formData.discovered_by || !formData.disclosure ||
-        !formData.discovery_date || !formData.incident_date || !formData.incident_status) {
-      setError('Заполните все обязательные поля во всех этапах перед сохранением.')
+    const missingFields: string[] = []
+    if (!formData.event_category_l1) missingFields.push('Категория события (Шаг 1)')
+    if (!formData.business_process)  missingFields.push('Бизнес-процесс (Шаг 1)')
+    if (!formData.factor)            missingFields.push('Фактор риска (Шаг 1)')
+    if (!formData.system)            missingFields.push('Система (Шаг 1)')
+    if (!formData.cause)             missingFields.push('Причина (Шаг 1)')
+    if (!formData.department)        missingFields.push('Подразделение (Шаг 1)')
+    if (!formData.discovered_by)     missingFields.push('Риск-координатор (Шаг 2)')
+    if (!formData.disclosure)        missingFields.push('Раскрытие (Шаг 2)')
+    if (!formData.discovery_date)    missingFields.push('Дата обнаружения (Шаг 2)')
+    if (!formData.incident_date)     missingFields.push('Дата инцидента (Шаг 2)')
+    if (!formData.incident_status)   missingFields.push('Статус инцидента (Шаг 1)')
+    if (missingFields.length > 0) {
+      setError('Не заполнены обязательные поля: ' + missingFields.join(' · '))
       setSaving(false); return
     }
     if (!formData.recovery_type) {
@@ -912,8 +924,10 @@ export default function RegistryPage() {
                     </select></div>
                   <div><label className={labelCls}>Сумма в сомони (TJS)</label>
                     <input type="number" min="0" step="0.01" value={String(formData.loss_amount_tjs)} onChange={e => handleChange('loss_amount_tjs', e.target.value)} placeholder="0.00" className={inputCls} /></div>
-                  <div><label className={labelCls}>Сумма возврата</label>
-                    <input type="number" min="0" step="0.01" value={String(formData.recovery_amount)} onChange={e => handleChange('recovery_amount', e.target.value)} placeholder="0.00" className={inputCls} /></div>
+                  {formData.recovery_type !== 'non_recoverable' && (
+                    <div><label className={labelCls}>Сумма возврата</label>
+                      <input type="number" min="0" step="0.01" value={String(formData.recovery_amount)} onChange={e => handleChange('recovery_amount', e.target.value)} placeholder="0.00" className={inputCls} /></div>
+                  )}
                   <div className="lg:col-span-2">
                     <label className={labelCls}>Тип инцидента по возмещению <span className="text-red-500">*</span></label>
                     <div className="flex gap-3 mt-1">
