@@ -288,6 +288,13 @@ export default function RegistryPage() {
       const { error: e } = await supabase.from('operational_incidents').update(payload).eq('id', editingId)
       err = e
     } else {
+      const { data: maxData } = await supabase
+        .from('operational_incidents')
+        .select('incident_number')
+        .order('incident_number', { ascending: false })
+        .limit(1)
+        .maybeSingle()
+      payload.incident_number = (maxData?.incident_number || 0) + 1
       const { error: e } = await supabase.from('operational_incidents').insert(payload)
       err = e
     }
@@ -310,6 +317,17 @@ export default function RegistryPage() {
   async function handleDelete(id: string) {
     if (!confirm('Удалить инцидент?')) return
     await supabase.from('operational_incidents').delete().eq('id', id)
+    const { data: remaining } = await supabase
+      .from('operational_incidents')
+      .select('id')
+      .order('created_at', { ascending: true })
+    if (remaining) {
+      await Promise.all(
+        remaining.map((row, i) =>
+          supabase.from('operational_incidents').update({ incident_number: i + 1 }).eq('id', row.id)
+        )
+      )
+    }
     fetchIncidents()
   }
 
