@@ -445,42 +445,42 @@ export default function DashboardPage() {
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
             <div>
               <p className="text-xs text-gray-500 mb-2 font-medium">Сумма ущерба по годам (TJS)</p>
-              <ResponsiveContainer width="100%" height={200}>
-                <BarChart data={yearData}>
+              <ResponsiveContainer width="100%" height={260}>
+                <BarChart data={yearData} margin={{ top: 35 }}>
                   <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
                   <XAxis dataKey="year" tick={{ fontSize: 11 }} />
                   <YAxis tick={{ fontSize: 10 }} tickFormatter={v => fmt(v)} />
                   <Tooltip formatter={(v: number) => [fmt(v), 'Ущерб (TJS)']} />
                   <Bar dataKey="loss" name="Ущерб (TJS)" fill="#EF4444" radius={[4,4,0,0]}>
-                    <LabelList dataKey="loss" position="top" style={{ fontSize: 9 }} formatter={(v: number) => v > 0 ? fmt(v) : ''} />
+                    <LabelList dataKey="loss" position="top" style={{ fontSize: 10 }} formatter={(v: number) => v > 0 ? fmt(v) : ''} />
                   </Bar>
                 </BarChart>
               </ResponsiveContainer>
             </div>
             <div>
               <p className="text-xs text-gray-500 mb-2 font-medium">Сумма возмещения по годам (TJS)</p>
-              <ResponsiveContainer width="100%" height={200}>
-                <BarChart data={yearData}>
+              <ResponsiveContainer width="100%" height={260}>
+                <BarChart data={yearData} margin={{ top: 35 }}>
                   <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
                   <XAxis dataKey="year" tick={{ fontSize: 11 }} />
                   <YAxis tick={{ fontSize: 10 }} tickFormatter={v => fmt(v)} />
                   <Tooltip formatter={(v: number) => [fmt(v), 'Возмещение (TJS)']} />
                   <Bar dataKey="recovery" name="Возмещение (TJS)" fill="#1B8A4C" radius={[4,4,0,0]}>
-                    <LabelList dataKey="recovery" position="top" style={{ fontSize: 9 }} formatter={(v: number) => v > 0 ? fmt(v) : ''} />
+                    <LabelList dataKey="recovery" position="top" style={{ fontSize: 10 }} formatter={(v: number) => v > 0 ? fmt(v) : ''} />
                   </Bar>
                 </BarChart>
               </ResponsiveContainer>
             </div>
             <div>
               <p className="text-xs text-gray-500 mb-2 font-medium">Остаток (ущерб − возмещение) по годам (TJS)</p>
-              <ResponsiveContainer width="100%" height={200}>
-                <BarChart data={yearData}>
+              <ResponsiveContainer width="100%" height={260}>
+                <BarChart data={yearData} margin={{ top: 35 }}>
                   <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
                   <XAxis dataKey="year" tick={{ fontSize: 11 }} />
                   <YAxis tick={{ fontSize: 10 }} tickFormatter={v => fmt(v)} />
                   <Tooltip formatter={(v: number) => [fmt(v), 'Остаток (TJS)']} />
                   <Bar dataKey="remainder" name="Остаток (TJS)" fill="#F97316" radius={[4,4,0,0]}>
-                    <LabelList dataKey="remainder" position="top" style={{ fontSize: 9 }} formatter={(v: number) => v > 0 ? fmt(v) : ''} />
+                    <LabelList dataKey="remainder" position="top" style={{ fontSize: 10 }} formatter={(v: number) => v > 0 ? fmt(v) : ''} />
                   </Bar>
                 </BarChart>
               </ResponsiveContainer>
