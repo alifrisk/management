@@ -645,7 +645,7 @@ export default function RegistryPage() {
               ) : (
                 paginated.map((incident, idx) => (
                   <tr key={incident.id} className="hover:bg-gray-50 transition-colors">
-                    <td className="px-4 py-3 font-medium text-gray-900">{(currentPage - 1) * PAGE_SIZE + idx + 1}</td>
+                    <td className="px-4 py-3 font-medium text-gray-900">{incident.incident_number}</td>
                     <td className="px-4 py-3 text-gray-600 whitespace-nowrap">{formatDate(incident.discovery_date)}</td>
                     <td className="px-4 py-3 text-gray-600 max-w-[150px] truncate" title={incident.event_category_l1}>{incident.event_category_l1?.replace(/_/g,' ')}</td>
                     <td className="px-4 py-3 text-gray-600 max-w-[150px] truncate" title={incident.business_process}>{incident.business_process}</td>
