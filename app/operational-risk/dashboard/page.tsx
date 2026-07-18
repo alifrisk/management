@@ -14,6 +14,7 @@ interface Incident {
   factor: string; business_process: string; risk_level: string; incident_status: string
   client_work_status: string; frequency: string; department: string; system: string
   loss_amount_tjs: number; recovery_amount: number; discovery_date: string; incident_date: string
+  recovery_type: string | null
 }
 const MONTHS = ['январь','февраль','март','апрель','май','июнь','июль','август','сентябрь','октябрь','ноябрь','декабрь']
 export default function DashboardPage() {
@@ -28,7 +29,7 @@ export default function DashboardPage() {
     setLoading(true)
     let query = supabase
       .from('operational_incidents')
-      .select('factor, business_process, risk_level, incident_status, client_work_status, frequency, department, system, loss_amount_tjs, recovery_amount, discovery_date, incident_date')
+      .select('factor, business_process, risk_level, incident_status, client_work_status, frequency, department, system, loss_amount_tjs, recovery_amount, discovery_date, incident_date, recovery_type')
       .gte('discovery_date', `${year}-01-01`)
       .lte('discovery_date', `${year}-12-31`)
     if (filterMonth) {
@@ -58,6 +59,10 @@ export default function DashboardPage() {
   const totalLoss = incidents.reduce((s, i) => s + (i.loss_amount_tjs || 0), 0)
   const totalRecovery = incidents.reduce((s, i) => s + (i.recovery_amount || 0), 0)
   const recoveryRate = totalLoss > 0 ? (totalRecovery / totalLoss * 100).toFixed(1) : '0'
+  const recoverableOnly   = incidents.filter(i => i.recovery_type === 'recoverable')
+  const recoverableLoss   = recoverableOnly.reduce((s, i) => s + (i.loss_amount_tjs || 0), 0)
+  const recoverableRecov  = recoverableOnly.reduce((s, i) => s + (i.recovery_amount || 0), 0)
+  const recoveryRateClean = recoverableLoss > 0 ? (recoverableRecov / recoverableLoss * 100).toFixed(1) : null
   const open = incidents.filter(i => i.incident_status === 'Открыт' || i.incident_status === 'В процессе').length
   const high = incidents.filter(i => i.risk_level === 'Высокий' || i.risk_level === 'Экстремальные').length
   const prevLoss = prevIncidents.reduce((s, i) => s + (i.loss_amount_tjs || 0), 0)
@@ -240,16 +245,40 @@ export default function DashboardPage() {
 
         {/* Возвратность */}
         <div className={`${card} group relative cursor-default`}>
-          <p className="text-xs text-gray-500 mb-1">Возвратность</p>
+          <p className="text-xs text-gray-500 mb-1">Возвратность (все)</p>
           <p className="text-2xl font-bold text-[#1B8A4C]">{recoveryRate}%</p>
           <p className="text-xs text-gray-400 mt-1">{fmt(totalRecovery)} / {fmt(totalLoss)}</p>
           <div className="absolute top-full right-0 mt-2 hidden group-hover:block z-30 w-56 bg-gray-900 text-white text-xs rounded-xl p-3 shadow-2xl pointer-events-none">
-            <p className="font-semibold mb-2 border-b border-white/20 pb-1.5">Коэффициент возвратности</p>
+            <p className="font-semibold mb-2 border-b border-white/20 pb-1.5">Коэффициент возвратности (все инциденты)</p>
             <div className="space-y-1.5">
               <div className="flex justify-between"><span className="text-gray-300">Возвращено:</span><span className="text-green-400">{fmt(totalRecovery)} TJS</span></div>
               <div className="flex justify-between"><span className="text-gray-300">Общий ущерб:</span><span>{fmt(totalLoss)} TJS</span></div>
               <div className="flex justify-between border-t border-white/10 pt-1.5 mt-1"><span className="text-gray-300">Коэффициент:</span><span className="font-bold text-green-400">{recoveryRate}%</span></div>
             </div>
+            <div className="absolute bottom-full right-5 mb-[-1px] border-4 border-transparent border-b-gray-900" />
+          </div>
+        </div>
+
+        {/* Возвратность (очищенная — только возмещаемые) */}
+        <div className={`${card} group relative cursor-default`}>
+          <p className="text-xs text-gray-500 mb-1">Возвратность (возмещаемые)</p>
+          <p className="text-2xl font-bold text-blue-600">
+            {recoveryRateClean !== null ? `${recoveryRateClean}%` : '—'}
+          </p>
+          <p className="text-xs text-gray-400 mt-1">
+            {recoverableOnly.length > 0
+              ? `${fmt(recoverableRecov)} / ${fmt(recoverableLoss)}`
+              : 'нет данных с типом'}
+          </p>
+          <div className="absolute top-full right-0 mt-2 hidden group-hover:block z-30 w-64 bg-gray-900 text-white text-xs rounded-xl p-3 shadow-2xl pointer-events-none">
+            <p className="font-semibold mb-2 border-b border-white/20 pb-1.5">Возвратность по возмещаемым инцидентам</p>
+            <div className="space-y-1.5">
+              <div className="flex justify-between"><span className="text-gray-300">Возмещаемых инцидентов:</span><span>{recoverableOnly.length}</span></div>
+              <div className="flex justify-between"><span className="text-gray-300">Ущерб (возмещаемые):</span><span>{fmt(recoverableLoss)} TJS</span></div>
+              <div className="flex justify-between"><span className="text-gray-300">Возвращено:</span><span className="text-green-400">{fmt(recoverableRecov)} TJS</span></div>
+              <div className="flex justify-between border-t border-white/10 pt-1.5 mt-1"><span className="text-gray-300">Коэффициент:</span><span className="font-bold text-blue-400">{recoveryRateClean ?? '—'}%</span></div>
+            </div>
+            <p className="text-gray-400 mt-2 text-[10px]">Штрафы и регуляторные санкции (невозмещаемые) исключены из расчёта</p>
             <div className="absolute bottom-full right-5 mb-[-1px] border-4 border-transparent border-b-gray-900" />
           </div>
         </div>

@@ -48,6 +48,7 @@ interface Incident {
   responsible: string
   source: string
   created_at: string
+  recovery_type: string | null
 }
 
 interface IncidentForm {
@@ -97,6 +98,7 @@ const EMPTY_FORM = {
   employee_involved: '', incident_location: '', department: '',
   discovered_by: '', disclosure: '', discovery_date: '', incident_date: '',
   loss_amount: '', currency: 'TJS', loss_amount_tjs: '', recovery_amount: '',
+  recovery_type: '',
   incident_status: 'Открыт', client_work_status: '', system_link: '',
   transaction_count: '', probability: '', impact: '', control_quality: '',
   probability_score: '', impact_score: '', risk_level: '',
@@ -241,6 +243,10 @@ export default function RegistryPage() {
       setError('Заполните все обязательные поля во всех этапах перед сохранением.')
       setSaving(false); return
     }
+    if (!formData.recovery_type) {
+      setError('Укажите тип инцидента по возмещению (Шаг 3 — Финансовые данные).')
+      setSaving(false); return
+    }
     const payload: Record<string, unknown> = {
       event_category_l1: formData.event_category_l1, event_category_l2: formData.event_category_l2,
       event_category_l3: formData.event_category_l3, business_process: formData.business_process,
@@ -252,6 +258,7 @@ export default function RegistryPage() {
       loss_amount: formData.loss_amount ? Number(formData.loss_amount) : null, currency: formData.currency,
       loss_amount_tjs: formData.loss_amount_tjs ? Number(formData.loss_amount_tjs) : null,
       recovery_amount: formData.recovery_amount ? Number(formData.recovery_amount) : null,
+      recovery_type: formData.recovery_type || null,
       incident_status: formData.incident_status, client_work_status: formData.client_work_status || null,
       system_link: formData.system_link || null,
       transaction_count: formData.transaction_count ? Number(formData.transaction_count) : null,
@@ -907,6 +914,31 @@ export default function RegistryPage() {
                     <input type="number" min="0" step="0.01" value={String(formData.loss_amount_tjs)} onChange={e => handleChange('loss_amount_tjs', e.target.value)} placeholder="0.00" className={inputCls} /></div>
                   <div><label className={labelCls}>Сумма возврата</label>
                     <input type="number" min="0" step="0.01" value={String(formData.recovery_amount)} onChange={e => handleChange('recovery_amount', e.target.value)} placeholder="0.00" className={inputCls} /></div>
+                  <div className="lg:col-span-2">
+                    <label className={labelCls}>Тип инцидента по возмещению <span className="text-red-500">*</span></label>
+                    <div className="flex gap-3 mt-1">
+                      {[
+                        { value: 'recoverable',     label: 'Возмещаемый',    desc: 'Мошенничество, ошибки — возврат теоретически возможен', color: 'green' },
+                        { value: 'non_recoverable', label: 'Невозмещаемый',  desc: 'Штрафы, регуляторные санкции — возврат невозможен',     color: 'red'   },
+                      ].map(opt => (
+                        <button key={opt.value} type="button"
+                          onClick={() => handleChange('recovery_type', opt.value)}
+                          className={`flex-1 px-4 py-3 rounded-lg border-2 text-left transition-all ${
+                            formData.recovery_type === opt.value
+                              ? opt.color === 'green'
+                                ? 'border-green-500 bg-green-50 text-green-800'
+                                : 'border-red-500 bg-red-50 text-red-800'
+                              : 'border-gray-200 bg-white text-gray-600 hover:border-gray-300'
+                          }`}>
+                          <p className="font-semibold text-sm">{opt.label}</p>
+                          <p className="text-xs mt-0.5 opacity-75">{opt.desc}</p>
+                        </button>
+                      ))}
+                    </div>
+                    {!formData.recovery_type && (
+                      <p className="text-xs text-amber-600 mt-1">⚠ Обязательное поле — выберите тип перед сохранением</p>
+                    )}
+                  </div>
                   {Boolean(formData.loss_amount_tjs) && Boolean(formData.recovery_amount) && (
                     <div className="lg:col-span-2 grid grid-cols-2 gap-4">
                       <div className="bg-gray-50 rounded-lg p-3">
