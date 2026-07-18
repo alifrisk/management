@@ -194,23 +194,6 @@ export default function DashboardPage() {
           </div>
         </div>
 
-        {/* Высокий риск */}
-        <div className={`${card} group relative cursor-default`}>
-          <p className="text-xs text-gray-500 mb-1">Высокий риск</p>
-          <p className="text-2xl font-bold text-orange-600">{high}</p>
-          <p className="text-xs text-gray-400 mt-1">{total > 0 ? ((high/total)*100).toFixed(0) : 0}% от всех</p>
-          <div className="absolute top-full left-0 mt-2 hidden group-hover:block z-30 w-52 bg-gray-900 text-white text-xs rounded-xl p-3 shadow-2xl pointer-events-none">
-            <p className="font-semibold mb-2 border-b border-white/20 pb-1.5">По уровню риска</p>
-            <div className="space-y-1.5">
-              <div className="flex justify-between"><span className="text-gray-300">Низкий:</span><span className="text-green-400">{incidents.filter(i => i.risk_level === 'Низкий').length}</span></div>
-              <div className="flex justify-between"><span className="text-gray-300">Средний:</span><span className="text-yellow-400">{incidents.filter(i => i.risk_level === 'Средний').length}</span></div>
-              <div className="flex justify-between"><span className="text-gray-300">Высокий:</span><span className="text-orange-400">{incidents.filter(i => i.risk_level === 'Высокий').length}</span></div>
-              <div className="flex justify-between"><span className="text-gray-300">Экстремальный:</span><span className="text-red-400">{incidents.filter(i => i.risk_level === 'Экстремальные').length}</span></div>
-            </div>
-            <div className="absolute bottom-full left-5 mb-[-1px] border-4 border-transparent border-b-gray-900" />
-          </div>
-        </div>
-
         {/* Ущерб */}
         <div className={`${card} group relative cursor-default`}>
           <p className="text-xs text-gray-500 mb-1">Ущерб (TJS)</p>
@@ -243,22 +226,6 @@ export default function DashboardPage() {
           </div>
         </div>
 
-        {/* Возвратность */}
-        <div className={`${card} group relative cursor-default`}>
-          <p className="text-xs text-gray-500 mb-1">Возвратность (все)</p>
-          <p className="text-2xl font-bold text-[#1B8A4C]">{recoveryRate}%</p>
-          <p className="text-xs text-gray-400 mt-1">{fmt(totalRecovery)} / {fmt(totalLoss)}</p>
-          <div className="absolute top-full right-0 mt-2 hidden group-hover:block z-30 w-56 bg-gray-900 text-white text-xs rounded-xl p-3 shadow-2xl pointer-events-none">
-            <p className="font-semibold mb-2 border-b border-white/20 pb-1.5">Коэффициент возвратности (все инциденты)</p>
-            <div className="space-y-1.5">
-              <div className="flex justify-between"><span className="text-gray-300">Возвращено:</span><span className="text-green-400">{fmt(totalRecovery)} TJS</span></div>
-              <div className="flex justify-between"><span className="text-gray-300">Общий ущерб:</span><span>{fmt(totalLoss)} TJS</span></div>
-              <div className="flex justify-between border-t border-white/10 pt-1.5 mt-1"><span className="text-gray-300">Коэффициент:</span><span className="font-bold text-green-400">{recoveryRate}%</span></div>
-            </div>
-            <div className="absolute bottom-full right-5 mb-[-1px] border-4 border-transparent border-b-gray-900" />
-          </div>
-        </div>
-
         {/* Возвратность (очищенная — только возмещаемые) */}
         <div className={`${card} group relative cursor-default`}>
           <p className="text-xs text-gray-500 mb-1">Возвратность (возмещаемые)</p>
@@ -279,6 +246,22 @@ export default function DashboardPage() {
               <div className="flex justify-between border-t border-white/10 pt-1.5 mt-1"><span className="text-gray-300">Коэффициент:</span><span className="font-bold text-blue-400">{recoveryRateClean ?? '—'}%</span></div>
             </div>
             <p className="text-gray-400 mt-2 text-[10px]">Штрафы и регуляторные санкции (невозмещаемые) исключены из расчёта</p>
+            <div className="absolute bottom-full right-5 mb-[-1px] border-4 border-transparent border-b-gray-900" />
+          </div>
+        </div>
+
+        {/* Возвратность (все) */}
+        <div className={`${card} group relative cursor-default`}>
+          <p className="text-xs text-gray-500 mb-1">Возвратность (все)</p>
+          <p className="text-2xl font-bold text-[#1B8A4C]">{recoveryRate}%</p>
+          <p className="text-xs text-gray-400 mt-1">{fmt(totalRecovery)} / {fmt(totalLoss)}</p>
+          <div className="absolute top-full right-0 mt-2 hidden group-hover:block z-30 w-56 bg-gray-900 text-white text-xs rounded-xl p-3 shadow-2xl pointer-events-none">
+            <p className="font-semibold mb-2 border-b border-white/20 pb-1.5">Коэффициент возвратности (все инциденты)</p>
+            <div className="space-y-1.5">
+              <div className="flex justify-between"><span className="text-gray-300">Возвращено:</span><span className="text-green-400">{fmt(totalRecovery)} TJS</span></div>
+              <div className="flex justify-between"><span className="text-gray-300">Общий ущерб:</span><span>{fmt(totalLoss)} TJS</span></div>
+              <div className="flex justify-between border-t border-white/10 pt-1.5 mt-1"><span className="text-gray-300">Коэффициент:</span><span className="font-bold text-green-400">{recoveryRate}%</span></div>
+            </div>
             <div className="absolute bottom-full right-5 mb-[-1px] border-4 border-transparent border-b-gray-900" />
           </div>
         </div>
