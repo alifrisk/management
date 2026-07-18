@@ -55,6 +55,11 @@ export default function DashboardPage() {
       .then(({ data }) => setAllIncidents(data || []))
   }, [])
   const fmt = (n: number) => new Intl.NumberFormat('ru-RU').format(Math.round(n))
+  const fmtShort = (n: number) => {
+    if (n >= 1_000_000) return (n / 1_000_000).toFixed(1).replace('.', ',') + ' млн'
+    if (n >= 1_000)     return Math.round(n / 1_000) + ' тыс'
+    return fmt(n)
+  }
   const total = incidents.length
   const totalLoss = incidents.reduce((s, i) => s + (i.loss_amount_tjs || 0), 0)
   const totalRecovery = incidents.reduce((s, i) => s + (i.recovery_amount || 0), 0)
@@ -64,7 +69,6 @@ export default function DashboardPage() {
   const recoverableRecov  = recoverableOnly.reduce((s, i) => s + (i.recovery_amount || 0), 0)
   const recoveryRateClean = recoverableLoss > 0 ? (recoverableRecov / recoverableLoss * 100).toFixed(1) : null
   const open = incidents.filter(i => i.incident_status === 'Открыт' || i.incident_status === 'В процессе').length
-  const high = incidents.filter(i => i.risk_level === 'Высокий' || i.risk_level === 'Экстремальные').length
   const prevLoss = prevIncidents.reduce((s, i) => s + (i.loss_amount_tjs || 0), 0)
   const prevCount = prevIncidents.length
   const lossDiff = prevLoss > 0 ? ((totalLoss - prevLoss) / prevLoss * 100).toFixed(1) : null
@@ -89,7 +93,7 @@ export default function DashboardPage() {
     acc[i.system].recovery += i.recovery_amount || 0
     acc[i.system].count += 1
     return acc
-  }, {} as Record<string, { loss: number; recovery: number; count: number }>)).sort((a, b) => b[1].loss - a[1].loss).slice(0, 8).map(([name, v]) => ({ name, loss: Math.round(v.loss), recovery: Math.round(v.recovery), count: v.count }))
+  }, {} as Record<string, { loss: number; recovery: number; count: number }>)).sort((a, b) => b[1].loss - a[1].loss).slice(0, 8).map(([name, v]) => ({ name: name.length > 22 ? name.slice(0, 22) + '…' : name, loss: Math.round(v.loss), recovery: Math.round(v.recovery), count: v.count }))
   const factorData = ['Риск систем', 'Риск человеческого фактора', 'Риск внутренний процесс', 'Юридический риск', 'Внешний риск'].map(f => {
     const m = incidents.filter(i => i.factor === f)
     return { name: f, count: m.length, loss: Math.round(m.reduce((s, i) => s + (i.loss_amount_tjs || 0), 0)), recovery: Math.round(m.reduce((s, i) => s + (i.recovery_amount || 0), 0)) }
@@ -228,14 +232,14 @@ export default function DashboardPage() {
 
         {/* Возвратность (очищенная — только возмещаемые) */}
         <div className={`${card} group relative cursor-default`}>
-          <p className="text-xs text-gray-500 mb-1">Возвратность (возмещаемые)</p>
+          <p className="text-[10px] leading-tight text-gray-500 mb-1">Возвратность (возмещ.)</p>
           <p className="text-2xl font-bold text-blue-600">
             {recoveryRateClean !== null ? `${recoveryRateClean}%` : '—'}
           </p>
-          <p className="text-xs text-gray-400 mt-1">
+          <p className="text-xs text-gray-400 mt-1 truncate">
             {recoverableOnly.length > 0
-              ? `${fmt(recoverableRecov)} / ${fmt(recoverableLoss)}`
-              : 'нет данных с типом'}
+              ? `${fmtShort(recoverableRecov)} / ${fmtShort(recoverableLoss)}`
+              : 'нет возмещаемых'}
           </p>
           <div className="absolute top-full right-0 mt-2 hidden group-hover:block z-30 w-64 bg-gray-900 text-white text-xs rounded-xl p-3 shadow-2xl pointer-events-none">
             <p className="font-semibold mb-2 border-b border-white/20 pb-1.5">Возвратность по возмещаемым инцидентам</p>
@@ -254,7 +258,7 @@ export default function DashboardPage() {
         <div className={`${card} group relative cursor-default`}>
           <p className="text-xs text-gray-500 mb-1">Возвратность (все)</p>
           <p className="text-2xl font-bold text-[#1B8A4C]">{recoveryRate}%</p>
-          <p className="text-xs text-gray-400 mt-1">{fmt(totalRecovery)} / {fmt(totalLoss)}</p>
+          <p className="text-xs text-gray-400 mt-1 truncate">{fmtShort(totalRecovery)} / {fmtShort(totalLoss)}</p>
           <div className="absolute top-full right-0 mt-2 hidden group-hover:block z-30 w-56 bg-gray-900 text-white text-xs rounded-xl p-3 shadow-2xl pointer-events-none">
             <p className="font-semibold mb-2 border-b border-white/20 pb-1.5">Коэффициент возвратности (все инциденты)</p>
             <div className="space-y-1.5">
@@ -281,7 +285,7 @@ export default function DashboardPage() {
                 <div className="flex items-center gap-3">
                   <span className={`w-7 h-7 rounded-full flex items-center justify-center text-white text-sm font-bold ${i === 0 ? 'bg-red-600' : i === 1 ? 'bg-orange-500' : 'bg-yellow-500'}`}>{i+1}</span>
                   <div>
-                    <p className="text-sm font-medium text-gray-900">{inc.business_process || '—'}</p>
+                    <p className="text-sm font-medium text-gray-900">{(inc.business_process || '—').length > 32 ? (inc.business_process || '—').slice(0, 32) + '…' : (inc.business_process || '—')}</p>
                     <p className="text-xs text-gray-500">{inc.department} · {inc.discovery_date ? new Date(inc.discovery_date).toLocaleDateString('ru-RU') : '—'}</p>
                   </div>
                 </div>
@@ -298,8 +302,8 @@ export default function DashboardPage() {
       {/* Ущерб по месяцам */}
       <div className={card}>
         <p className={title}>Ущерб, возврат и количество инцидентов по месяцам</p>
-        <ResponsiveContainer width="100%" height={250}>
-          <ComposedChart data={filterMonth ? monthData.filter((_,i) => i === parseInt(filterMonth) - 1) : monthData}>
+        <ResponsiveContainer width="100%" height={280}>
+          <ComposedChart data={filterMonth ? monthData.filter((_,i) => i === parseInt(filterMonth) - 1) : monthData} margin={{ top: 35 }}>
             <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
             <XAxis dataKey="name" tick={{ fontSize: 11 }} />
             <YAxis yAxisId="left" tick={{ fontSize: 11 }} tickFormatter={v => fmt(v)} domain={[0, (dataMax: number) => Math.ceil(dataMax * 1.3) || 1]} />
@@ -318,7 +322,7 @@ export default function DashboardPage() {
         <div className={card}>
           <p className={title}>Ущерб и возврат по бизнес-процессам (TJS)</p>
           <ResponsiveContainer width="100%" height={280}>
-            <BarChart data={bpData} layout="vertical">
+            <BarChart data={bpData} layout="vertical" margin={{ right: 55 }}>
               <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
               <XAxis type="number" tick={{ fontSize: 10 }} tickFormatter={v => fmt(v)} />
               <YAxis dataKey="name" type="category" tick={{ fontSize: 9 }} width={150} />
@@ -332,10 +336,10 @@ export default function DashboardPage() {
         <div className={card}>
           <p className={title}>Ущерб и возврат по системам (TJS)</p>
           <ResponsiveContainer width="100%" height={280}>
-            <BarChart data={systemData} layout="vertical">
+            <BarChart data={systemData} layout="vertical" margin={{ right: 55 }}>
               <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
               <XAxis type="number" tick={{ fontSize: 10 }} tickFormatter={v => fmt(v)} />
-              <YAxis dataKey="name" type="category" tick={{ fontSize: 9 }} width={130} />
+              <YAxis dataKey="name" type="category" tick={{ fontSize: 9 }} width={150} />
               <Tooltip formatter={(v: number) => fmt(v)} />
               <Legend />
               <Bar dataKey="loss" name="Ущерб" fill="#EF4444" radius={[0,4,4,0]}><LabelList dataKey="loss" position="right" style={{ fontSize: 9 }} formatter={(v: number) => v > 0 ? fmt(v) : ''} /></Bar>
@@ -349,10 +353,10 @@ export default function DashboardPage() {
       <div className={card}>
         <p className={title}>Ущерб и возврат по факторам риска (TJS)</p>
         <ResponsiveContainer width="100%" height={220}>
-          <BarChart data={factorData} layout="vertical">
+          <BarChart data={factorData} layout="vertical" margin={{ right: 55 }}>
             <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
             <XAxis type="number" tick={{ fontSize: 11 }} tickFormatter={v => fmt(v)} />
-            <YAxis dataKey="name" type="category" tick={{ fontSize: 10 }} width={120} />
+            <YAxis dataKey="name" type="category" tick={{ fontSize: 10 }} width={155} />
             <Tooltip formatter={(v: number) => fmt(v)} />
             <Legend />
             <Bar dataKey="loss" name="Ущерб" fill="#EF4444" radius={[0,4,4,0]}><LabelList dataKey="loss" position="right" style={{ fontSize: 9 }} formatter={(v: number) => v > 0 ? fmt(v) : ''} /></Bar>
@@ -382,10 +386,17 @@ export default function DashboardPage() {
           <p className={title}>По статусу инцидентов</p>
           <ResponsiveContainer width="100%" height={220}>
             <PieChart>
-              <Pie data={statusData} dataKey="value" nameKey="name" cx="50%" cy="45%" outerRadius={75} label={({ name, value }) => `${name}: ${value}`} labelLine={true}>
+              <Pie data={statusData} dataKey="value" nameKey="name" cx="50%" cy="50%" outerRadius={80}
+                label={({ cx, cy, midAngle, innerRadius, outerRadius, value }) => {
+                  const RADIAN = Math.PI / 180
+                  const r = innerRadius + (outerRadius - innerRadius) * 0.5
+                  const x = cx + r * Math.cos(-midAngle * RADIAN)
+                  const y = cy + r * Math.sin(-midAngle * RADIAN)
+                  return value > 0 ? <text x={x} y={y} fill="white" textAnchor="middle" dominantBaseline="central" fontSize={12} fontWeight="bold">{value}</text> : null
+                }} labelLine={false}>
                 {statusData.map((_, i) => <Cell key={i} fill={['#3B82F6','#F59E0B','#1B8A4C'][i]} />)}
               </Pie>
-              <Tooltip />
+              <Tooltip formatter={(v, name) => [v, name]} />
               <Legend />
             </PieChart>
           </ResponsiveContainer>
@@ -398,10 +409,17 @@ export default function DashboardPage() {
           <p className={title}>По частоте повторений</p>
           <ResponsiveContainer width="100%" height={220}>
             <PieChart>
-              <Pie data={frequencyData} dataKey="value" nameKey="name" cx="50%" cy="45%" outerRadius={75} label={({ name, value }) => `${name}: ${value}`} labelLine={true}>
+              <Pie data={frequencyData} dataKey="value" nameKey="name" cx="50%" cy="50%" outerRadius={80}
+                label={({ cx, cy, midAngle, innerRadius, outerRadius, value }) => {
+                  const RADIAN = Math.PI / 180
+                  const r = innerRadius + (outerRadius - innerRadius) * 0.5
+                  const x = cx + r * Math.cos(-midAngle * RADIAN)
+                  const y = cy + r * Math.sin(-midAngle * RADIAN)
+                  return value > 0 ? <text x={x} y={y} fill="white" textAnchor="middle" dominantBaseline="central" fontSize={12} fontWeight="bold">{value}</text> : null
+                }} labelLine={false}>
                 {frequencyData.map((_, i) => <Cell key={i} fill={COLORS[i]} />)}
               </Pie>
-              <Tooltip />
+              <Tooltip formatter={(v, name) => [v, name]} />
               <Legend />
             </PieChart>
           </ResponsiveContainer>
@@ -409,7 +427,7 @@ export default function DashboardPage() {
         <div className={card}>
           <p className={title}>По статусу работы с клиентами</p>
           <ResponsiveContainer width="100%" height={220}>
-            <BarChart data={clientStatusData} layout="vertical">
+            <BarChart data={clientStatusData} layout="vertical" margin={{ right: 30 }}>
               <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
               <XAxis type="number" tick={{ fontSize: 11 }} />
               <YAxis dataKey="name" type="category" tick={{ fontSize: 9 }} width={150} />
@@ -426,7 +444,7 @@ export default function DashboardPage() {
       <div className={card}>
         <p className={title}>Топ подразделений по количеству инцидентов</p>
         <ResponsiveContainer width="100%" height={280}>
-          <BarChart data={deptData} layout="vertical">
+          <BarChart data={deptData} layout="vertical" margin={{ right: 30 }}>
             <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
             <XAxis type="number" tick={{ fontSize: 11 }} />
             <YAxis dataKey="name" type="category" tick={{ fontSize: 9 }} width={180} />
