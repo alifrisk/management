@@ -126,6 +126,7 @@ export default function RegistryPage() {
   const [showFilters, setShowFilters] = useState(false)
   const [viewingIncident, setViewingIncident] = useState<Incident | null>(null)
   const [currentPage, setCurrentPage] = useState(1)
+  const [showHelp, setShowHelp] = useState<'probability' | 'impact' | 'control' | null>(null)
 
   // ── Alert state ─────────────────────────────────────────────────────────────
   const [nbtReported, setNbtReported] = useState<Record<string, boolean>>({})
@@ -1014,22 +1015,113 @@ export default function RegistryPage() {
               {activeTab === 5 && (
                 <div className="space-y-4">
                   <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
-                    <div><label className={labelCls}>Вероятность *</label>
+
+                    {/* Вероятность */}
+                    <div>
+                      <div className="flex items-center gap-1 mb-1">
+                        <label className={labelCls + ' mb-0'}>Вероятность *</label>
+                        <button type="button" onClick={() => setShowHelp(showHelp === 'probability' ? null : 'probability')}
+                          className="w-4 h-4 rounded-full bg-gray-200 text-gray-600 text-[10px] font-bold flex items-center justify-center hover:bg-[#1B8A4C] hover:text-white transition-colors flex-shrink-0" title="Справка">ⓘ</button>
+                      </div>
+                      {showHelp === 'probability' && (
+                        <div className="mb-2 rounded-lg border border-blue-100 bg-blue-50 p-3 text-xs">
+                          <p className="font-semibold text-blue-800 mb-2">Критерии выбора вероятности</p>
+                          <table className="w-full border-collapse">
+                            <tbody className="divide-y divide-blue-100">
+                              {[
+                                { v: 5, name: 'Определённо', desc: 'Почти наверняка, неизбежно — свыше 50 случаев в год' },
+                                { v: 4, name: 'Часто',       desc: 'Большая вероятность — от 20 до 49 случаев в год' },
+                                { v: 3, name: 'Вероятно',    desc: 'Случается часто — от 10 до 19 случаев в год' },
+                                { v: 2, name: 'Редко',        desc: 'Небольшой шанс — от 5 до 9 случаев в год' },
+                                { v: 1, name: 'Маловероятно', desc: 'Крайне редко — до 5 случаев в год' },
+                              ].map(r => (
+                                <tr key={r.v} className="align-top">
+                                  <td className="pr-2 py-1 font-bold text-blue-700 whitespace-nowrap">{r.v}</td>
+                                  <td className="pr-2 py-1 font-medium text-gray-700 whitespace-nowrap">{r.name}</td>
+                                  <td className="py-1 text-gray-600">{r.desc}</td>
+                                </tr>
+                              ))}
+                            </tbody>
+                          </table>
+                        </div>
+                      )}
                       <select value={String(formData.probability)} onChange={e => handleChange('probability', e.target.value)} className={inputCls}>
                         <option value="">Выберите</option>
                         {PROBABILITY_SCORES.map(p => <option key={p.value} value={p.value}>{p.value} — {p.label}</option>)}
-                      </select></div>
-                    <div><label className={labelCls}>Влияние *</label>
+                      </select>
+                    </div>
+
+                    {/* Влияние */}
+                    <div>
+                      <div className="flex items-center gap-1 mb-1">
+                        <label className={labelCls + ' mb-0'}>Влияние *</label>
+                        <button type="button" onClick={() => setShowHelp(showHelp === 'impact' ? null : 'impact')}
+                          className="w-4 h-4 rounded-full bg-gray-200 text-gray-600 text-[10px] font-bold flex items-center justify-center hover:bg-[#1B8A4C] hover:text-white transition-colors flex-shrink-0" title="Справка">ⓘ</button>
+                      </div>
+                      {showHelp === 'impact' && (
+                        <div className="mb-2 rounded-lg border border-blue-100 bg-blue-50 p-3 text-xs">
+                          <p className="font-semibold text-blue-800 mb-2">Критерии выбора влияния</p>
+                          <table className="w-full border-collapse">
+                            <tbody className="divide-y divide-blue-100">
+                              {[
+                                { v: 5, name: 'Катастрофическое', desc: 'Нарушает непрерывность деятельности — потери свыше 1 000 001 сомони, или >0,5% УК за год; мошенничество, штрафы регулятора, негативные СМИ' },
+                                { v: 4, name: 'Критическое',      desc: 'Значительные затраты на устранение — потери 50 001–1 000 000 сомони, или 0,3–0,5% УК за год; письменное предупреждение регулятора' },
+                                { v: 3, name: 'Умеренное',        desc: 'Легко устранимо — потери 5 001–50 000 сомони, нечастые повторения' },
+                                { v: 2, name: 'Малое',            desc: 'Небольшой потенциал вреда — потери 1 001–5 000 сомони' },
+                                { v: 1, name: 'Несущественное',   desc: 'Без реальных последствий — потери до 1 000 сомони' },
+                              ].map(r => (
+                                <tr key={r.v} className="align-top">
+                                  <td className="pr-2 py-1 font-bold text-blue-700 whitespace-nowrap">{r.v}</td>
+                                  <td className="pr-2 py-1 font-medium text-gray-700 whitespace-nowrap">{r.name}</td>
+                                  <td className="py-1 text-gray-600">{r.desc}</td>
+                                </tr>
+                              ))}
+                            </tbody>
+                          </table>
+                        </div>
+                      )}
                       <select value={String(formData.impact)} onChange={e => handleChange('impact', e.target.value)} className={inputCls}>
                         <option value="">Выберите</option>
                         {IMPACT_SCORES.map(i => <option key={i.value} value={i.value}>{i.value} — {i.label}</option>)}
-                      </select></div>
-                    <div><label className={labelCls}>Контроль и регулирование</label>
+                      </select>
+                    </div>
+
+                    {/* Контроль */}
+                    <div>
+                      <div className="flex items-center gap-1 mb-1">
+                        <label className={labelCls + ' mb-0'}>Контроль и регулирование</label>
+                        <button type="button" onClick={() => setShowHelp(showHelp === 'control' ? null : 'control')}
+                          className="w-4 h-4 rounded-full bg-gray-200 text-gray-600 text-[10px] font-bold flex items-center justify-center hover:bg-[#1B8A4C] hover:text-white transition-colors flex-shrink-0" title="Справка">ⓘ</button>
+                      </div>
+                      {showHelp === 'control' && (
+                        <div className="mb-2 rounded-lg border border-blue-100 bg-blue-50 p-3 text-xs">
+                          <p className="font-semibold text-blue-800 mb-2">Критерии оценки контроля</p>
+                          <table className="w-full border-collapse">
+                            <tbody className="divide-y divide-blue-100">
+                              {[
+                                { v: 1, name: 'Слабый / Отсутствует', desc: 'Механизмы управления отсутствуют' },
+                                { v: 2, name: 'Благоразумный',        desc: 'Механизмы есть, но требуют улучшения' },
+                                { v: 3, name: 'Эффективный',          desc: 'Механизмы есть и работают эффективно' },
+                              ].map(r => (
+                                <tr key={r.v} className="align-top">
+                                  <td className="pr-2 py-1 font-bold text-blue-700 whitespace-nowrap">{r.v}</td>
+                                  <td className="pr-2 py-1 font-medium text-gray-700 whitespace-nowrap">{r.name}</td>
+                                  <td className="py-1 text-gray-600">{r.desc}</td>
+                                </tr>
+                              ))}
+                            </tbody>
+                          </table>
+                        </div>
+                      )}
                       <select value={String(formData.control_quality)} onChange={e => handleChange('control_quality', e.target.value)} className={inputCls}>
                         <option value="">Выберите</option>
                         {CONTROL_SCORES.map(c => <option key={c.value} value={c.value}>{c.value} — {c.label}</option>)}
-                      </select></div>
+                      </select>
+                    </div>
+
                   </div>
+
+                  {/* Результат */}
                   {Boolean(formData.risk_level) && (
                     <div className={`p-4 rounded-xl border-2 ${formData.risk_level==='Экстремальные'?'bg-red-50 border-red-200':formData.risk_level==='Высокий'?'bg-orange-50 border-orange-200':formData.risk_level==='Средний'?'bg-yellow-50 border-yellow-200':'bg-green-50 border-green-200'}`}>
                       <p className="text-xs text-gray-500 mb-1">Степень риска (автоматически)</p>
@@ -1038,6 +1130,29 @@ export default function RegistryPage() {
                       </p>
                     </div>
                   )}
+
+                  {/* Постоянная легенда порогов */}
+                  <div className="rounded-xl border border-gray-100 bg-gray-50 p-4">
+                    <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">Шкала уровней риска</p>
+                    <p className="text-[11px] text-gray-400 mb-3 font-mono">Балл = (Вероятность × Влияние) ÷ Контроль</p>
+                    <div className="grid grid-cols-2 lg:grid-cols-4 gap-2">
+                      {[
+                        { label: '≤ 3',  level: 'Низкий',       color: 'bg-green-100 border-green-200 text-green-800',   desc: 'Решается на уровне СУР / аудита / комплаенс' },
+                        { label: '≤ 6',  level: 'Средний',      color: 'bg-yellow-100 border-yellow-200 text-yellow-800', desc: 'Руководство должно быть осведомлено' },
+                        { label: '≤ 12', level: 'Высокий',      color: 'bg-orange-100 border-orange-200 text-orange-800', desc: 'Незамедлительные действия по снижению' },
+                        { label: '> 12', level: 'Экстремальный', color: 'bg-red-100 border-red-200 text-red-800',          desc: 'Высший приоритет, немедленные меры' },
+                      ].map(z => (
+                        <div key={z.level} className={`rounded-lg border p-2.5 ${z.color}`}>
+                          <div className="flex items-baseline gap-1.5 mb-1">
+                            <span className="text-base font-bold font-mono">{z.label}</span>
+                            <span className="text-xs font-semibold">{z.level}</span>
+                          </div>
+                          <p className="text-[10px] opacity-80 leading-tight">{z.desc}</p>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+
                 </div>
               )}
             </div>
