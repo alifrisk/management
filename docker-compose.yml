@@ -1,0 +1,12 @@
+services:
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: alif-risk-platform:latest
+    container_name: alif-risk-platform
+    restart: unless-stopped
+    ports:
+      - "3000:3000"
+    env_file:
+      - .env.production.local
